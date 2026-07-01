@@ -17,6 +17,7 @@ import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
 import { listSessions } from "./procedures/list-sessions";
 import { previewCommand } from "./procedures/preview-command";
+import { reconcileConnections } from "./procedures/reconcile-connections";
 import { reconcileSessions } from "./procedures/reconcile-sessions";
 import { requestPairingCode } from "./procedures/request-pairing-code";
 import { sendMessage } from "./procedures/send-message";
@@ -41,6 +42,7 @@ export const whatsappRouter = {
 	updateSettings,
 	adminListSessions,
 	reconcileSessions,
+	reconcileConnections,
 	// Inbox / conversations
 	listConversations: listConversationsProcedure,
 	listChats,

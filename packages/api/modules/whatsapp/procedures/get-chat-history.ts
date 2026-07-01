@@ -1,4 +1,5 @@
 import { getConversation, getDefaultSession, getWhatsAppSession } from "@repo/database";
+import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
@@ -92,7 +93,16 @@ export const getChatHistory = protectedProcedure
 				input.limit ?? 40,
 				true,
 			);
-		} catch {
+		} catch (error) {
+			// A disconnected/unknown OpenWA session lands here — the empty thread is
+			// then explained by the inbox's ConnectionBanner (driven by live status),
+			// but log it so the cause isn't invisible on the server.
+			logger.warn("WhatsApp history fetch failed", {
+				ctx: "whatsapp.history",
+				sessionId: sender.id,
+				status: sender.status,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			return [] as HistoryMessage[];
 		}
 
