@@ -148,6 +148,7 @@ model Organization {
   goHighLevelConnection GoHighLevelConnection?
   whatsAppSessions      WhatsAppSession[]
   whatsAppMessages      WhatsAppMessage[]
+  whatsAppSettings      WhatsAppSettings?
 
   @@unique([slug])
   @@map("organization")
@@ -217,6 +218,18 @@ model WhatsAppMessage {
 
   @@index([sessionId, timestamp])
   @@map("whatsapp_message")
+}
+
+model WhatsAppSettings {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Global spintax variables, e.g. { "SPINTAX_1": ["Hi", "Hello"], ... }.
+  globalSpintax  Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("whatsapp_settings")
 }
 
 model Member {

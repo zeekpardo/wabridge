@@ -70,6 +70,12 @@ export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationI
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
 
+// File: WhatsAppSettingsScalarFieldEnum.schema.ts
+
+export const WhatsAppSettingsScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'globalSpintax', 'createdAt', 'updatedAt'])
+
+export type WhatsAppSettingsScalarFieldEnum = z.infer<typeof WhatsAppSettingsScalarFieldEnumSchema>;
+
 // File: MemberScalarFieldEnum.schema.ts
 
 export const MemberScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'userId', 'role', 'createdAt'])
@@ -105,6 +111,12 @@ export type UserNotificationPreferenceScalarFieldEnum = z.infer<typeof UserNotif
 export const SortOrderSchema = z.enum(['asc', 'desc'])
 
 export type SortOrder = z.infer<typeof SortOrderSchema>;
+
+// File: NullableJsonNullValueInput.schema.ts
+
+export const NullableJsonNullValueInputSchema = z.enum(['DbNull', 'JsonNull'])
+
+export type NullableJsonNullValueInput = z.infer<typeof NullableJsonNullValueInputSchema>;
 
 // File: JsonNullValueInput.schema.ts
 
@@ -338,6 +350,19 @@ export const WhatsAppMessageSchema = z.object({
 });
 
 export type WhatsAppMessageType = z.infer<typeof WhatsAppMessageSchema>;
+
+
+// File: WhatsAppSettings.schema.ts
+
+export const WhatsAppSettingsSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  globalSpintax: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type WhatsAppSettingsType = z.infer<typeof WhatsAppSettingsSchema>;
 
 
 // File: Member.schema.ts

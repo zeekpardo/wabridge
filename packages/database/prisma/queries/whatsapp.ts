@@ -82,6 +82,23 @@ export async function deleteWhatsAppSession(organizationId: string, id: string) 
 	return result.count > 0;
 }
 
+// ─── WhatsApp Settings (per org) ──────────────────────────────────────────────
+
+export async function getWhatsAppSettings(organizationId: string) {
+	return db.whatsAppSettings.findUnique({ where: { organizationId } });
+}
+
+export async function upsertWhatsAppSettings(
+	organizationId: string,
+	data: { globalSpintax?: unknown },
+) {
+	return db.whatsAppSettings.upsert({
+		where: { organizationId },
+		create: { organizationId, globalSpintax: data.globalSpintax ?? undefined },
+		update: { globalSpintax: data.globalSpintax ?? undefined },
+	});
+}
+
 /**
  * Cross-tenant listing for operator/admin surfaces and the reconciler. NOT
  * org-scoped — callers must be admin/system. Includes the owning organization.

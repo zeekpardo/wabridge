@@ -33,6 +33,18 @@ export interface SendTextInput {
 	text: string;
 }
 
+export type OpenWaMediaKind = "image" | "video" | "audio" | "document";
+
+export interface SendMediaInput {
+	chatId: string;
+	/** Media source URL (or provide base64 + mimetype). */
+	url?: string;
+	base64?: string;
+	mimetype?: string;
+	filename?: string;
+	caption?: string;
+}
+
 export interface OpenWaClient {
 	createSession(input: CreateSessionInput): Promise<OpenWaSession>;
 	listSessions(): Promise<OpenWaSession[]>;
@@ -43,6 +55,11 @@ export interface OpenWaClient {
 	getQr(id: string): Promise<OpenWaQrResponse>;
 	requestPairingCode(id: string, phoneNumber: string): Promise<OpenWaPairingCodeResponse>;
 	sendText(id: string, input: SendTextInput): Promise<OpenWaSendTextResult>;
+	sendMedia(
+		id: string,
+		kind: OpenWaMediaKind,
+		input: SendMediaInput,
+	): Promise<OpenWaSendTextResult>;
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown>;
 }
 
@@ -144,6 +161,25 @@ class OpenWaHttpClient implements OpenWaClient {
 			chatId: input.chatId,
 			text: input.text,
 		});
+	}
+
+	sendMedia(
+		id: string,
+		kind: OpenWaMediaKind,
+		input: SendMediaInput,
+	): Promise<OpenWaSendTextResult> {
+		return this.request<OpenWaSendTextResult>(
+			"POST",
+			`/sessions/${id}/messages/send-${kind}`,
+			{
+				chatId: input.chatId,
+				...(input.url ? { url: input.url } : {}),
+				...(input.base64 ? { base64: input.base64 } : {}),
+				...(input.mimetype ? { mimetype: input.mimetype } : {}),
+				...(input.filename ? { filename: input.filename } : {}),
+				...(input.caption ? { caption: input.caption } : {}),
+			},
+		);
 	}
 
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown> {
