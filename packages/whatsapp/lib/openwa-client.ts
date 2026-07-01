@@ -43,6 +43,19 @@ export interface OpenWaChat {
 	lastMessage?: string;
 }
 
+export interface OpenWaHistoryMessage {
+	id: string;
+	chatId: string;
+	from?: string;
+	to?: string;
+	body?: string;
+	type: string;
+	/** Unix seconds. */
+	timestamp: number;
+	fromMe: boolean;
+	isGroup?: boolean;
+}
+
 export type OpenWaMediaKind = "image" | "video" | "audio" | "document";
 
 export interface SendMediaInput {
@@ -65,6 +78,7 @@ export interface OpenWaClient {
 	getQr(id: string): Promise<OpenWaQrResponse>;
 	requestPairingCode(id: string, phoneNumber: string): Promise<OpenWaPairingCodeResponse>;
 	getChats(id: string): Promise<OpenWaChat[]>;
+	getChatHistory(id: string, chatId: string, limit?: number): Promise<OpenWaHistoryMessage[]>;
 	sendText(id: string, input: SendTextInput): Promise<OpenWaSendTextResult>;
 	sendMedia(
 		id: string,
@@ -169,6 +183,13 @@ class OpenWaHttpClient implements OpenWaClient {
 
 	getChats(id: string): Promise<OpenWaChat[]> {
 		return this.request<OpenWaChat[]>("GET", `/sessions/${id}/chats`);
+	}
+
+	getChatHistory(id: string, chatId: string, limit = 50): Promise<OpenWaHistoryMessage[]> {
+		return this.request<OpenWaHistoryMessage[]>(
+			"GET",
+			`/sessions/${id}/messages/${encodeURIComponent(chatId)}/history?limit=${limit}`,
+		);
 	}
 
 	sendText(id: string, input: SendTextInput): Promise<OpenWaSendTextResult> {

@@ -13,7 +13,7 @@ import {
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, MessageSquareIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Composer } from "./Composer";
 import { ConversationList } from "./ConversationList";
 import { MessageThread } from "./MessageThread";
@@ -40,6 +40,33 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 		refetchInterval: selectedChatId ? 4000 : false,
 	});
 
+	// Real WhatsApp history for the chat (live from OpenWA). Fetched once per open
+	// — not polled — so past conversations show even for never-messaged contacts.
+	const historyQuery = useQuery({
+		...orpc.whatsapp.getChatHistory.queryOptions({
+			input: { chatId: selectedChatId ?? "", limit: 50 },
+		}),
+		enabled: !!selectedChatId,
+		staleTime: 60_000,
+	});
+
+	// Merge OpenWA history with our tracked/live messages, deduped by WhatsApp id.
+	const threadMessages = useMemo(() => {
+		const byKey = new Map<
+			string,
+			{ id: string; direction: string; body: string | null; type: string; timestamp: Date | string }
+		>();
+		for (const m of historyQuery.data ?? []) {
+			byKey.set(m.waMessageId ?? m.id, m);
+		}
+		for (const m of threadQuery.data?.messages ?? []) {
+			byKey.set(m.waMessageId ?? m.id, m);
+		}
+		return [...byKey.values()].sort(
+			(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+		);
+	}, [historyQuery.data, threadQuery.data]);
+
 	function invalidateInbox() {
 		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listChats.key() });
 		if (selectedChatId) {
@@ -57,9 +84,14 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	const numbers = numbersQuery.data ?? [];
 	const conversation = threadQuery.data?.conversation;
 
-	const activeNumberId = conversation?.activeSessionId ?? numbers[0]?.id ?? "";
-	const contactName = conversation?.contactName
-		|| (selectedChatId ? prettyPhone(selectedChatId) : "");
+	const selectedChat = conversations.find((chat) => chat.chatId === selectedChatId);
+	const activeNumberId =
+		conversation?.activeSessionId ?? selectedChat?.activeSession?.id ?? numbers[0]?.id ?? "";
+	const contactName =
+		selectedChat?.contactName ||
+		conversation?.contactName ||
+		selectedChat?.phone ||
+		(selectedChatId ? prettyPhone(selectedChatId) : "");
 
 	return (
 		<Card
@@ -110,9 +142,9 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 								</Button>
 								<div className="min-w-0">
 									<p className="truncate font-medium text-sm">{contactName}</p>
-									<p className="truncate text-foreground/50 text-xs">
-										{prettyPhone(selectedChatId)}
-									</p>
+									{selectedChat?.phone && selectedChat.phone !== contactName ? (
+										<p className="truncate text-foreground/50 text-xs">{selectedChat.phone}</p>
+									) : null}
 								</div>
 							</div>
 							<div className="flex items-center gap-2">
@@ -139,8 +171,8 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 						</div>
 
 						<MessageThread
-							messages={threadQuery.data?.messages ?? []}
-							isLoading={threadQuery.isLoading}
+							messages={threadMessages}
+							isLoading={threadQuery.isLoading || historyQuery.isLoading}
 						/>
 
 						<Composer

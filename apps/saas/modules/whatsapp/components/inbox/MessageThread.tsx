@@ -2,11 +2,16 @@
 
 import { cn } from "@repo/ui";
 import { Spinner } from "@repo/ui/components/spinner";
-import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
 import { useEffect, useRef } from "react";
 import { messageTime } from "./helpers";
 
-type ThreadMessage = RouterOutputs["whatsapp"]["getThread"]["messages"][number];
+interface ThreadMessage {
+	id: string;
+	direction: string;
+	body: string | null;
+	type: string;
+	timestamp: Date | string;
+}
 
 interface MessageThreadProps {
 	messages: ThreadMessage[];
