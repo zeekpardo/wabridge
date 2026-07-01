@@ -1,48 +1,65 @@
-# Docker Compose configuration for local development
-# Provides PostgreSQL database and MinIO S3-compatible storage
+# Local dev infra for wabridge (WhatsApp <-> GoHighLevel bridge)
+# Namespaced + ported to avoid clashing with other local supastarter stacks.
+#   Postgres : localhost:5442
+#   Redis    : localhost:6389   (BullMQ worker queues)
+#   MinIO    : localhost:9010 (S3 API) / 9011 (console)
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: supastarter-postgres
+    container_name: wabridge-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: supastarter
+      POSTGRES_DB: wabridge
     ports:
-      - "5432:5432"
+      - "5442:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - wabridge_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: wabridge-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6389:6379"
+    volumes:
+      - wabridge_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:latest
-    container_name: supastarter-minio
+    container_name: wabridge-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # MinIO Console
+      - "9010:9000" # S3 API
+      - "9011:9001" # Console
     volumes:
-      - minio_data:/data
+      - wabridge_minio_data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Creates the default bucket on startup
   minio-setup:
     image: minio/mc:latest
-    container_name: supastarter-minio-setup
+    container_name: wabridge-minio-setup
     depends_on:
       minio:
         condition: service_healthy
@@ -56,5 +73,6 @@ services:
       "
 
 volumes:
-  postgres_data:
-  minio_data:
+  wabridge_postgres_data:
+  wabridge_redis_data:
+  wabridge_minio_data:
