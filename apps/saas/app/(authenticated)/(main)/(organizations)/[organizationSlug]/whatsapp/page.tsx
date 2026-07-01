@@ -1,6 +1,6 @@
 import { getActiveOrganization } from "@auth/lib/server";
 import { PageHeader } from "@shared/components/PageHeader";
-import { WhatsAppNumbers } from "@whatsapp/components/WhatsAppNumbers";
+import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 import { notFound } from "next/navigation";
 
 export async function generateMetadata() {
@@ -27,7 +27,7 @@ export default async function WhatsAppPage({
 				title="WhatsApp"
 				subtitle="Connect WhatsApp numbers and send messages for this organization."
 			/>
-			<WhatsAppNumbers />
+			<WhatsAppTabs />
 		</>
 	);
 }
