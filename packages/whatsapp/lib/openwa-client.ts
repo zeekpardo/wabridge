@@ -54,6 +54,8 @@ export interface OpenWaHistoryMessage {
 	timestamp: number;
 	fromMe: boolean;
 	isGroup?: boolean;
+	/** Present when the history was fetched with includeMedia. */
+	media?: { mimetype?: string; data?: string } | null;
 }
 
 export type OpenWaMediaKind = "image" | "video" | "audio" | "document";
@@ -78,7 +80,12 @@ export interface OpenWaClient {
 	getQr(id: string): Promise<OpenWaQrResponse>;
 	requestPairingCode(id: string, phoneNumber: string): Promise<OpenWaPairingCodeResponse>;
 	getChats(id: string): Promise<OpenWaChat[]>;
-	getChatHistory(id: string, chatId: string, limit?: number): Promise<OpenWaHistoryMessage[]>;
+	getChatHistory(
+		id: string,
+		chatId: string,
+		limit?: number,
+		includeMedia?: boolean,
+	): Promise<OpenWaHistoryMessage[]>;
 	sendText(id: string, input: SendTextInput): Promise<OpenWaSendTextResult>;
 	sendMedia(
 		id: string,
@@ -185,10 +192,16 @@ class OpenWaHttpClient implements OpenWaClient {
 		return this.request<OpenWaChat[]>("GET", `/sessions/${id}/chats`);
 	}
 
-	getChatHistory(id: string, chatId: string, limit = 50): Promise<OpenWaHistoryMessage[]> {
+	getChatHistory(
+		id: string,
+		chatId: string,
+		limit = 50,
+		includeMedia = false,
+	): Promise<OpenWaHistoryMessage[]> {
+		const query = `limit=${limit}${includeMedia ? "&includeMedia=true" : ""}`;
 		return this.request<OpenWaHistoryMessage[]>(
 			"GET",
-			`/sessions/${id}/messages/${encodeURIComponent(chatId)}/history?limit=${limit}`,
+			`/sessions/${id}/messages/${encodeURIComponent(chatId)}/history?${query}`,
 		);
 	}
 

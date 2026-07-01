@@ -2,6 +2,7 @@
 
 import { cn } from "@repo/ui";
 import { Spinner } from "@repo/ui/components/spinner";
+import { FileIcon, PlayIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { messageTime } from "./helpers";
 
@@ -11,6 +12,7 @@ interface ThreadMessage {
 	body: string | null;
 	type: string;
 	timestamp: Date | string;
+	media?: { kind: string; dataUrl: string | null } | null;
 }
 
 interface MessageThreadProps {
@@ -22,7 +24,6 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
 	const bottomRef = useRef<HTMLDivElement>(null);
 	const lastMessageId = messages.at(-1)?.id;
 
-	// Auto-scroll to the newest message whenever the tail changes.
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ block: "end" });
 	}, [lastMessageId]);
@@ -55,21 +56,50 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
 
 function MessageBubble({ message }: { message: ThreadMessage }) {
 	const isOutbound = message.direction === "outbound";
-	const body = message.body ?? `[${message.type}]`;
+	const media = message.media;
+	const hasImage = Boolean(media?.dataUrl);
+	const emptyText = !media && !message.body;
 
 	return (
-		<div
-			className={cn("group flex flex-col", isOutbound ? "items-end" : "items-start")}
-		>
+		<div className={cn("group flex flex-col", isOutbound ? "items-end" : "items-start")}>
 			<div
 				className={cn(
-					"max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[70%]",
+					"max-w-[80%] overflow-hidden break-words rounded-2xl text-sm shadow-sm sm:max-w-[70%]",
 					isOutbound
 						? "rounded-br-sm bg-primary text-primary-foreground"
 						: "rounded-bl-sm border bg-card text-foreground",
+					hasImage ? "p-1" : "px-3.5 py-2",
 				)}
 			>
-				{body}
+				{hasImage ? (
+					<div className="relative">
+						{/* biome-ignore lint/a11y/useAltText: WhatsApp media thumbnail */}
+						{/* oxlint-disable-next-line jsx-a11y/alt-text */}
+						<img
+							src={media?.dataUrl ?? ""}
+							alt=""
+							className="max-h-72 w-full rounded-xl object-cover"
+						/>
+						{media?.kind === "video" && (
+							<span className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 flex size-11 items-center justify-center rounded-full bg-black/55 text-white">
+								<PlayIcon className="size-5 fill-white" />
+							</span>
+						)}
+					</div>
+				) : media ? (
+					<span className="flex items-center gap-1.5 italic opacity-80">
+						<FileIcon className="size-4" />
+						{media.kind}
+					</span>
+				) : null}
+
+				{message.body ? (
+					<div className={cn("whitespace-pre-wrap", hasImage && "px-2.5 py-1.5")}>
+						{message.body}
+					</div>
+				) : null}
+
+				{emptyText ? <span className="italic opacity-60">[{message.type}]</span> : null}
 			</div>
 			<span className="mt-0.5 px-1 text-[10px] text-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
 				{messageTime(message.timestamp)}

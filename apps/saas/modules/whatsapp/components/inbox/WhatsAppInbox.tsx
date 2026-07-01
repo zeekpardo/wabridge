@@ -51,16 +51,40 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	});
 
 	// Merge OpenWA history with our tracked/live messages, deduped by WhatsApp id.
+	// Our DB rows go first; the OpenWA history (which carries media thumbnails) wins
+	// for messages present in both. Brand-new sends live only in the DB until the
+	// next history refresh.
 	const threadMessages = useMemo(() => {
 		const byKey = new Map<
 			string,
-			{ id: string; direction: string; body: string | null; type: string; timestamp: Date | string }
+			{
+				id: string;
+				direction: string;
+				body: string | null;
+				type: string;
+				timestamp: Date | string;
+				media?: { kind: string; dataUrl: string | null } | null;
+			}
 		>();
-		for (const m of historyQuery.data ?? []) {
-			byKey.set(m.waMessageId ?? m.id, m);
-		}
 		for (const m of threadQuery.data?.messages ?? []) {
-			byKey.set(m.waMessageId ?? m.id, m);
+			byKey.set(m.waMessageId ?? m.id, {
+				id: m.id,
+				direction: m.direction,
+				body: m.body,
+				type: m.type,
+				timestamp: m.timestamp,
+				media: null,
+			});
+		}
+		for (const m of historyQuery.data ?? []) {
+			byKey.set(m.waMessageId ?? m.id, {
+				id: m.id,
+				direction: m.direction,
+				body: m.body,
+				type: m.type,
+				timestamp: m.timestamp,
+				media: m.media,
+			});
 		}
 		return [...byKey.values()].sort(
 			(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
@@ -71,6 +95,7 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listChats.key() });
 		if (selectedChatId) {
 			void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getThread.key() });
+			void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getChatHistory.key() });
 		}
 	}
 
