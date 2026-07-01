@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import {
@@ -14,7 +13,7 @@ import { Textarea } from "@repo/ui/components/textarea";
 import { toastError } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation } from "@tanstack/react-query";
-import { SendIcon } from "lucide-react";
+import { ArrowUpIcon, ClockIcon, ShuffleIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type MessageType, guessMimetype } from "./helpers";
 
@@ -58,15 +57,16 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 	);
 
 	const isMedia = type !== "text";
-	const attachments = isMedia && mediaUrl.trim()
-		? [
-				{
-					url: mediaUrl.trim(),
-					mimetype: guessMimetype(mediaUrl.trim(), type),
-					filename: filename.trim() || undefined,
-				},
-			]
-		: undefined;
+	const attachments =
+		isMedia && mediaUrl.trim()
+			? [
+					{
+						url: mediaUrl.trim(),
+						mimetype: guessMimetype(mediaUrl.trim(), type),
+						filename: filename.trim() || undefined,
+					},
+				]
+			: undefined;
 
 	const canSend = text.trim().length > 0 || (attachments?.length ?? 0) > 0;
 
@@ -102,39 +102,13 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 		if (!canSend) {
 			return;
 		}
-		send.mutate({
-			chatId,
-			text,
-			attachments,
-			fromSessionId: fromSessionId ?? undefined,
-		});
+		send.mutate({ chatId, text, attachments, fromSessionId: fromSessionId ?? undefined });
 	}
 
-	return (
-		<div className="flex flex-col gap-2 border-t p-3">
-			<div className="flex items-center gap-2">
-				<Select value={type} onValueChange={(value) => setType(value as MessageType)}>
-					<SelectTrigger className="w-32">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						{TYPE_OPTIONS.map((option) => (
-							<SelectItem key={option.value} value={option.value}>
-								{option.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-				<div className="flex gap-1.5">
-					<Button variant="outline" size="sm" onClick={insertSpintax}>
-						+ Spintax
-					</Button>
-					<Button variant="outline" size="sm" onClick={insertDelay}>
-						+ Delay
-					</Button>
-				</div>
-			</div>
+	const showPreview = preview.data && text.trim().length > 0;
 
+	return (
+		<div className="flex flex-col gap-2 border-t bg-card/40 p-3">
 			{isMedia && (
 				<div className="flex flex-col gap-2 sm:flex-row">
 					<Input
@@ -150,53 +124,91 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 				</div>
 			)}
 
-			<Textarea
-				ref={textareaRef}
-				rows={3}
-				className="font-mono text-sm"
-				placeholder={
-					isMedia
-						? "Optional caption. Commands are supported."
-						: "Type a message. Commands are supported, e.g. !/SPINTAX_A/Hi/Hey/SPINTAX_A/! ${SPINTAX_A}"
-				}
-				value={text}
-				onChange={(e) => setText(e.target.value)}
-			/>
-
-			{preview.data && text.trim().length > 0 && (
-				<div className="flex flex-col gap-1.5 rounded-lg border bg-muted/40 p-2.5">
-					<p className="font-medium text-foreground/60 text-xs uppercase tracking-wide">
-						Resolves to {preview.data.actions.length} action
-						{preview.data.actions.length === 1 ? "" : "s"}
-						{preview.data.meta.spintaxApplied ? " · spintax applied" : ""}
-					</p>
-					{preview.data.meta.unresolvedSpintax && (
-						<p className="rounded-md bg-amber-500/10 px-2 py-1 text-amber-600 text-xs">
-							⚠️ Undefined spintax removed: {preview.data.meta.unresolvedSpintax.join(", ")}
-						</p>
+			{showPreview && (
+				<div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
+					<span className="shrink-0 font-medium text-foreground/50">Preview</span>
+					<span className="min-w-0 flex-1 truncate">
+						{preview.data?.actions.map((a) => a.text ?? `[${a.kind}]`).join("  ") || "—"}
+					</span>
+					{preview.data?.meta.delayMs ? (
+						<span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600">
+							delay {preview.data.meta.delayMs}ms
+						</span>
+					) : null}
+					{preview.data?.meta.unresolvedSpintax && (
+						<span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600">
+							⚠ removed {preview.data.meta.unresolvedSpintax.join(", ")}
+						</span>
 					)}
-					{preview.data.actions.map((action, i) => (
-						<div key={i} className="flex items-start gap-2 text-sm">
-							<Badge status="info">{action.kind}</Badge>
-							<div className="min-w-0 flex-1">
-								{action.url && (
-									<p className="truncate text-foreground/60 text-xs">{action.url}</p>
-								)}
-								{action.text && <p className="whitespace-pre-wrap">{action.text}</p>}
-								{action.delayMs ? (
-									<p className="text-amber-600 text-xs">delay {action.delayMs} ms</p>
-								) : null}
-							</div>
-						</div>
-					))}
 				</div>
 			)}
 
-			<div className="flex justify-end">
-				<Button disabled={!canSend} loading={send.isPending} onClick={runSend}>
-					<SendIcon className="mr-1.5 size-4" />
-					Send
-				</Button>
+			<div className="rounded-2xl border bg-card focus-within:ring-1 focus-within:ring-primary">
+				<Textarea
+					ref={textareaRef}
+					rows={1}
+					className="min-h-11 resize-none border-0 bg-transparent px-3.5 py-3 text-sm shadow-none focus-visible:ring-0"
+					placeholder={
+						isMedia
+							? "Optional caption. Commands are supported."
+							: "Type a message…  (Enter to send, Shift+Enter for newline)"
+					}
+					value={text}
+					onChange={(e) => setText(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							runSend();
+						}
+					}}
+				/>
+				<div className="flex items-center justify-between gap-2 px-2 pb-2">
+					<div className="flex items-center gap-0.5">
+						<Select value={type} onValueChange={(value) => setType(value as MessageType)}>
+							<SelectTrigger className="h-8 w-[6.5rem] border-0 text-xs shadow-none">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{TYPE_OPTIONS.map((option) => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="h-8 gap-1 px-2 text-foreground/60 text-xs"
+							onClick={insertSpintax}
+						>
+							<ShuffleIcon className="size-3.5" />
+							Spintax
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="h-8 gap-1 px-2 text-foreground/60 text-xs"
+							onClick={insertDelay}
+						>
+							<ClockIcon className="size-3.5" />
+							Delay
+						</Button>
+					</div>
+					<Button
+						type="button"
+						size="icon"
+						className="size-8 rounded-full"
+						disabled={!canSend}
+						loading={send.isPending}
+						onClick={runSend}
+						aria-label="Send"
+					>
+						<ArrowUpIcon className="size-4" />
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

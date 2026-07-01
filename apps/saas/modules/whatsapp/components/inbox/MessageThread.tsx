@@ -24,7 +24,7 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
 
 	if (isLoading && messages.length === 0) {
 		return (
-			<div className="flex flex-1 items-center justify-center">
+			<div className="flex flex-1 items-center justify-center bg-muted/20">
 				<Spinner className="size-5" />
 			</div>
 		);
@@ -32,14 +32,14 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
 
 	if (messages.length === 0) {
 		return (
-			<div className="flex flex-1 items-center justify-center px-4 text-center">
+			<div className="flex flex-1 items-center justify-center bg-muted/20 px-4 text-center">
 				<p className="text-foreground/50 text-sm">No messages in this conversation yet.</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
+		<div className="flex flex-1 flex-col gap-1 overflow-y-auto bg-muted/20 p-4">
 			{messages.map((message) => (
 				<MessageBubble key={message.id} message={message} />
 			))}
@@ -53,16 +53,20 @@ function MessageBubble({ message }: { message: ThreadMessage }) {
 	const body = message.body ?? `[${message.type}]`;
 
 	return (
-		<div className={cn("flex flex-col", isOutbound ? "items-end" : "items-start")}>
+		<div
+			className={cn("group flex flex-col", isOutbound ? "items-end" : "items-start")}
+		>
 			<div
 				className={cn(
-					"max-w-[75%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm",
-					isOutbound ? "bg-primary/15 text-foreground" : "bg-muted text-foreground",
+					"max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[70%]",
+					isOutbound
+						? "rounded-br-sm bg-primary text-primary-foreground"
+						: "rounded-bl-sm border bg-card text-foreground",
 				)}
 			>
 				{body}
 			</div>
-			<span className="mt-0.5 text-foreground/40 text-[10px]">
+			<span className="mt-0.5 px-1 text-[10px] text-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
 				{messageTime(message.timestamp)}
 			</span>
 		</div>

@@ -1,10 +1,10 @@
 "use client";
 
-import { Badge } from "@repo/ui/components/badge";
+import { cn } from "@repo/ui";
+import { Avatar, AvatarFallback } from "@repo/ui/components/avatar";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Spinner } from "@repo/ui/components/spinner";
-import { cn } from "@repo/ui";
 import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
 import { InboxIcon, PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
@@ -17,6 +17,20 @@ interface ConversationListProps {
 	isLoading: boolean;
 	selectedChatId: string | null;
 	onSelect: (chatId: string) => void;
+}
+
+function avatarText(name: string): string {
+	const letters = name.replace(/[^a-zA-Z]/g, " ").trim();
+	if (letters) {
+		return letters
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((part) => part[0])
+			.join("")
+			.toUpperCase();
+	}
+	const digits = name.replace(/\D/g, "");
+	return digits.slice(-2) || "#";
 }
 
 export function ConversationList({
@@ -39,18 +53,15 @@ export function ConversationList({
 
 	return (
 		<div className="flex h-full flex-col">
-			<div className="flex items-center justify-between gap-2 border-b p-3">
-				<h3 className="font-medium text-sm">Conversations</h3>
+			<div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+				<h3 className="font-semibold text-sm">Chats</h3>
 				<Button
-					variant="secondary"
+					variant="ghost"
 					size="sm"
+					className="h-8 gap-1.5 px-2 text-xs"
 					onClick={() => setShowNewChat((value) => !value)}
 				>
-					{showNewChat ? (
-						<XIcon className="mr-1.5 size-3.5" />
-					) : (
-						<PlusIcon className="mr-1.5 size-3.5" />
-					)}
+					{showNewChat ? <XIcon className="size-3.5" /> : <PlusIcon className="size-3.5" />}
 					New chat
 				</Button>
 			</div>
@@ -76,7 +87,7 @@ export function ConversationList({
 				</div>
 			)}
 
-			<div className="flex-1 overflow-y-auto">
+			<div className="flex-1 overflow-y-auto p-1.5">
 				{isLoading ? (
 					<div className="flex justify-center py-12">
 						<Spinner className="size-5" />
@@ -115,37 +126,52 @@ interface ConversationRowProps {
 function ConversationRow({ conversation, isSelected, onSelect }: ConversationRowProps) {
 	const name = conversation.contactName || prettyPhone(conversation.chatId);
 	const numberLabel = conversation.activeSession?.label || conversation.activeSession?.phone;
+	const hasUnread = conversation.unreadCount > 0;
 
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
 			className={cn(
-				"flex w-full flex-col gap-1 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+				"flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
 				isSelected && "bg-muted",
 			)}
 		>
-			<div className="flex items-center justify-between gap-2">
-				<span className="truncate font-medium text-sm">{name}</span>
-				<span className="shrink-0 text-foreground/50 text-xs">
-					{relativeTime(conversation.lastMessageAt)}
-				</span>
-			</div>
-			<div className="flex items-center justify-between gap-2">
-				<span className="truncate text-foreground/60 text-xs">
-					{conversation.lastMessagePreview || "No messages yet"}
-				</span>
-				{conversation.unreadCount > 0 && (
-					<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-						{conversation.unreadCount}
+			<Avatar className="size-9 shrink-0">
+				<AvatarFallback className={cn("text-xs", isSelected && "bg-primary/15 text-primary")}>
+					{avatarText(name)}
+				</AvatarFallback>
+			</Avatar>
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center justify-between gap-2">
+					<span className={cn("truncate text-sm", hasUnread ? "font-semibold" : "font-medium")}>
+						{name}
+					</span>
+					<span className="shrink-0 text-[11px] text-foreground/40">
+						{relativeTime(conversation.lastMessageAt)}
+					</span>
+				</div>
+				<div className="flex items-center justify-between gap-2">
+					<span
+						className={cn(
+							"truncate text-xs",
+							hasUnread ? "text-foreground/80" : "text-foreground/55",
+						)}
+					>
+						{conversation.lastMessagePreview || "No messages yet"}
+					</span>
+					{hasUnread && (
+						<span className="flex size-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
+							{conversation.unreadCount}
+						</span>
+					)}
+				</div>
+				{numberLabel && (
+					<span className="mt-0.5 block truncate text-[10px] text-foreground/40">
+						via {numberLabel}
 					</span>
 				)}
 			</div>
-			{numberLabel && (
-				<div>
-					<Badge status="info">{numberLabel}</Badge>
-				</div>
-			)}
 		</button>
 	);
 }
