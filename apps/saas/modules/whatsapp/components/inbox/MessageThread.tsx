@@ -4,7 +4,10 @@ import { cn } from "@repo/ui";
 import { Spinner } from "@repo/ui/components/spinner";
 import { FileIcon, PlayIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { LinkPreview } from "./LinkPreview";
 import { messageTime } from "./helpers";
+
+const URL_RE = /https?:\/\/[^\s]+/i;
 
 interface ThreadMessage {
 	id: string;
@@ -59,6 +62,7 @@ function MessageBubble({ message }: { message: ThreadMessage }) {
 	const media = message.media;
 	const hasImage = Boolean(media?.dataUrl);
 	const emptyText = !media && !message.body;
+	const linkUrl = !media && message.body ? (message.body.match(URL_RE)?.[0] ?? null) : null;
 
 	return (
 		<div className={cn("group flex flex-col", isOutbound ? "items-end" : "items-start")}>
@@ -96,6 +100,12 @@ function MessageBubble({ message }: { message: ThreadMessage }) {
 				{message.body ? (
 					<div className={cn("whitespace-pre-wrap", hasImage && "px-2.5 py-1.5")}>
 						{message.body}
+					</div>
+				) : null}
+
+				{linkUrl ? (
+					<div className={cn(hasImage && "px-2.5 pb-1.5")}>
+						<LinkPreview url={linkUrl} />
 					</div>
 				) : null}
 

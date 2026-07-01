@@ -6,6 +6,7 @@ import { getSession } from "./procedures/get-session";
 import { getChatHistory } from "./procedures/get-chat-history";
 import { getSettings } from "./procedures/get-settings";
 import { getThread } from "./procedures/get-thread";
+import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
 import { listConversationsProcedure } from "./procedures/list-conversations";
 import { listMessages } from "./procedures/list-messages";
@@ -39,6 +40,7 @@ export const whatsappRouter = {
 	listChats,
 	getThread,
 	getChatHistory,
+	linkPreview,
 	setConversationNumber,
 	listNumbers,
 };
