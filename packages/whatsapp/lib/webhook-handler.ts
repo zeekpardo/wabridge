@@ -1,6 +1,7 @@
 import {
 	createWhatsAppMessage,
 	getWhatsAppSessionByOpenwaSessionId,
+	updateWhatsAppMessageStatus,
 	updateWhatsAppSession,
 } from "@repo/database";
 import { logger } from "@repo/logs";
@@ -64,20 +65,35 @@ async function processEvent(
 	const data = payload.data as Record<string, unknown>;
 
 	switch (payload.event) {
-		case OPENWA_WEBHOOK_EVENTS.messageReceived: {
+		case OPENWA_WEBHOOK_EVENTS.messageReceived:
+		case OPENWA_WEBHOOK_EVENTS.messageSent: {
+			// message.received => inbound; message.sent => outbound (fromMe, whether
+			// sent through our API or directly from the linked phone). Dedup on
+			// waMessageId (in createWhatsAppMessage) collapses the API-send row and
+			// its message.sent webhook echo into one.
+			const outbound = payload.event === OPENWA_WEBHOOK_EVENTS.messageSent;
 			await createWhatsAppMessage({
 				organizationId,
 				sessionId,
-				direction: "inbound",
+				direction: outbound ? "outbound" : "inbound",
 				chatId: String(data.chatId ?? ""),
-				fromMe: Boolean(data.fromMe ?? false),
+				fromMe: outbound ? true : Boolean(data.fromMe ?? false),
 				type: String(data.type ?? "text"),
 				body: typeof data.body === "string" ? data.body : null,
-				status: typeof data.status === "string" ? data.status : null,
+				status: typeof data.status === "string" ? data.status : outbound ? "sent" : null,
 				waMessageId: typeof data.id === "string" ? data.id : null,
 				idempotencyKey: payload.idempotencyKey,
 				timestamp: parseTimestamp(payload.timestamp),
 			});
+			break;
+		}
+		case OPENWA_WEBHOOK_EVENTS.messageAck: {
+			// Delivery/read receipt for a message we already have — update its status.
+			const waMessageId = typeof data.id === "string" ? data.id : null;
+			const status = typeof data.status === "string" ? data.status : null;
+			if (waMessageId && status) {
+				await updateWhatsAppMessageStatus(sessionId, waMessageId, status);
+			}
 			break;
 		}
 		case OPENWA_WEBHOOK_EVENTS.sessionStatus:
@@ -99,7 +115,7 @@ async function processEvent(
 			break;
 		}
 		default:
-			// message.ack and any unhandled event types are acknowledged as no-ops.
+			// Any unhandled event types are acknowledged as no-ops.
 			break;
 	}
 }

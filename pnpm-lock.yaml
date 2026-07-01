@@ -518,6 +518,9 @@ importers:
       '@repo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@repo/whatsapp':
+        specifier: workspace:*
+        version: link:../../packages/whatsapp
       '@tanstack/react-query':
         specifier: ^5.101.2
         version: 5.101.2(react@19.2.7)

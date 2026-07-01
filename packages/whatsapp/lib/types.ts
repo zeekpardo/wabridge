@@ -53,6 +53,7 @@ export interface OpenWaSendTextResult {
 
 export const OPENWA_WEBHOOK_EVENTS = {
 	messageReceived: "message.received",
+	messageSent: "message.sent",
 	messageAck: "message.ack",
 	sessionStatus: "session.status",
 	sessionQr: "session.qr",

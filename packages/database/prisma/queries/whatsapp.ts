@@ -82,6 +82,17 @@ export async function deleteWhatsAppSession(organizationId: string, id: string) 
 	return result.count > 0;
 }
 
+/**
+ * Cross-tenant listing for operator/admin surfaces and the reconciler. NOT
+ * org-scoped — callers must be admin/system. Includes the owning organization.
+ */
+export async function listAllWhatsAppSessions() {
+	return db.whatsAppSession.findMany({
+		orderBy: { createdAt: "desc" },
+		include: { organization: { select: { id: true, slug: true, name: true } } },
+	});
+}
+
 // ─── WhatsApp Message ─────────────────────────────────────────────────────────
 
 export async function createWhatsAppMessage(data: {
@@ -109,6 +120,19 @@ export async function createWhatsAppMessage(data: {
 		}
 	}
 
+	// Also dedup on the WhatsApp message id within a session: an outbound message
+	// stored at API-send time and its later `message.sent` webhook echo share a
+	// waMessageId and must collapse to a single row.
+	if (data.waMessageId) {
+		const existing = await db.whatsAppMessage.findFirst({
+			where: { sessionId: data.sessionId, waMessageId: data.waMessageId },
+		});
+
+		if (existing) {
+			return existing;
+		}
+	}
+
 	return db.whatsAppMessage.create({
 		data: {
 			organizationId: data.organizationId,
@@ -123,6 +147,21 @@ export async function createWhatsAppMessage(data: {
 			status: data.status,
 			idempotencyKey: data.idempotencyKey,
 		},
+	});
+}
+
+/**
+ * Update the delivery status of a stored message by its WhatsApp id (from a
+ * `message.ack` receipt). No-op if the message isn't tracked in this session.
+ */
+export async function updateWhatsAppMessageStatus(
+	sessionId: string,
+	waMessageId: string,
+	status: string,
+) {
+	return db.whatsAppMessage.updateMany({
+		where: { sessionId, waMessageId },
+		data: { status },
 	});
 }
 
