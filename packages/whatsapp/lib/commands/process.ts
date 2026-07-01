@@ -51,7 +51,7 @@ export function processMessage(input: ProcessInput): ProcessedMessage {
 	}
 
 	const expanded = expandSpintax(originalText, input.globals ?? {}, rng);
-	const { text, delayMs } = extractDelay(expanded, rng);
+	const { text, delayMs } = extractDelay(expanded.text, rng);
 
 	const attachments = input.attachments ?? [];
 	const actions: SendAction[] = [];
@@ -78,6 +78,7 @@ export function processMessage(input: ProcessInput): ProcessedMessage {
 			spintaxApplied: text !== originalText,
 			delayMs,
 			controlOnly: actions.length === 0,
+			unresolvedSpintax: expanded.unresolved.length ? expanded.unresolved : undefined,
 		},
 	};
 }

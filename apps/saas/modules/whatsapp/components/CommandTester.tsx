@@ -139,6 +139,11 @@ export function CommandTester({ sessionId }: { sessionId: string }) {
 								{preview.data.actions.length === 1 ? "" : "s"}
 								{preview.data.meta.spintaxApplied ? " · spintax applied" : ""}
 							</p>
+							{preview.data.meta.unresolvedSpintax && (
+								<p className="rounded-md bg-amber-500/10 px-2 py-1 text-amber-600 text-xs">
+									⚠️ Undefined spintax removed: {preview.data.meta.unresolvedSpintax.join(", ")}
+								</p>
+							)}
 							{preview.data.actions.length === 0 ? (
 								<p className="text-foreground/60 text-sm">Nothing to send.</p>
 							) : (

@@ -15,6 +15,12 @@ function pick(options: string[], rng: Rng): string {
 	return options[index] ?? "";
 }
 
+export interface SpintaxResult {
+	text: string;
+	/** SPINTAX_ tokens that had no definition and were stripped. */
+	unresolved: string[];
+}
+
 /**
  * Expand spintax in a message.
  *
@@ -22,14 +28,15 @@ function pick(options: string[], rng: Rng): string {
  *   options [a,b,c]; the declaration is stripped from the output.
  * - Global: variables passed in `globals` (e.g. SPINTAX_1..6 from settings).
  * - Usage `${SPINTAX_X}` is replaced by a random option. Message-level
- *   declarations win over globals for the same name. Unknown variables are
- *   left untouched.
+ *   declarations win over globals for the same name.
+ * - Undefined `${SPINTAX_X}` tokens are STRIPPED (never delivered literally)
+ *   and reported in `unresolved` so callers can warn.
  */
 export function expandSpintax(
 	text: string,
 	globals: GlobalSpintax = {},
 	rng: Rng = Math.random,
-): string {
+): SpintaxResult {
 	const vars: GlobalSpintax = { ...globals };
 
 	const withoutDecls = text.replace(INLINE_DECL, (_match, name: string, body: string) => {
@@ -37,13 +44,20 @@ export function expandSpintax(
 		return "";
 	});
 
-	return withoutDecls.replace(USAGE, (match, name: string) => {
+	const unresolved = new Set<string>();
+	const substituted = withoutDecls.replace(USAGE, (_match, name: string) => {
 		const options = vars[`SPINTAX_${name}`];
 		if (!options || options.length === 0) {
-			return match;
+			unresolved.add(`SPINTAX_${name}`);
+			return "";
 		}
 		return pick(options, rng);
 	});
+
+	// Collapse whitespace left by stripped tokens (spaces/tabs only; keep newlines).
+	const cleaned = substituted.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/gm, "");
+
+	return { text: cleaned, unresolved: [...unresolved] };
 }
 
 /** True if the text contains any spintax declaration or usage token. */

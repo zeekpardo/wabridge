@@ -42,6 +42,8 @@ export interface ProcessedMessage {
 		delayMs?: number;
 		/** A whole-message command that produced no sendable content (e.g. bare #switch). */
 		controlOnly?: boolean;
+		/** SPINTAX_ tokens that were undefined and stripped (surface as a warning). */
+		unresolvedSpintax?: string[];
 	};
 }
 

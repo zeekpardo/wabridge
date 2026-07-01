@@ -11,29 +11,31 @@ const last: () => number = () => 0.999999; // always picks the last option / hig
 describe("expandSpintax", () => {
 	it("expands an inline declaration and strips it", () => {
 		const input = "!/SPINTAX_A/Hello/Hi/Hey/SPINTAX_A/!\n${SPINTAX_A} there";
-		expect(expandSpintax(input, {}, first)).toBe("Hello there");
-		expect(expandSpintax(input, {}, last)).toBe("Hey there");
+		expect(expandSpintax(input, {}, first).text).toBe("Hello there");
+		expect(expandSpintax(input, {}, last).text).toBe("Hey there");
 	});
 
 	it("expands global spintax variables", () => {
 		const globals = { SPINTAX_1: ["Good morning", "Hi"] };
-		expect(expandSpintax("${SPINTAX_1}, team", globals, first)).toBe("Good morning, team");
+		expect(expandSpintax("${SPINTAX_1}, team", globals, first).text).toBe("Good morning, team");
 	});
 
 	it("lets an inline declaration override a global of the same name", () => {
 		const globals = { SPINTAX_A: ["global"] };
 		const input = "!/SPINTAX_A/local/SPINTAX_A/!${SPINTAX_A}";
-		expect(expandSpintax(input, globals, first)).toBe("local");
+		expect(expandSpintax(input, globals, first).text).toBe("local");
 	});
 
-	it("leaves unknown variables untouched", () => {
-		expect(expandSpintax("${SPINTAX_Z} end", {}, first)).toBe("${SPINTAX_Z} end");
+	it("strips undefined variables (never delivered literally) and reports them", () => {
+		const result = expandSpintax("Hi ${SPINTAX_Z} end", {}, first);
+		expect(result.text).toBe("Hi end");
+		expect(result.unresolved).toEqual(["SPINTAX_Z"]);
 	});
 
 	it("handles multiple variables in one message", () => {
 		const input =
 			"!/SPINTAX_A/Hello/Hi/SPINTAX_A/!\n!/SPINTAX_B/team/all/SPINTAX_B/!\n${SPINTAX_A} ${SPINTAX_B}";
-		expect(expandSpintax(input, {}, first)).toBe("Hello team");
+		expect(expandSpintax(input, {}, first).text).toBe("Hello team");
 	});
 });
 
