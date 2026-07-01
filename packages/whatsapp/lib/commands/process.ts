@@ -1,5 +1,6 @@
 import { extractDelay } from "./delay";
 import { expandSpintax } from "./spintax";
+import { parseSwitch } from "./switch";
 import type { ProcessInput, ProcessedMessage, SendAction, SendActionKind } from "./types";
 
 function mediaKind(mimetype?: string): SendActionKind {
@@ -29,6 +30,25 @@ function mediaKind(mimetype?: string): SendActionKind {
 export function processMessage(input: ProcessInput): ProcessedMessage {
 	const rng = input.rng ?? Math.random;
 	const originalText = input.text ?? "";
+
+	// Whole-message switch commands are handled before any text processing.
+	const sw = parseSwitch(originalText);
+	if (sw?.kind === "switch") {
+		// Control-only: changes the active number, sends nothing.
+		return {
+			actions: [],
+			numberOverride: { priority: sw.priority, scope: "session" },
+			meta: { spintaxApplied: false, controlOnly: true },
+		};
+	}
+	if (sw?.kind === "switch_unique") {
+		// Send just the inner message from the chosen number, once.
+		const inner = processMessage({ ...input, text: sw.message ?? "" });
+		return {
+			...inner,
+			numberOverride: { priority: sw.priority, scope: "once" },
+		};
+	}
 
 	const expanded = expandSpintax(originalText, input.globals ?? {}, rng);
 	const { text, delayMs } = extractDelay(expanded, rng);

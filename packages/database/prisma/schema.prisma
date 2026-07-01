@@ -148,6 +148,7 @@ model Organization {
   goHighLevelConnection GoHighLevelConnection?
   whatsAppSessions      WhatsAppSession[]
   whatsAppMessages      WhatsAppMessage[]
+  whatsAppConversations WhatsAppConversation[]
   whatsAppSettings      WhatsAppSettings?
 
   @@unique([slug])
@@ -189,11 +190,14 @@ model WhatsAppSession {
   status          String
   webhookSecret   String
   needsQr         Boolean           @default(true)
+  // Sending priority (1 = highest). Used for default routing and #switch|N.
+  priority        Int               @default(0)
   lastError       String?           @db.Text
   connectedAt     DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   messages        WhatsAppMessage[]
+  activeConversations WhatsAppConversation[] @relation("ConversationActiveSession")
 
   @@index([organizationId])
   @@map("whatsapp_session")
@@ -217,7 +221,30 @@ model WhatsAppMessage {
   createdAt      DateTime        @default(now())
 
   @@index([sessionId, timestamp])
+  @@index([organizationId, chatId, timestamp])
   @@map("whatsapp_message")
+}
+
+model WhatsAppConversation {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // The contact's chat id (e.g. 15551234567@c.us). One thread per contact.
+  chatId             String
+  contactName        String?
+  // Which of the org's numbers currently replies (set by inbound reply-lock or #switch).
+  activeSessionId    String?
+  activeSession      WhatsAppSession? @relation("ConversationActiveSession", fields: [activeSessionId], references: [id], onDelete: SetNull)
+  lastMessageAt      DateTime?
+  lastMessagePreview String?          @db.Text
+  lastDirection      String?
+  unreadCount        Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([organizationId, chatId])
+  @@index([organizationId, lastMessageAt])
+  @@map("whatsapp_conversation")
 }
 
 model WhatsAppSettings {

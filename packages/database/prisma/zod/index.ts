@@ -60,7 +60,7 @@ export type GoHighLevelConnectionScalarFieldEnum = z.infer<typeof GoHighLevelCon
 
 // File: WhatsAppSessionScalarFieldEnum.schema.ts
 
-export const WhatsAppSessionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'openwaSessionId', 'openwaName', 'workerBaseUrl', 'label', 'phone', 'jid', 'status', 'webhookSecret', 'needsQr', 'lastError', 'connectedAt', 'createdAt', 'updatedAt'])
+export const WhatsAppSessionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'openwaSessionId', 'openwaName', 'workerBaseUrl', 'label', 'phone', 'jid', 'status', 'webhookSecret', 'needsQr', 'priority', 'lastError', 'connectedAt', 'createdAt', 'updatedAt'])
 
 export type WhatsAppSessionScalarFieldEnum = z.infer<typeof WhatsAppSessionScalarFieldEnumSchema>;
 
@@ -69,6 +69,12 @@ export type WhatsAppSessionScalarFieldEnum = z.infer<typeof WhatsAppSessionScala
 export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'idempotencyKey', 'timestamp', 'createdAt'])
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
+
+// File: WhatsAppConversationScalarFieldEnum.schema.ts
+
+export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'chatId', 'contactName', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
+
+export type WhatsAppConversationScalarFieldEnum = z.infer<typeof WhatsAppConversationScalarFieldEnumSchema>;
 
 // File: WhatsAppSettingsScalarFieldEnum.schema.ts
 
@@ -322,6 +328,7 @@ export const WhatsAppSessionSchema = z.object({
   status: z.string(),
   webhookSecret: z.string(),
   needsQr: z.boolean().default(true),
+  priority: z.number().int(),
   lastError: z.string().nullish(),
   connectedAt: z.date().nullish(),
   createdAt: z.date(),
@@ -350,6 +357,25 @@ export const WhatsAppMessageSchema = z.object({
 });
 
 export type WhatsAppMessageType = z.infer<typeof WhatsAppMessageSchema>;
+
+
+// File: WhatsAppConversation.schema.ts
+
+export const WhatsAppConversationSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  chatId: z.string(),
+  contactName: z.string().nullish(),
+  activeSessionId: z.string().nullish(),
+  lastMessageAt: z.date().nullish(),
+  lastMessagePreview: z.string().nullish(),
+  lastDirection: z.string().nullish(),
+  unreadCount: z.number().int(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type WhatsAppConversationType = z.infer<typeof WhatsAppConversationSchema>;
 
 
 // File: WhatsAppSettings.schema.ts

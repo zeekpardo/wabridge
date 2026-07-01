@@ -90,4 +90,21 @@ describe("processMessage", () => {
 		expect(result.actions).toHaveLength(0);
 		expect(result.meta.controlOnly).toBe(true);
 	});
+
+	it("parses #switch|N as a control-only number override", () => {
+		const result = processMessage({ text: "#switch|2" });
+		expect(result.actions).toHaveLength(0);
+		expect(result.meta.controlOnly).toBe(true);
+		expect(result.numberOverride).toEqual({ priority: 2, scope: "session" });
+	});
+
+	it("parses #switch_unique|N|msg into a one-off from that number, with spintax", () => {
+		const result = processMessage({
+			text: "#switch_unique|3|!/SPINTAX_A/Hi/Yo/SPINTAX_A/!${SPINTAX_A}",
+			rng: first,
+		});
+		expect(result.numberOverride).toEqual({ priority: 3, scope: "once" });
+		expect(result.actions).toHaveLength(1);
+		expect(result.actions[0]?.text).toBe("Hi");
+	});
 });
