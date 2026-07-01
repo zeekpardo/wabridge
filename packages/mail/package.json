@@ -11,7 +11,7 @@
 		"@repo/i18n": "workspace:*",
 		"@repo/logs": "workspace:*",
 		"@repo/ui": "workspace:*",
-		"nodemailer": "^9.0.1",
+		"nodemailer": "^9.0.3",
 		"react": "catalog:",
 		"react-dom": "catalog:",
 		"react-email": "^6.6.5",
