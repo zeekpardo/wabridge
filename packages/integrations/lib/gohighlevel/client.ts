@@ -210,9 +210,10 @@ export class GoHighLevelClient {
 
 	/**
 	 * Find an existing conversation for a contact, creating one if none exists.
+	 * GHL maintains one conversation per contact (per the marketplace docs), so
+	 * the first match is the thread.
 	 * Search: GET /conversations/search?locationId=&contactId=
 	 * Create: POST /conversations/ with { locationId, contactId }
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async getOrCreateConversation(params: {
 		locationId: string;
@@ -243,21 +244,25 @@ export class GoHighLevelClient {
 	}
 
 	/**
-	 * Record an inbound message (WhatsApp → GHL) against a contact's conversation.
+	 * Record an inbound message (WhatsApp → GHL) in a conversation. Per the
+	 * marketplace Conversation Providers docs, the payload is keyed on
+	 * `conversationId` (not contact/location) — resolve it first via
+	 * {@link getOrCreateConversation}. `conversationProviderId` stays omitted for
+	 * the SMS-replace provider (Option B).
 	 * POST /conversations/messages/inbound
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async postInboundMessage(input: GHLInboundMessageInput): Promise<GHLMessageResponse> {
 		return this.request<GHLMessageResponse>("/conversations/messages/inbound", {
 			method: "POST",
 			body: JSON.stringify({
-				conversationProviderId: input.conversationProviderId,
-				locationId: input.locationId,
-				contactId: input.contactId,
-				message: input.message,
-				attachments: input.attachments,
-				direction: input.direction,
 				type: input.type,
+				conversationId: input.conversationId,
+				message: input.message,
+				...(input.conversationProviderId
+					? { conversationProviderId: input.conversationProviderId }
+					: {}),
+				...(input.attachments?.length ? { attachments: input.attachments } : {}),
+				...(input.date ? { date: input.date } : {}),
 			}),
 		});
 	}
@@ -266,30 +271,31 @@ export class GoHighLevelClient {
 	 * Record an outbound message that this provider sent on GHL's behalf, so the
 	 * conversation timeline shows the sent message. This is distinct from the
 	 * standard "send message" flow (which asks GHL to deliver); here the provider
-	 * delivered the message itself and is only writing the record back.
+	 * delivered the message itself and is only writing the record back. Keyed on
+	 * `conversationId`, same as the inbound record.
 	 * POST /conversations/messages/outbound
-	 * TODO: verify endpoint against GHL marketplace docs — GHL's outbound record
-	 * endpoint naming has varied; confirm the exact path/payload before relying on it.
 	 */
 	async postOutboundMessageRecord(input: GHLOutboundMessageInput): Promise<GHLMessageResponse> {
 		return this.request<GHLMessageResponse>("/conversations/messages/outbound", {
 			method: "POST",
 			body: JSON.stringify({
-				conversationProviderId: input.conversationProviderId,
-				locationId: input.locationId,
-				contactId: input.contactId,
-				message: input.message,
-				attachments: input.attachments,
-				direction: input.direction,
 				type: input.type,
+				conversationId: input.conversationId,
+				message: input.message,
+				...(input.conversationProviderId
+					? { conversationProviderId: input.conversationProviderId }
+					: {}),
+				...(input.attachments?.length ? { attachments: input.attachments } : {}),
+				...(input.date ? { date: input.date } : {}),
 			}),
 		});
 	}
 
 	/**
-	 * Update the delivery status of a message (delivered | read | failed | pending).
+	 * Update the delivery status of a message (delivered | read | failed |
+	 * pending). Only the conversation-provider app's token may do this (per the
+	 * marketplace docs), which is us.
 	 * PUT /conversations/messages/{messageId}/status
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async updateMessageStatus(input: GHLUpdateMessageStatusInput): Promise<void> {
 		await this.request(`/conversations/messages/${input.messageId}/status`, {

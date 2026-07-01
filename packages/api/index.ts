@@ -13,6 +13,7 @@ import {
 	ghlProviderOutboundHandler,
 	ghlSsoDecryptHandler,
 } from "./modules/ghl/handlers";
+import { createOpenWaWebhookHooks } from "./modules/messaging/webhook-hooks";
 import { openApiHandler, rpcHandler } from "./orpc/handler";
 
 export { router } from "./orpc/router";
@@ -36,8 +37,9 @@ export const app = new Hono()
 	.on(["POST", "GET"], "/auth/**", (c) => auth.handler(c.req.raw))
 	// Payments webhook handler
 	.post("/webhooks/payments", (c) => paymentsWebhookHandler(c.req.raw))
-	// OpenWA (WhatsApp) webhook handler
-	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw))
+	// OpenWA (WhatsApp) webhook handler — hooks route inbound messages through
+	// the message hub (GHL mirror) and relay delivery acks to GHL.
+	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw, createOpenWaWebhookHooks()))
 	// GoHighLevel OAuth install + SSO (embedded Custom Page)
 	.get("/ghl/oauth/authorize", (c) => ghlAuthorizeHandler(c.req.raw))
 	.get("/ghl/oauth/callback", (c) => ghlCallbackHandler(c.req.raw))

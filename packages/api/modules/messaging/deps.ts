@@ -1,13 +1,15 @@
 import {
 	createWhatsAppMessage,
+	getConversation,
 	getDefaultSession,
 	getGhlConnection,
 	getMessageByGhlMessageId,
 	getMessageByWaMessageId,
 	getWhatsAppSession,
 	markMessageGhlSynced,
+	setConversationGhlLink,
 } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
+import { createGoHighLevelClient, type GoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 
@@ -17,6 +19,55 @@ import type { CanonicalMessage, FanOutDeps } from "./fan-out";
 function phoneFromChatId(chatId: string): string | null {
 	const digits = chatId.replace(/@.*/, "").replace(/\D/g, "");
 	return digits.length >= 6 ? `+${digits}` : null;
+}
+
+/** GHL message body for media messages that carry no caption. */
+function ghlMessageBody(message: CanonicalMessage): string {
+	return message.body?.trim() ? message.body : `[${message.type}]`;
+}
+
+/**
+ * Resolve the GHL contact + conversation for a thread, caching both ids on the
+ * local conversation row: after the first message per thread, projections cost
+ * zero extra GHL API calls (and rate-limit pressure) beyond the message post.
+ */
+async function resolveGhlThread(
+	message: CanonicalMessage,
+	client: GoHighLevelClient,
+	locationId: string,
+): Promise<{ conversationId: string } | null> {
+	const cached = await getConversation(message.subaccountId, message.chatId);
+	if (cached?.ghlConversationId) {
+		return { conversationId: cached.ghlConversationId };
+	}
+
+	const phone = phoneFromChatId(message.chatId);
+	if (!phone) {
+		return null;
+	}
+
+	const contactId =
+		cached?.ghlContactId ??
+		(
+			await client.upsertContact({
+				phone,
+				locationId,
+				...(cached?.contactName ? { name: cached.contactName } : {}),
+				source: "WABridge",
+			})
+		).id;
+
+	const conversation = await client.getOrCreateConversation({ locationId, contactId });
+
+	await setConversationGhlLink({
+		subaccountId: message.subaccountId,
+		organizationId: message.organizationId,
+		chatId: message.chatId,
+		ghlContactId: contactId,
+		ghlConversationId: conversation.id,
+	});
+
+	return { conversationId: conversation.id };
 }
 
 /** Resolve the WhatsApp session that owns/sends this thread. */
@@ -80,53 +131,62 @@ export function createFanOutDeps(): FanOutDeps {
 			return { waMessageId: result?.id ?? null };
 		},
 
+		// Both GHL projections are best-effort: a GHL outage or bad token must never
+		// fail the inbound webhook or block a WhatsApp send. Failures log and leave
+		// the row ghlSynced=false for a later sweep.
 		async pushGhlInbound(message) {
-			const [client, connection] = await Promise.all([
-				createGoHighLevelClient(message.subaccountId),
-				getGhlConnection(message.subaccountId),
-			]);
-			if (!client || !connection) {
+			try {
+				const [client, connection] = await Promise.all([
+					createGoHighLevelClient(message.subaccountId),
+					getGhlConnection(message.subaccountId),
+				]);
+				if (!client || !connection) {
+					return null;
+				}
+				const thread = await resolveGhlThread(message, client, connection.locationId);
+				if (!thread) {
+					return null;
+				}
+				const res = await client.postInboundMessage({
+					// SMS-replace (Option B): no conversationProviderId.
+					conversationId: thread.conversationId,
+					message: ghlMessageBody(message),
+					attachments: message.attachments,
+					type: "SMS",
+					date: message.timestamp.toISOString(),
+				});
+				return { ghlMessageId: res.messageId ?? res.message?.id ?? null };
+			} catch (error) {
+				logger.error(error, { ctx: "messaging.fanOut.pushGhlInbound", chatId: message.chatId });
 				return null;
 			}
-			const phone = phoneFromChatId(message.chatId);
-			if (!phone) {
-				return null;
-			}
-			const contact = await client.upsertContact({ phone, locationId: connection.locationId });
-			const res = await client.postInboundMessage({
-				// SMS-replace (Option B): no conversationProviderId.
-				locationId: connection.locationId,
-				contactId: contact.id,
-				message: message.body ?? "",
-				attachments: message.attachments,
-				direction: "inbound",
-				type: "SMS",
-			});
-			return { ghlMessageId: res.messageId ?? res.message?.id ?? null };
 		},
 
 		async recordGhlOutbound(message) {
-			const [client, connection] = await Promise.all([
-				createGoHighLevelClient(message.subaccountId),
-				getGhlConnection(message.subaccountId),
-			]);
-			if (!client || !connection) {
+			try {
+				const [client, connection] = await Promise.all([
+					createGoHighLevelClient(message.subaccountId),
+					getGhlConnection(message.subaccountId),
+				]);
+				if (!client || !connection) {
+					return null;
+				}
+				const thread = await resolveGhlThread(message, client, connection.locationId);
+				if (!thread) {
+					return null;
+				}
+				const res = await client.postOutboundMessageRecord({
+					conversationId: thread.conversationId,
+					message: ghlMessageBody(message),
+					attachments: message.attachments,
+					type: "SMS",
+					date: message.timestamp.toISOString(),
+				});
+				return { ghlMessageId: res.messageId ?? res.message?.id ?? null };
+			} catch (error) {
+				logger.error(error, { ctx: "messaging.fanOut.recordGhlOutbound", chatId: message.chatId });
 				return null;
 			}
-			const phone = phoneFromChatId(message.chatId);
-			if (!phone) {
-				return null;
-			}
-			const contact = await client.upsertContact({ phone, locationId: connection.locationId });
-			const res = await client.postOutboundMessageRecord({
-				locationId: connection.locationId,
-				contactId: contact.id,
-				message: message.body ?? "",
-				attachments: message.attachments,
-				direction: "outbound",
-				type: "SMS",
-			});
-			return { ghlMessageId: res.messageId ?? res.message?.id ?? null };
 		},
 
 		async markSynced(id, ghlMessageId) {

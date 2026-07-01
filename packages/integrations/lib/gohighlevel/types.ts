@@ -132,23 +132,27 @@ export interface GHLInboundMessageInput {
 	 * native SMS channel.
 	 */
 	conversationProviderId?: string;
-	locationId: string;
-	contactId: string;
+	/** The GHL conversation to append to (one per contact; see getOrCreateConversation). */
+	conversationId: string;
 	message: string;
+	/** Public attachment URLs. */
 	attachments?: string[];
-	direction: "inbound";
 	type: GHLMessageType;
+	/** Original message time (ISO 8601); defaults to now on GHL's side. */
+	date?: string;
 }
 
 export interface GHLOutboundMessageInput {
 	/** Custom conversation provider id (omit for the SMS-replace provider). */
 	conversationProviderId?: string;
-	locationId: string;
-	contactId: string;
+	/** The GHL conversation to append to (one per contact; see getOrCreateConversation). */
+	conversationId: string;
 	message: string;
+	/** Public attachment URLs. */
 	attachments?: string[];
-	direction: "outbound";
 	type: GHLMessageType;
+	/** Original message time (ISO 8601); defaults to now on GHL's side. */
+	date?: string;
 }
 
 export interface GHLMessageResponse {

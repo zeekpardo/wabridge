@@ -10,6 +10,7 @@ import {
 	upsertGhlConnection,
 } from "@repo/database";
 import {
+	createGoHighLevelClient,
 	decryptGhlSsoPayload,
 	encrypt,
 	exchangeGhlCode,
@@ -178,7 +179,7 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	const session = await getDefaultSession(subaccount.id);
 
 	try {
-		await fanOutMessage(
+		const result = await fanOutMessage(
 			{
 				subaccountId: subaccount.id,
 				organizationId: subaccount.organizationId,
@@ -194,12 +195,39 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			},
 			createFanOutDeps(),
 		);
+		// No WhatsApp message id and not a redelivery → the send didn't happen
+		// (e.g. no connected number). Tell GHL so the rep sees "failed" instead of
+		// an eternally-pending SMS. Success statuses flow later from the WA ack.
+		if (!result.deduped && !result.waMessageId && ghlMessageId) {
+			await reportGhlSendFailure(subaccount.id, ghlMessageId, "No connected WhatsApp number");
+		}
 	} catch (error) {
 		logger.error(error, { ctx: "ghl.provider.outbound", locationId });
-		return new Response("Processing error.", { status: 500 });
+		if (ghlMessageId) {
+			await reportGhlSendFailure(subaccount.id, ghlMessageId, "WhatsApp delivery failed");
+		}
+		// Acknowledge: we reported the failure; a retry would double-send later.
+		return new Response("Delivery failed.", { status: 200 });
 	}
 
 	return new Response("OK", { status: 200 });
+}
+
+/** Best-effort "failed" status back to GHL for an SMS we couldn't deliver. */
+async function reportGhlSendFailure(
+	subaccountId: string,
+	ghlMessageId: string,
+	detail: string,
+): Promise<void> {
+	try {
+		const client = await createGoHighLevelClient(subaccountId);
+		if (!client) {
+			return;
+		}
+		await client.updateMessageStatus({ messageId: ghlMessageId, status: "failed", error: detail });
+	} catch (error) {
+		logger.error(error, { ctx: "ghl.provider.outbound.status", ghlMessageId });
+	}
 }
 
 function str(value: unknown): string | undefined {

@@ -194,6 +194,34 @@ export async function touchConversationOutbound(data: {
 	});
 }
 
+/**
+ * Cache the GHL contact/conversation ids for a thread so message projections
+ * skip the upsert/search round-trips after the first message. Upserts because
+ * the projection can run before the thread row exists (first inbound message).
+ */
+export async function setConversationGhlLink(data: {
+	subaccountId: string;
+	organizationId: string;
+	chatId: string;
+	ghlContactId: string;
+	ghlConversationId?: string | null;
+}) {
+	return db.whatsAppConversation.upsert({
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
+		create: {
+			subaccountId: data.subaccountId,
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			ghlContactId: data.ghlContactId,
+			ghlConversationId: data.ghlConversationId ?? undefined,
+		},
+		update: {
+			ghlContactId: data.ghlContactId,
+			...(data.ghlConversationId ? { ghlConversationId: data.ghlConversationId } : {}),
+		},
+	});
+}
+
 /** Persist the active/sending number for a conversation (dropdown or #switch). */
 export async function setConversationActiveSession(data: {
 	subaccountId: string;
