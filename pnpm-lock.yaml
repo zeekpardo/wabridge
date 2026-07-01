@@ -706,6 +706,9 @@ importers:
       '@repo/utils':
         specifier: workspace:*
         version: link:../utils
+      '@repo/whatsapp':
+        specifier: workspace:*
+        version: link:../whatsapp
       '@sindresorhus/slugify':
         specifier: 'catalog:'
         version: 3.0.0
@@ -1059,6 +1062,25 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.4.3
+    devDependencies:
+      '@repo/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.0.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/whatsapp:
+    dependencies:
+      '@repo/database':
+        specifier: workspace:*
+        version: link:../database
+      '@repo/logs':
+        specifier: workspace:*
+        version: link:../logs
     devDependencies:
       '@repo/tsconfig':
         specifier: workspace:*

@@ -24,6 +24,7 @@
 		"@repo/payments": "workspace:*",
 		"@repo/storage": "workspace:*",
 		"@repo/utils": "workspace:*",
+		"@repo/whatsapp": "workspace:*",
 		"@sindresorhus/slugify": "catalog:",
 		"hono": "catalog:",
 		"nanoid": "catalog:",

@@ -1,0 +1,110 @@
+import {
+	createWhatsAppMessage,
+	getWhatsAppSessionByOpenwaSessionId,
+	updateWhatsAppSession,
+} from "@repo/database";
+import { logger } from "@repo/logs";
+
+import { OPENWA_WEBHOOK_EVENTS } from "./types";
+import { parseOpenWaWebhookPayload, verifyOpenWaSignature } from "./webhook";
+
+/**
+ * Public inbound webhook handler for OpenWA -> us deliveries. Mirrors the
+ * payments webhook handler style: reads the raw body, verifies the
+ * `X-OpenWA-Signature` HMAC against the target session's stored secret, then
+ * processes the event. Returns a `Response`.
+ */
+export async function webhookHandler(req: Request): Promise<Response> {
+	const rawBody = await req.text();
+
+	if (!rawBody) {
+		return new Response("Invalid request.", { status: 400 });
+	}
+
+	let payload: ReturnType<typeof parseOpenWaWebhookPayload>;
+	try {
+		payload = parseOpenWaWebhookPayload(rawBody);
+	} catch (error) {
+		logger.error(error, { ctx: "whatsapp.webhook.parse" });
+		return new Response("Invalid request.", { status: 400 });
+	}
+
+	const row = await getWhatsAppSessionByOpenwaSessionId(payload.sessionId);
+
+	if (!row) {
+		// Unknown session — acknowledge without processing to avoid retries.
+		return new Response("Unknown session.", { status: 404 });
+	}
+
+	const signatureValid = verifyOpenWaSignature(
+		row.webhookSecret,
+		rawBody,
+		req.headers.get("X-OpenWA-Signature"),
+	);
+
+	if (!signatureValid) {
+		return new Response("Invalid signature.", { status: 401 });
+	}
+
+	try {
+		await processEvent(row.id, row.organizationId, payload);
+	} catch (error) {
+		logger.error(error, { ctx: "whatsapp.webhook.process", event: payload.event });
+		return new Response("Processing error.", { status: 500 });
+	}
+
+	return new Response("OK", { status: 200 });
+}
+
+async function processEvent(
+	sessionId: string,
+	organizationId: string,
+	payload: ReturnType<typeof parseOpenWaWebhookPayload>,
+): Promise<void> {
+	const data = payload.data as Record<string, unknown>;
+
+	switch (payload.event) {
+		case OPENWA_WEBHOOK_EVENTS.messageReceived: {
+			await createWhatsAppMessage({
+				organizationId,
+				sessionId,
+				direction: "inbound",
+				chatId: String(data.chatId ?? ""),
+				fromMe: Boolean(data.fromMe ?? false),
+				type: String(data.type ?? "text"),
+				body: typeof data.body === "string" ? data.body : null,
+				status: typeof data.status === "string" ? data.status : null,
+				waMessageId: typeof data.id === "string" ? data.id : null,
+				idempotencyKey: payload.idempotencyKey,
+				timestamp: parseTimestamp(payload.timestamp),
+			});
+			break;
+		}
+		case OPENWA_WEBHOOK_EVENTS.sessionStatus:
+		case OPENWA_WEBHOOK_EVENTS.sessionAuthenticated:
+		case OPENWA_WEBHOOK_EVENTS.sessionDisconnected: {
+			const status = typeof data.status === "string" ? data.status : undefined;
+			await updateWhatsAppSession(organizationId, sessionId, {
+				...(status ? { status } : {}),
+				...(payload.event === OPENWA_WEBHOOK_EVENTS.sessionAuthenticated
+					? { needsQr: false, connectedAt: new Date() }
+					: {}),
+				...(typeof data.phone === "string" ? { phone: data.phone } : {}),
+				...(typeof data.jid === "string" ? { jid: data.jid } : {}),
+			});
+			break;
+		}
+		case OPENWA_WEBHOOK_EVENTS.sessionQr: {
+			await updateWhatsAppSession(organizationId, sessionId, { needsQr: true });
+			break;
+		}
+		default:
+			// message.ack and any unhandled event types are acknowledged as no-ops.
+			break;
+	}
+}
+
+function parseTimestamp(value: string): Date {
+	const parsed = new Date(value);
+	return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}

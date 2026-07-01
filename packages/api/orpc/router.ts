@@ -6,6 +6,7 @@ import { notificationsRouter } from "../modules/notifications/router";
 import { organizationsRouter } from "../modules/organizations/router";
 import { paymentsRouter } from "../modules/payments/router";
 import { usersRouter } from "../modules/users/router";
+import { whatsappRouter } from "../modules/whatsapp/router";
 import { publicProcedure } from "./procedures";
 
 export const router = publicProcedure.router({
@@ -15,6 +16,7 @@ export const router = publicProcedure.router({
 	payments: paymentsRouter,
 	ai: aiRouter,
 	notifications: notificationsRouter,
+	whatsapp: whatsappRouter,
 });
 
 export type ApiRouterClient = RouterClient<typeof router>;

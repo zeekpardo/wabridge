@@ -146,6 +146,8 @@ model Organization {
   purchases          Purchase[]
 
   goHighLevelConnection GoHighLevelConnection?
+  whatsAppSessions      WhatsAppSession[]
+  whatsAppMessages      WhatsAppMessage[]
 
   @@unique([slug])
   @@map("organization")
@@ -171,6 +173,50 @@ model GoHighLevelConnection {
   updatedAt              DateTime     @updatedAt
 
   @@map("go_high_level_connection")
+}
+
+model WhatsAppSession {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  openwaSessionId String            @unique
+  openwaName      String            @unique
+  workerBaseUrl   String
+  label           String?
+  phone           String?
+  jid             String?
+  status          String
+  webhookSecret   String
+  needsQr         Boolean           @default(true)
+  lastError       String?           @db.Text
+  connectedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  messages        WhatsAppMessage[]
+
+  @@index([organizationId])
+  @@map("whatsapp_session")
+}
+
+model WhatsAppMessage {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessionId      String
+  session        WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  direction      String
+  waMessageId    String?
+  chatId         String
+  fromMe         Boolean
+  body           String?         @db.Text
+  type           String
+  status         String?
+  idempotencyKey String?         @unique
+  timestamp      DateTime
+  createdAt      DateTime        @default(now())
+
+  @@index([sessionId, timestamp])
+  @@map("whatsapp_message")
 }
 
 model Member {

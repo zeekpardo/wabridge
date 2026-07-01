@@ -1,0 +1,30 @@
+{
+	"name": "@repo/whatsapp",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"main": "./index.ts",
+	"types": "./**/.ts",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"default": "./index.ts"
+		},
+		"./types": "./lib/types.ts",
+		"./client": "./lib/openwa-client.ts",
+		"./webhook": "./lib/webhook.ts"
+	},
+	"scripts": {
+		"clean": "git clean -xdf .cache .turbo dist node_modules",
+		"type-check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@repo/database": "workspace:*",
+		"@repo/logs": "workspace:*"
+	},
+	"devDependencies": {
+		"@repo/tsconfig": "workspace:*",
+		"@types/node": "catalog:",
+		"typescript": "catalog:"
+	}
+}

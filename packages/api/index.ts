@@ -2,6 +2,7 @@ import { auth } from "@repo/auth";
 import { logger } from "@repo/logs";
 import { webhookHandler as paymentsWebhookHandler } from "@repo/payments";
 import { getBaseUrl } from "@repo/utils";
+import { webhookHandler as openwaWebhookHandler } from "@repo/whatsapp";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
@@ -29,6 +30,8 @@ export const app = new Hono()
 	.on(["POST", "GET"], "/auth/**", (c) => auth.handler(c.req.raw))
 	// Payments webhook handler
 	.post("/webhooks/payments", (c) => paymentsWebhookHandler(c.req.raw))
+	// OpenWA (WhatsApp) webhook handler
+	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw))
 	// Health check
 	.get("/health", (c) => c.text("OK"))
 	// oRPC handlers (for RPC and OpenAPI)
