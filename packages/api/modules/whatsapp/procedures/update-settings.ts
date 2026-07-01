@@ -20,11 +20,7 @@ export const updateSettings = protectedProcedure
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		await upsertWhatsAppSettings(subaccount.id, { globalSpintax: input.globalSpintax });
 

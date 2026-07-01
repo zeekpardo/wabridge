@@ -24,7 +24,7 @@ export const sendTestMessage = protectedProcedure
 		}),
 	)
 	.handler(async ({ input: { id, toPhone, text, subaccountId }, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(session.activeOrganizationId, user.id, subaccountId);
+		const subaccount = await resolveSubaccount(session, user.id, subaccountId);
 
 		const row = await getWhatsAppSession(subaccount.id, id);
 

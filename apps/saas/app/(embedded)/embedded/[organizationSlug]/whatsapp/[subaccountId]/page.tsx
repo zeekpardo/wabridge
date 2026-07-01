@@ -1,6 +1,7 @@
 import { getActiveOrganization } from "@auth/lib/server";
 import { auth } from "@repo/auth";
 import { getSubaccount } from "@repo/database";
+import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
 import { WhatsAppInbox } from "@whatsapp/components/inbox/WhatsAppInbox";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -44,5 +45,10 @@ export default async function EmbeddedSubaccountWhatsAppPage({
 		// Not a member / no session — the inbox's own auth handling takes over.
 	}
 
-	return <WhatsAppInbox embedded subaccountId={subaccount.id} />;
+	return (
+		<>
+			<EmbeddedSsoBootstrap />
+			<WhatsAppInbox embedded subaccountId={subaccount.id} />
+		</>
+	);
 }

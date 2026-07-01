@@ -21,11 +21,7 @@ export const setConversationNumber = protectedProcedure
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		const target = await getWhatsAppSession(subaccount.id, input.sessionId);
 		if (!target) {

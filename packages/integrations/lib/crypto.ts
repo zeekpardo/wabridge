@@ -32,6 +32,55 @@ export function encrypt(plaintext: string): string {
 	return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
+/**
+ * OpenSSL EVP_BytesToKey (MD5) key derivation — matches CryptoJS's default
+ * passphrase mode, which is what GoHighLevel uses to encrypt SSO payloads.
+ */
+function evpBytesToKey(
+	password: Buffer,
+	salt: Buffer,
+	keyLen: number,
+	ivLen: number,
+): { key: Buffer; iv: Buffer } {
+	const crypto = require("node:crypto") as typeof import("node:crypto");
+	const derived: Buffer[] = [];
+	let block = Buffer.alloc(0);
+	let total = 0;
+	while (total < keyLen + ivLen) {
+		block = crypto
+			.createHash("md5")
+			.update(Buffer.concat([block, password, salt]))
+			.digest();
+		derived.push(block);
+		total += block.length;
+	}
+	const full = Buffer.concat(derived);
+	return { key: full.subarray(0, keyLen), iv: full.subarray(keyLen, keyLen + ivLen) };
+}
+
+/**
+ * Decrypt a GoHighLevel SSO payload. The GHL Custom Page iframe posts an
+ * AES-encrypted (CryptoJS default: OpenSSL "Salted__" + AES-256-CBC) blob; we
+ * decrypt it with the app's SSO key to recover the user/location context.
+ */
+export function decryptGhlSsoPayload<T = Record<string, unknown>>(
+	encryptedBase64: string,
+	ssoKey: string,
+): T {
+	const crypto = require("node:crypto") as typeof import("node:crypto");
+	const data = Buffer.from(encryptedBase64, "base64");
+	// CryptoJS/OpenSSL salted format: "Salted__"(8) + salt(8) + ciphertext.
+	if (data.subarray(0, 8).toString("utf8") !== "Salted__") {
+		throw new Error("Unexpected GHL SSO payload format");
+	}
+	const salt = data.subarray(8, 16);
+	const ciphertext = data.subarray(16);
+	const { key, iv } = evpBytesToKey(Buffer.from(ssoKey, "utf8"), salt, 32, 16);
+	const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+	const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+	return JSON.parse(decrypted.toString("utf8")) as T;
+}
+
 export function decrypt(ciphertext: string): string {
 	const crypto = require("node:crypto") as typeof import("node:crypto");
 	const key = getKey();

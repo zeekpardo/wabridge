@@ -21,11 +21,7 @@ export const getThread = protectedProcedure
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		await markConversationRead(subaccount.id, input.chatId);
 

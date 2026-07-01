@@ -71,11 +71,7 @@ export const getChatHistory = protectedProcedure
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		// Which number owns this chat: the conversation's active number, else the default.
 		const conversation = await getConversation(subaccount.id, input.chatId);

@@ -7,6 +7,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 
+import {
+	ghlAuthorizeHandler,
+	ghlCallbackHandler,
+	ghlSsoDecryptHandler,
+} from "./modules/ghl/handlers";
 import { openApiHandler, rpcHandler } from "./orpc/handler";
 
 export { router } from "./orpc/router";
@@ -32,6 +37,10 @@ export const app = new Hono()
 	.post("/webhooks/payments", (c) => paymentsWebhookHandler(c.req.raw))
 	// OpenWA (WhatsApp) webhook handler
 	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw))
+	// GoHighLevel OAuth install + SSO (embedded Custom Page)
+	.get("/ghl/oauth/authorize", (c) => ghlAuthorizeHandler(c.req.raw))
+	.get("/ghl/oauth/callback", (c) => ghlCallbackHandler(c.req.raw))
+	.post("/ghl-sso/decrypt", (c) => ghlSsoDecryptHandler(c.req.raw))
 	// Health check
 	.get("/health", (c) => c.text("OK"))
 	// oRPC handlers (for RPC and OpenAPI)

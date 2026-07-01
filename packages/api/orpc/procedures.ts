@@ -1,6 +1,8 @@
 import { ORPCError, os } from "@orpc/server";
 import { auth } from "@repo/auth";
 
+import { resolveEmbeddedSession } from "./lib/embedded-session";
+
 export const publicProcedure = os.$context<{
 	headers: Headers;
 }>();
@@ -10,16 +12,35 @@ export const protectedProcedure = publicProcedure.use(async ({ context, next }) 
 		headers: context.headers,
 	});
 
-	if (!session) {
-		throw new ORPCError("UNAUTHORIZED");
+	if (session) {
+		return await next({
+			context: {
+				session: session.session,
+				user: session.user,
+			},
+		});
 	}
 
-	return await next({
-		context: {
-			session: session.session,
-			user: session.user,
-		},
-	});
+	// Fallback for the GoHighLevel embedded Custom Page: third-party iframe
+	// cookies are often blocked, so accept a verified embedded token that pins
+	// the request to an agency + subaccount (minted after GHL SSO decrypt).
+	const embedded = await resolveEmbeddedSession(context.headers);
+	if (embedded) {
+		return await next({
+			context: {
+				session: {
+					activeOrganizationId: embedded.organizationId,
+					isEmbedded: true,
+					embeddedSubaccountId: embedded.subaccountId,
+				} as unknown as NonNullable<typeof session>["session"],
+				user: {
+					id: `ghl:${embedded.ghlUserId ?? "sso"}`,
+				} as unknown as NonNullable<typeof session>["user"],
+			},
+		});
+	}
+
+	throw new ORPCError("UNAUTHORIZED");
 });
 
 export const adminProcedure = protectedProcedure.use(async ({ context, next }) => {

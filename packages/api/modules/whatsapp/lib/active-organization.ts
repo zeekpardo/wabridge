@@ -39,24 +39,49 @@ export interface ResolvedSubaccount {
 }
 
 /**
+ * The subset of the auth session the scoping helper needs. A first-party
+ * better-auth session provides `activeOrganizationId`; an embedded (GHL SSO)
+ * session additionally carries a pre-authorized subaccount.
+ */
+export interface SessionScope {
+	activeOrganizationId?: string | null;
+	isEmbedded?: boolean;
+	embeddedSubaccountId?: string | null;
+}
+
+/**
  * The scoping choke point for all WhatsApp/GHL data. Resolves and authorizes a
  * subaccount for the caller:
  *
- *  1. The active agency organization is read from the session and membership is
- *     verified (never trusts a client-supplied org id).
- *  2. If a `subaccountId` is given, it must belong to that agency; otherwise the
- *     agency's default (single) subaccount is used — so existing single-tenant
- *     callers keep working without passing an id.
- *
- * Throws `FORBIDDEN` when the subaccount isn't owned by the caller's agency and
- * `NOT_FOUND` when the agency has no subaccount yet.
+ *  - Embedded (GHL SSO) sessions are pinned to the subaccount authorized at
+ *    SSO-decrypt time; the client-supplied id is ignored and org membership is
+ *    not re-checked (the SSO signature is the proof).
+ *  - First-party sessions verify agency membership, then use the given
+ *    `subaccountId` (must belong to the agency) or fall back to the agency's
+ *    single subaccount — so existing single-tenant callers keep working.
  */
 export async function resolveSubaccount(
-	activeOrganizationId: string | null | undefined,
+	session: SessionScope,
 	userId: string,
 	subaccountId?: string | null,
 ): Promise<ResolvedSubaccount> {
-	const organizationId = await requireActiveOrganizationId(activeOrganizationId, userId);
+	if (session.isEmbedded && session.embeddedSubaccountId && session.activeOrganizationId) {
+		const embedded = await getSubaccount(
+			session.activeOrganizationId,
+			session.embeddedSubaccountId,
+		);
+		if (!embedded) {
+			throw new ORPCError("FORBIDDEN", { message: "Embedded subaccount is no longer valid." });
+		}
+		return {
+			id: embedded.id,
+			organizationId: embedded.organizationId,
+			name: embedded.name,
+			ghlLocationId: embedded.ghlLocationId,
+		};
+	}
+
+	const organizationId = await requireActiveOrganizationId(session.activeOrganizationId, userId);
 
 	const subaccount = subaccountId
 		? await getSubaccount(organizationId, subaccountId)

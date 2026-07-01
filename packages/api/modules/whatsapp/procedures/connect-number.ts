@@ -32,7 +32,7 @@ export const connectNumber = protectedProcedure
 		}),
 	)
 	.handler(async ({ input: { label, subaccountId }, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(session.activeOrganizationId, user.id, subaccountId);
+		const subaccount = await resolveSubaccount(session, user.id, subaccountId);
 
 		// Next send-priority for this subaccount (1 = first/highest). Powers #switch|N.
 		const priority = (await countWhatsAppSessions(subaccount.id)) + 1;

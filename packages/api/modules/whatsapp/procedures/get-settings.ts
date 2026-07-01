@@ -15,11 +15,7 @@ export const getSettings = protectedProcedure
 	})
 	.input(z.object({ subaccountId: z.string().optional() }))
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		const settings = await getWhatsAppSettings(subaccount.id);
 		const globalSpintax = (settings?.globalSpintax as GlobalSpintax | null) ?? {};

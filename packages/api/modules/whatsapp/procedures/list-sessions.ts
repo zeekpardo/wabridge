@@ -14,11 +14,7 @@ export const listSessions = protectedProcedure
 	})
 	.input(z.object({ subaccountId: z.string().optional() }))
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		return listWhatsAppSessions(subaccount.id);
 	});

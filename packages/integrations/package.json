@@ -9,6 +9,10 @@
 		".": {
 			"types": "./index.ts",
 			"default": "./index.ts"
+		},
+		"./crypto": {
+			"types": "./lib/crypto.ts",
+			"default": "./lib/crypto.ts"
 		}
 	},
 	"scripts": {

@@ -29,11 +29,7 @@ export const setContactTags = protectedProcedure
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }): Promise<{ tags: string[] }> => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		const conversation = await getConversation(subaccount.id, input.chatId);
 		const existing = currentTags(conversation?.tags);

@@ -1,4 +1,4 @@
-export { decrypt, encrypt } from "./lib/crypto";
+export { decrypt, decryptGhlSsoPayload, encrypt } from "./lib/crypto";
 
 export { TokenManager } from "./lib/token-refresh/token-manager";
 export { TokenExpiredError } from "./lib/token-refresh/types";

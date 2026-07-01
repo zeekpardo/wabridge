@@ -67,11 +67,7 @@ export const getContactProfile = protectedProcedure
 	})
 	.input(z.object({ chatId: z.string(), subaccountId: z.string().optional() }))
 	.handler(async ({ input, context: { user, session } }): Promise<ContactProfile> => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		const [conversation, ghl, members] = await Promise.all([
 			getConversation(subaccount.id, input.chatId),

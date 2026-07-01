@@ -45,11 +45,7 @@ export const sendMessage = protectedProcedure
 			}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const subaccount = await resolveSubaccount(
-			session.activeOrganizationId,
-			user.id,
-			input.subaccountId,
-		);
+		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		const chatId = input.chatId ?? toChatId(input.toPhone ?? "");
 

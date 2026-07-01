@@ -1,5 +1,6 @@
 import { getActiveOrganization } from "@auth/lib/server";
 import { auth } from "@repo/auth";
+import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
 import { WhatsAppInbox } from "@whatsapp/components/inbox/WhatsAppInbox";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -42,5 +43,10 @@ export default async function EmbeddedWhatsAppPage({
 		// Not a member / no session — the inbox's own auth handling takes over.
 	}
 
-	return <WhatsAppInbox embedded />;
+	return (
+		<>
+			<EmbeddedSsoBootstrap />
+			<WhatsAppInbox embedded />
+		</>
+	);
 }

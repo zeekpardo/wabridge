@@ -69,6 +69,11 @@ export function SubaccountWorkspace({
 						<p className="text-xs text-foreground/60">CRM connection</p>
 						<p className="font-bold text-lg">{sub.ghl.connected ? "Connected" : "Not connected"}</p>
 					</div>
+					<Button asChild size="sm" variant={sub.ghl.connected ? "outline" : "primary"}>
+						<a href={`/api/ghl/oauth/authorize?subaccountId=${subaccountId}`}>
+							{sub.ghl.connected ? "Reconnect" : "Connect GoHighLevel"}
+						</a>
+					</Button>
 				</Card>
 
 				<Card className="gap-3 p-4 flex items-center">
