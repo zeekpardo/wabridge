@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildCommandString } from "./builder";
 import { extractDelay } from "./delay";
 import { processMessage } from "./process";
 import { expandSpintax } from "./spintax";
@@ -108,5 +109,41 @@ describe("processMessage", () => {
 		expect(result.numberOverride).toEqual({ priority: 3, scope: "once" });
 		expect(result.actions).toHaveLength(1);
 		expect(result.actions[0]?.text).toBe("Hi");
+	});
+});
+
+describe("buildCommandString (composer segments -> raw)", () => {
+	it("compiles a spintax segment that the parser resolves to one option", () => {
+		const raw = buildCommandString([
+			{ type: "text", value: "Hi " },
+			{ type: "spintax", options: ["there", "friend", "team"] },
+			{ type: "text", value: "!" },
+		]);
+		// Round-trips through the real parser to one of the options.
+		const low = processMessage({ text: raw, rng: () => 0 });
+		const high = processMessage({ text: raw, rng: () => 0.999999 });
+		expect(low.actions[0]?.text).toBe("Hi there!");
+		expect(high.actions[0]?.text).toBe("Hi team!");
+	});
+
+	it("gives each spintax segment its own letter and appends a single delay", () => {
+		const raw = buildCommandString([
+			{ type: "spintax", options: ["a", "b"] },
+			{ type: "text", value: " " },
+			{ type: "spintax", options: ["c", "d"] },
+			{ type: "delay", minMs: 1000, maxMs: 4000 },
+		]);
+		expect(raw).toContain("SPINTAX_A");
+		expect(raw).toContain("SPINTAX_B");
+		expect(raw.endsWith("!/DELAY/1000/4000/!")).toBe(true);
+		const result = processMessage({ text: raw, rng: () => 0 });
+		expect(result.actions[0]?.text).toBe("a c");
+		expect(result.actions[0]?.delayMs).toBe(1000);
+	});
+
+	it("drops empty options and sanitizes slashes", () => {
+		const raw = buildCommandString([{ type: "spintax", options: ["one/two", "", "  "] }]);
+		expect(raw).toContain("one two");
+		expect(processMessage({ text: raw, rng: () => 0 }).actions[0]?.text).toBe("one two");
 	});
 });
