@@ -45,7 +45,7 @@ export function SessionCard({ session }: { session: SessionRow }) {
 		orpc.whatsapp.deleteSession.mutationOptions({
 			onSuccess: () => {
 				toastSuccess("Number removed");
-				queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
+				void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
 			},
 			onError: (error) => toastError(error.message ?? "Could not remove the number"),
 		}),
@@ -112,7 +112,7 @@ function TestMessageDialog({ sessionId }: { sessionId: string }) {
 			onSuccess: () => {
 				toastSuccess("Message sent");
 				setText("");
-				messagesQuery.refetch();
+				void messagesQuery.refetch();
 			},
 			onError: (error) => toastError(error.message ?? "Could not send the message"),
 		}),

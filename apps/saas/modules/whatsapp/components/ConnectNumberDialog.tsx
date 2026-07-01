@@ -39,7 +39,7 @@ export function ConnectNumberDialog() {
 		orpc.whatsapp.connectNumber.mutationOptions({
 			onSuccess: (row) => {
 				setSessionId(row.id);
-				queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
+				void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
 			},
 			onError: (error) => toastError(error.message ?? "Could not start a session"),
 		}),
@@ -79,7 +79,7 @@ export function ConnectNumberDialog() {
 	// When the session flips to connected, refresh the list once.
 	useEffect(() => {
 		if (connected && sessionId) {
-			queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
+			void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listSessions.key() });
 		}
 	}, [connected, sessionId, queryClient]);
 
