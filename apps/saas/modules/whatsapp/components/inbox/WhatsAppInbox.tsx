@@ -63,7 +63,7 @@ export function WhatsAppInbox() {
 		<Card className="flex h-[calc(100vh-16rem)] min-h-[32rem] overflow-hidden p-0">
 			<div
 				className={cn(
-					"w-full shrink-0 border-r md:w-72",
+					"w-full shrink-0 border-r md:w-1/4 md:min-w-56",
 					selectedChatId ? "hidden md:block" : "block",
 				)}
 			>
