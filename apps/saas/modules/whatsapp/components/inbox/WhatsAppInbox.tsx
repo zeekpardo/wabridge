@@ -19,7 +19,7 @@ import { ConversationList } from "./ConversationList";
 import { MessageThread } from "./MessageThread";
 import { prettyPhone } from "./helpers";
 
-export function WhatsAppInbox() {
+export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
@@ -60,7 +60,14 @@ export function WhatsAppInbox() {
 		|| (selectedChatId ? prettyPhone(selectedChatId) : "");
 
 	return (
-		<Card className="flex h-[calc(100vh-16rem)] min-h-[32rem] overflow-hidden p-0">
+		<Card
+			className={cn(
+				"flex overflow-hidden p-0",
+				embedded
+					? "h-[100dvh] rounded-none border-0 shadow-none"
+					: "h-[calc(100vh-16rem)] min-h-[32rem]",
+			)}
+		>
 			<div
 				className={cn(
 					"w-full shrink-0 border-r md:w-1/4 md:min-w-56",

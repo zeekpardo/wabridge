@@ -21,6 +21,25 @@ const nextConfig: NextConfig = {
 			},
 		],
 	},
+	async headers() {
+		// Allow only GoHighLevel (+ self) to embed the /embedded/* pages in an iframe.
+		// Override the allowed hosts with GHL_FRAME_ANCESTORS (space-separated) for
+		// white-label domains.
+		const ghlFrameAncestors =
+			process.env.GHL_FRAME_ANCESTORS ??
+			"https://app.gohighlevel.com https://*.gohighlevel.com https://*.leadconnectorhq.com https://*.msgsndr.com";
+		return [
+			{
+				source: "/embedded/:path*",
+				headers: [
+					{
+						key: "Content-Security-Policy",
+						value: `frame-ancestors 'self' ${ghlFrameAncestors};`,
+					},
+				],
+			},
+		];
+	},
 	async redirects() {
 		return [
 			{
