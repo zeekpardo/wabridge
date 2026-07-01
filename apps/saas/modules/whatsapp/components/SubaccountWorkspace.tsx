@@ -3,11 +3,13 @@
 import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
 import { Spinner } from "@repo/ui/components/spinner";
+import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, CircleCheckIcon, CircleXIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 
+import { openOAuthPopup } from "../lib/oauth-popup";
 import { WhatsAppTabs } from "./WhatsAppTabs";
 
 export function SubaccountWorkspace({
@@ -17,7 +19,25 @@ export function SubaccountWorkspace({
 	organizationSlug: string;
 	subaccountId: string;
 }) {
+	const queryClient = useQueryClient();
 	const query = useQuery(orpc.subaccounts.get.queryOptions({ input: { id: subaccountId } }));
+
+	const getUrl = useMutation(orpc.whatsapp.getGhlOAuthUrl.mutationOptions());
+
+	async function connectGhl() {
+		try {
+			const { url } = await getUrl.mutateAsync({ subaccountId });
+			const result = await openOAuthPopup(url);
+			if (result.success) {
+				toastSuccess("GoHighLevel connected");
+				void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.get.key() });
+			} else if (result.error) {
+				toastError(result.error);
+			}
+		} catch (error) {
+			toastError(error instanceof Error ? error.message : "Could not start GoHighLevel connect");
+		}
+	}
 
 	if (query.isLoading) {
 		return (
@@ -69,10 +89,13 @@ export function SubaccountWorkspace({
 						<p className="text-xs text-foreground/60">CRM connection</p>
 						<p className="font-bold text-lg">{sub.ghl.connected ? "Connected" : "Not connected"}</p>
 					</div>
-					<Button asChild size="sm" variant={sub.ghl.connected ? "outline" : "primary"}>
-						<a href={`/api/ghl/oauth/authorize?subaccountId=${subaccountId}`}>
-							{sub.ghl.connected ? "Reconnect" : "Connect GoHighLevel"}
-						</a>
+					<Button
+						size="sm"
+						variant={sub.ghl.connected ? "outline" : "primary"}
+						loading={getUrl.isPending}
+						onClick={connectGhl}
+					>
+						{sub.ghl.connected ? "Reconnect" : "Connect GoHighLevel"}
 					</Button>
 				</Card>
 

@@ -134,7 +134,7 @@ export function WhatsAppInbox({
 			className={cn(
 				"p-0 relative flex overflow-hidden",
 				embedded
-					? "h-[100dvh] rounded-none border-0 shadow-none"
+					? "h-full rounded-none border-0 shadow-none"
 					: "h-[calc(100vh-16rem)] min-h-[32rem]",
 			)}
 		>

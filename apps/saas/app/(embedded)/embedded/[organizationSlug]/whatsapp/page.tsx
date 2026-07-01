@@ -1,5 +1,5 @@
-import { getActiveOrganization } from "@auth/lib/server";
 import { auth } from "@repo/auth";
+import { getOrganizationBySlug } from "@repo/database";
 import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
 import { WhatsAppInbox } from "@whatsapp/components/inbox/WhatsAppInbox";
 import { headers } from "next/headers";
@@ -26,7 +26,7 @@ export default async function EmbeddedWhatsAppPage({
 }) {
 	const { organizationSlug } = await params;
 
-	const organization = await getActiveOrganization(organizationSlug);
+	const organization = await getOrganizationBySlug(organizationSlug);
 	if (!organization) {
 		return notFound();
 	}

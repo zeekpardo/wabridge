@@ -1,8 +1,7 @@
-import { getActiveOrganization } from "@auth/lib/server";
 import { auth } from "@repo/auth";
-import { getSubaccount } from "@repo/database";
+import { getOrganizationBySlug, getSubaccountById } from "@repo/database";
 import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
-import { WhatsAppInbox } from "@whatsapp/components/inbox/WhatsAppInbox";
+import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
@@ -11,12 +10,12 @@ export const metadata = {
 };
 
 /**
- * Chrome-less WhatsApp inbox for a specific subaccount — the per-location surface
- * a GoHighLevel Custom Page loads. Scopes the session's active org to the
- * subaccount's agency, then renders the inbox bound to that subaccount id.
- *
- * GHL SSO (env-gated, separate) will resolve the subaccount from the iframe's
- * encrypted locationId instead of relying on the first-party session.
+ * Chrome-less WhatsApp inbox for a specific subaccount — the surface a
+ * GoHighLevel Custom Page loads. Renders WITHOUT requiring a first-party session
+ * (the GHL iframe is third-party, so the auth cookie is blocked): the org and
+ * subaccount are resolved from the URL via plain lookups, and data access is
+ * authorized at the oRPC layer by the embedded token that GHL-SSO mints. If a
+ * first-party session happens to be present, we scope its active org too.
  */
 export default async function EmbeddedSubaccountWhatsAppPage({
 	params,
@@ -25,30 +24,31 @@ export default async function EmbeddedSubaccountWhatsAppPage({
 }) {
 	const { organizationSlug, subaccountId } = await params;
 
-	const organization = await getActiveOrganization(organizationSlug);
+	const organization = await getOrganizationBySlug(organizationSlug);
 	if (!organization) {
 		return notFound();
 	}
 
-	// The subaccount must belong to this agency org.
-	const subaccount = await getSubaccount(organization.id, subaccountId);
-	if (!subaccount) {
+	const subaccount = await getSubaccountById(subaccountId);
+	if (!subaccount || subaccount.organizationId !== organization.id) {
 		return notFound();
 	}
 
+	// Best-effort: if a first-party session exists, point it at this agency so
+	// direct (non-iframe) access works too. Ignored when there's no session.
 	try {
 		await auth.api.setActiveOrganization({
 			body: { organizationId: organization.id },
 			headers: await headers(),
 		});
 	} catch {
-		// Not a member / no session — the inbox's own auth handling takes over.
+		// Third-party iframe / no session — the embedded token takes over.
 	}
 
 	return (
 		<>
 			<EmbeddedSsoBootstrap />
-			<WhatsAppInbox embedded subaccountId={subaccount.id} />
+			<WhatsAppTabs embedded subaccountId={subaccount.id} />
 		</>
 	);
 }
