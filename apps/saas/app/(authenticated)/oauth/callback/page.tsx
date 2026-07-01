@@ -61,7 +61,7 @@ export default function GhlCallbackPage() {
 	}, []);
 
 	return (
-		<div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
+		<div className="gap-4 p-8 flex min-h-[60vh] flex-col items-center justify-center text-center">
 			{status === "loading" && (
 				<>
 					<div className="size-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -73,7 +73,7 @@ export default function GhlCallbackPage() {
 					<CheckCircleIcon className="size-14 text-emerald-500" />
 					<h2 className="font-semibold text-xl">Connected</h2>
 					<p className="text-foreground/60">{message}</p>
-					<p className="text-foreground/40 text-sm">You can close this window.</p>
+					<p className="text-sm text-foreground/40">You can close this window.</p>
 				</>
 			)}
 			{status === "error" && (

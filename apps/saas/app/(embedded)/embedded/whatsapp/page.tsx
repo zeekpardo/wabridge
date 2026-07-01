@@ -1,5 +1,5 @@
-import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
+import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 
 export const metadata = {
 	title: "WhatsApp",

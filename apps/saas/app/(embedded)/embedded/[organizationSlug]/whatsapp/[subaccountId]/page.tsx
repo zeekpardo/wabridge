@@ -1,7 +1,7 @@
 import { auth } from "@repo/auth";
 import { getOrganizationBySlug, getSubaccountById } from "@repo/database";
-import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 import { EmbeddedSsoBootstrap } from "@whatsapp/components/inbox/EmbeddedSsoBootstrap";
+import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 

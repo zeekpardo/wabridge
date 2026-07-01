@@ -28,16 +28,16 @@ app is named `saas`): **Docker → Next standalone, migrations run out of band,
 
 These files/settings must exist in this repo before Railway can build. Status:
 
-| Item | State |
-| --- | --- |
-| `apps/saas/next.config.ts` → `output: "standalone"` | **TODO** |
-| `Dockerfile` (multi-stage standalone) | **TODO** |
-| `.dockerignore` | **TODO** |
-| `railway.toml` (`builder = "dockerfile"`) | **TODO** |
-| `packages/database` → `migrate:deploy` script | **TODO** |
-| Prisma migrations baselined (currently on `db push`) | **TODO** |
-| `pnpm-workspace.yaml` `allowBuilds` incl. `prisma-zod-generator` | partial |
-| OpenWA repo `Dockerfile` | present |
+| Item                                                             | State    |
+| ---------------------------------------------------------------- | -------- |
+| `apps/saas/next.config.ts` → `output: "standalone"`              | **TODO** |
+| `Dockerfile` (multi-stage standalone)                            | **TODO** |
+| `.dockerignore`                                                  | **TODO** |
+| `railway.toml` (`builder = "dockerfile"`)                        | **TODO** |
+| `packages/database` → `migrate:deploy` script                    | **TODO** |
+| Prisma migrations baselined (currently on `db push`)             | **TODO** |
+| `pnpm-workspace.yaml` `allowBuilds` incl. `prisma-zod-generator` | partial  |
+| OpenWA repo `Dockerfile`                                         | present  |
 
 `railway.toml` start command (identical to manuscript — app is also `saas`):
 
@@ -166,7 +166,7 @@ The GHL code is env-gated; it returns `501`/`404` until configured.
    `conversations.write`, `conversations/message.write`, `conversations/message.readonly`,
    `contacts.readonly`, `contacts.write`, `conversations.readonly`. Redirect URI =
    `https://app.<domain>/oauth/callback`. Set the client id/secret + SSO key
-   + webhook public key in the `saas` env.
+   - webhook public key in the `saas` env.
 2. **SMS provider (Option B — takeover):** create a Conversation Provider, Type
    `SMS`, **do not** check "Is this a Custom Conversation Provider", Delivery URL =
    `https://app.<domain>/api/providers/sms/outbound`. Store its id as the

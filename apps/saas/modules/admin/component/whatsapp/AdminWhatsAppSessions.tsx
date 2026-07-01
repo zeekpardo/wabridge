@@ -1,6 +1,5 @@
 "use client";
 
-import { SessionStatusBadge } from "@whatsapp/components/SessionStatusBadge";
 import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
 import { Spinner } from "@repo/ui/components/spinner";
@@ -15,6 +14,7 @@ import {
 import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { SessionStatusBadge } from "@whatsapp/components/SessionStatusBadge";
 import { RefreshCwIcon } from "lucide-react";
 
 export function AdminWhatsAppSessions() {
@@ -35,30 +35,34 @@ export function AdminWhatsAppSessions() {
 	const sessions = sessionsQuery.data ?? [];
 
 	return (
-		<div className="flex flex-col gap-4">
+		<div className="gap-4 flex flex-col">
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="font-medium text-lg">All WhatsApp numbers</h2>
-					<p className="text-foreground/60 text-sm">
+					<p className="text-sm text-foreground/60">
 						Every organization's connected numbers across the platform.
 					</p>
 				</div>
-				<Button variant="secondary" loading={reconcile.isPending} onClick={() => reconcile.mutate({})}>
+				<Button
+					variant="secondary"
+					loading={reconcile.isPending}
+					onClick={() => reconcile.mutate({})}
+				>
 					<RefreshCwIcon className="mr-1.5 size-4" />
 					Reconcile all
 				</Button>
 			</div>
 
 			{sessionsQuery.isLoading ? (
-				<div className="flex justify-center py-12">
+				<div className="py-12 flex justify-center">
 					<Spinner className="size-6" />
 				</div>
 			) : sessions.length === 0 ? (
 				<Card className="py-12 text-center">
-					<p className="text-foreground/60 text-sm">No WhatsApp numbers connected yet.</p>
+					<p className="text-sm text-foreground/60">No WhatsApp numbers connected yet.</p>
 				</Card>
 			) : (
-				<Card className="overflow-hidden p-0">
+				<Card className="p-0 overflow-hidden">
 					<Table>
 						<TableHeader>
 							<TableRow>
@@ -80,10 +84,8 @@ export function AdminWhatsAppSessions() {
 									<TableCell>
 										<SessionStatusBadge status={session.status} />
 									</TableCell>
-									<TableCell className="text-foreground/60 text-sm">
-										{session.connectedAt
-											? new Date(session.connectedAt).toLocaleDateString()
-											: "—"}
+									<TableCell className="text-sm text-foreground/60">
+										{session.connectedAt ? new Date(session.connectedAt).toLocaleDateString() : "—"}
 									</TableCell>
 								</TableRow>
 							))}
