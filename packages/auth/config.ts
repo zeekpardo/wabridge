@@ -3,8 +3,8 @@ import type { AuthConfig } from "./types";
 export const config = {
 	enableSignup: true,
 	enableMagicLink: true,
-	enableSocialLogin: true,
-	enablePasskeys: true,
+	enableSocialLogin: false,
+	enablePasskeys: false,
 	enablePasswordLogin: true,
 	enableTwoFactor: true,
 	sessionCookieMaxAge: 60 * 60 * 24 * 30,
