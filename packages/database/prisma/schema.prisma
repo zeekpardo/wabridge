@@ -145,8 +145,32 @@ model Organization {
   invitations        Invitation[]
   purchases          Purchase[]
 
+  goHighLevelConnection GoHighLevelConnection?
+
   @@unique([slug])
   @@map("organization")
+}
+
+model GoHighLevelConnection {
+  id                     String       @id @default(cuid())
+  organizationId         String       @unique
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationId             String
+  companyId              String?
+  userId                 String?
+  accessToken            String       @db.Text
+  refreshToken           String       @db.Text
+  tokenExpiresAt         DateTime
+  conversationProviderId String?
+  webhooksEnabled        Boolean      @default(false)
+  firstSyncInProgress    Boolean      @default(false)
+  needsReconnect         Boolean      @default(false)
+  // JSON: { allowedSources: string[] }
+  syncConfig             String?      @db.Text
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@map("go_high_level_connection")
 }
 
 model Member {

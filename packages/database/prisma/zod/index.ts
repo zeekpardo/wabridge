@@ -52,6 +52,12 @@ export const OrganizationScalarFieldEnumSchema = z.enum(['id', 'name', 'slug', '
 
 export type OrganizationScalarFieldEnum = z.infer<typeof OrganizationScalarFieldEnumSchema>;
 
+// File: GoHighLevelConnectionScalarFieldEnum.schema.ts
+
+export const GoHighLevelConnectionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'locationId', 'companyId', 'userId', 'accessToken', 'refreshToken', 'tokenExpiresAt', 'conversationProviderId', 'webhooksEnabled', 'firstSyncInProgress', 'needsReconnect', 'syncConfig', 'createdAt', 'updatedAt'])
+
+export type GoHighLevelConnectionScalarFieldEnum = z.infer<typeof GoHighLevelConnectionScalarFieldEnumSchema>;
+
 // File: MemberScalarFieldEnum.schema.ts
 
 export const MemberScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'userId', 'role', 'createdAt'])
@@ -253,6 +259,29 @@ export const OrganizationSchema = z.object({
 });
 
 export type OrganizationType = z.infer<typeof OrganizationSchema>;
+
+
+// File: GoHighLevelConnection.schema.ts
+
+export const GoHighLevelConnectionSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  locationId: z.string(),
+  companyId: z.string().nullish(),
+  userId: z.string().nullish(),
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  tokenExpiresAt: z.date(),
+  conversationProviderId: z.string().nullish(),
+  webhooksEnabled: z.boolean(),
+  firstSyncInProgress: z.boolean(),
+  needsReconnect: z.boolean(),
+  syncConfig: z.string().nullish(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type GoHighLevelConnectionType = z.infer<typeof GoHighLevelConnectionSchema>;
 
 
 // File: Member.schema.ts
