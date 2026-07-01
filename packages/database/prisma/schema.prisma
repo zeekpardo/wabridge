@@ -193,7 +193,10 @@ model GoHighLevelConnection {
   accessToken            String       @db.Text
   refreshToken           String       @db.Text
   tokenExpiresAt         DateTime
+  // The WhatsApp custom-channel provider (Option A — "add channel").
   conversationProviderId String?
+  // The SMS-replace provider (Option B — takes over the native SMS channel).
+  smsProviderId          String?
   webhooksEnabled        Boolean      @default(false)
   firstSyncInProgress    Boolean      @default(false)
   needsReconnect         Boolean      @default(false)
@@ -249,6 +252,13 @@ model WhatsAppMessage {
   body           String?         @db.Text
   type           String
   status         String?
+  // Provenance for the hub: where this message entered our store.
+  // "contact" = inbound from WhatsApp, "ghl" = GHL-originated outbound (SMS
+  // takeover / workflow / bulk), "app" = sent from our embedded messenger.
+  origin         String          @default("contact")
+  // GHL's message id once mirrored, for status updates + echo de-duplication.
+  ghlMessageId   String?
+  ghlSynced      Boolean         @default(false)
   idempotencyKey String?         @unique
   timestamp      DateTime
   createdAt      DateTime        @default(now())
@@ -256,6 +266,7 @@ model WhatsAppMessage {
   @@index([sessionId, timestamp])
   @@index([organizationId, chatId, timestamp])
   @@index([subaccountId, chatId, timestamp])
+  @@index([ghlMessageId])
   @@map("whatsapp_message")
 }
 

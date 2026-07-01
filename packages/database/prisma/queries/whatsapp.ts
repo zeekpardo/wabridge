@@ -331,6 +331,10 @@ export async function createWhatsAppMessage(data: {
 	body?: string | null;
 	status?: string | null;
 	idempotencyKey?: string | null;
+	/** Where this message entered the hub: "contact" | "ghl" | "app". */
+	origin?: string;
+	/** GHL's message id once mirrored (for status updates + echo de-dupe). */
+	ghlMessageId?: string | null;
 }) {
 	// Idempotent on `idempotencyKey`: when a key is provided and already stored,
 	// return the existing row instead of inserting a duplicate.
@@ -371,7 +375,27 @@ export async function createWhatsAppMessage(data: {
 			body: data.body,
 			status: data.status,
 			idempotencyKey: data.idempotencyKey,
+			origin: data.origin ?? "contact",
+			ghlMessageId: data.ghlMessageId ?? null,
 		},
+	});
+}
+
+/** Look up a stored message by the GHL message id (echo de-dupe + status). */
+export async function getMessageByGhlMessageId(subaccountId: string, ghlMessageId: string) {
+	return db.whatsAppMessage.findFirst({ where: { subaccountId, ghlMessageId } });
+}
+
+/** Look up a stored message by its WhatsApp id within a subaccount. */
+export async function getMessageByWaMessageId(subaccountId: string, waMessageId: string) {
+	return db.whatsAppMessage.findFirst({ where: { subaccountId, waMessageId } });
+}
+
+/** Record that a stored message was mirrored to GHL (maps our row ↔ GHL id). */
+export async function markMessageGhlSynced(id: string, ghlMessageId: string | null) {
+	return db.whatsAppMessage.update({
+		where: { id },
+		data: { ghlSynced: true, ghlMessageId },
 	});
 }
 

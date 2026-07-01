@@ -13,6 +13,10 @@
 		"./crypto": {
 			"types": "./lib/crypto.ts",
 			"default": "./lib/crypto.ts"
+		},
+		"./webhook-verify": {
+			"types": "./lib/gohighlevel/webhook-verify.ts",
+			"default": "./lib/gohighlevel/webhook-verify.ts"
 		}
 	},
 	"scripts": {

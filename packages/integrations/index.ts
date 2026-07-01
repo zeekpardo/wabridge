@@ -13,6 +13,7 @@ export { createGhlRefreshFn } from "./lib/token-refresh/adapters";
 export { GoHighLevelClient } from "./lib/gohighlevel/client";
 export type { GoHighLevelClientOptions } from "./lib/gohighlevel/client";
 export { exchangeGhlCode, getGhlAuthUrl, refreshGhlToken } from "./lib/gohighlevel/oauth";
+export { verifyGhlWebhookSignature } from "./lib/gohighlevel/webhook-verify";
 export type {
 	GHLApiResponse,
 	GHLContact,

@@ -126,8 +126,12 @@ export type GHLMessageDirection = "inbound" | "outbound";
 export type GHLMessageStatus = "delivered" | "read" | "failed" | "pending";
 
 export interface GHLInboundMessageInput {
-	/** The conversation provider id registered in the GHL marketplace app. */
-	conversationProviderId: string;
+	/**
+	 * Custom conversation provider id. Required for a custom channel (Option A);
+	 * omit for the SMS-replace provider (Option B), which posts against the
+	 * native SMS channel.
+	 */
+	conversationProviderId?: string;
 	locationId: string;
 	contactId: string;
 	message: string;
@@ -137,8 +141,8 @@ export interface GHLInboundMessageInput {
 }
 
 export interface GHLOutboundMessageInput {
-	/** The conversation provider id registered in the GHL marketplace app. */
-	conversationProviderId: string;
+	/** Custom conversation provider id (omit for the SMS-replace provider). */
+	conversationProviderId?: string;
 	locationId: string;
 	contactId: string;
 	message: string;

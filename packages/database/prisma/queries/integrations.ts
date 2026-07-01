@@ -57,6 +57,7 @@ export async function updateGhlConnection(
 		refreshToken: string;
 		tokenExpiresAt: Date;
 		conversationProviderId: string | null;
+		smsProviderId: string | null;
 		webhooksEnabled: boolean;
 		firstSyncInProgress: boolean;
 		needsReconnect: boolean;

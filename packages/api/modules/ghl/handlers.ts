@@ -1,6 +1,7 @@
 import { auth } from "@repo/auth";
 import {
 	createSubaccount,
+	getDefaultSession,
 	getGhlConnectionByLocationId,
 	getOrganizationById,
 	getSubaccount,
@@ -8,9 +9,16 @@ import {
 	updateSubaccount,
 	upsertGhlConnection,
 } from "@repo/database";
-import { decryptGhlSsoPayload, encrypt, exchangeGhlCode, getGhlAuthUrl } from "@repo/integrations";
+import {
+	decryptGhlSsoPayload,
+	encrypt,
+	exchangeGhlCode,
+	getGhlAuthUrl,
+	verifyGhlWebhookSignature,
+} from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { getBaseUrl } from "@repo/utils";
+import { toChatId } from "@repo/whatsapp";
 
 import {
 	EMBEDDED_COOKIE,
@@ -18,6 +26,8 @@ import {
 	signOAuthState,
 	verifyOAuthState,
 } from "../../orpc/lib/embedded-session";
+import { createFanOutDeps } from "../messaging/deps";
+import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
 
 function saasBaseUrl(): string {
@@ -122,6 +132,78 @@ export async function ghlCallbackHandler(req: Request): Promise<Response> {
 		logger.error(error, { ctx: "ghl.oauth.callback" });
 		return redirect("/?ghl=error");
 	}
+}
+
+/**
+ * POST /api/ghl/provider/outbound — the Conversation Provider Delivery URL.
+ * GHL POSTs a ProviderOutboundMessage whenever a user sends "SMS" from the UI,
+ * a workflow, or a bulk action (once we're the SMS provider). We verify the
+ * Ed25519 signature and route it through the hub, which delivers over WhatsApp.
+ */
+export async function ghlProviderOutboundHandler(req: Request): Promise<Response> {
+	const rawBody = await req.text();
+
+	// Signature verification is required whenever the public key is configured.
+	if (process.env.GOHIGHLEVEL_WEBHOOK_PUBLIC_KEY) {
+		const valid = verifyGhlWebhookSignature(rawBody, req.headers.get("X-GHL-Signature"));
+		if (!valid) {
+			return new Response("Invalid signature.", { status: 401 });
+		}
+	}
+
+	let payload: Record<string, unknown>;
+	try {
+		payload = JSON.parse(rawBody) as Record<string, unknown>;
+	} catch {
+		return new Response("Invalid body.", { status: 400 });
+	}
+
+	const locationId = str(payload.locationId);
+	const phone = str(payload.phone) ?? str(payload.to);
+	const body = str(payload.message) ?? str(payload.body) ?? "";
+	const ghlMessageId = str(payload.messageId) ?? str(payload.id);
+	const attachments = Array.isArray(payload.attachments)
+		? (payload.attachments.filter((a) => typeof a === "string") as string[])
+		: undefined;
+
+	if (!locationId || !phone) {
+		// Acknowledge malformed events so GHL doesn't hammer retries.
+		return new Response("Ignored.", { status: 200 });
+	}
+
+	const subaccount = await getSubaccountByLocationId(locationId);
+	if (!subaccount) {
+		return new Response("Location not linked.", { status: 404 });
+	}
+	const session = await getDefaultSession(subaccount.id);
+
+	try {
+		await fanOutMessage(
+			{
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				sessionId: session?.id ?? "",
+				chatId: toChatId(phone),
+				direction: "outbound",
+				origin: "ghl",
+				body,
+				type: "text",
+				attachments,
+				ghlMessageId: ghlMessageId ?? null,
+				timestamp: new Date(),
+			},
+			createFanOutDeps(),
+		);
+	} catch (error) {
+		logger.error(error, { ctx: "ghl.provider.outbound", locationId });
+		return new Response("Processing error.", { status: 500 });
+	}
+
+	return new Response("OK", { status: 200 });
+}
+
+function str(value: unknown): string | undefined {
+	return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 /**

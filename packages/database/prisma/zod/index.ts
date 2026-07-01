@@ -60,7 +60,7 @@ export type SubaccountScalarFieldEnum = z.infer<typeof SubaccountScalarFieldEnum
 
 // File: GoHighLevelConnectionScalarFieldEnum.schema.ts
 
-export const GoHighLevelConnectionScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'locationId', 'companyId', 'userId', 'accessToken', 'refreshToken', 'tokenExpiresAt', 'conversationProviderId', 'webhooksEnabled', 'firstSyncInProgress', 'needsReconnect', 'syncConfig', 'createdAt', 'updatedAt'])
+export const GoHighLevelConnectionScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'locationId', 'companyId', 'userId', 'accessToken', 'refreshToken', 'tokenExpiresAt', 'conversationProviderId', 'smsProviderId', 'webhooksEnabled', 'firstSyncInProgress', 'needsReconnect', 'syncConfig', 'createdAt', 'updatedAt'])
 
 export type GoHighLevelConnectionScalarFieldEnum = z.infer<typeof GoHighLevelConnectionScalarFieldEnumSchema>;
 
@@ -72,7 +72,7 @@ export type WhatsAppSessionScalarFieldEnum = z.infer<typeof WhatsAppSessionScala
 
 // File: WhatsAppMessageScalarFieldEnum.schema.ts
 
-export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'idempotencyKey', 'timestamp', 'createdAt'])
+export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'origin', 'ghlMessageId', 'ghlSynced', 'idempotencyKey', 'timestamp', 'createdAt'])
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
 
@@ -326,6 +326,7 @@ export const GoHighLevelConnectionSchema = z.object({
   refreshToken: z.string(),
   tokenExpiresAt: z.date(),
   conversationProviderId: z.string().nullish(),
+  smsProviderId: z.string().nullish(),
   webhooksEnabled: z.boolean(),
   firstSyncInProgress: z.boolean(),
   needsReconnect: z.boolean(),
@@ -376,6 +377,9 @@ export const WhatsAppMessageSchema = z.object({
   body: z.string().nullish(),
   type: z.string(),
   status: z.string().nullish(),
+  origin: z.string().default("contact"),
+  ghlMessageId: z.string().nullish(),
+  ghlSynced: z.boolean(),
   idempotencyKey: z.string().nullish(),
   timestamp: z.date(),
   createdAt: z.date(),
