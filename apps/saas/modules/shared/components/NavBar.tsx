@@ -32,6 +32,7 @@ import {
 	ChevronRightIcon,
 	HomeIcon,
 	MenuIcon,
+	MessageCircleIcon,
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	SettingsIcon,
@@ -322,6 +323,16 @@ export function NavBar() {
 				icon: BotMessageSquareIcon,
 				isActive: pathname.startsWith("/chatbot"),
 			},
+			...(activeOrganization
+				? [
+						{
+							label: "WhatsApp",
+							href: `${basePath}/whatsapp`,
+							icon: MessageCircleIcon,
+							isActive: pathname.startsWith(`${basePath}/whatsapp`),
+						},
+					]
+				: []),
 			...(organizationSubItems
 				? [
 						{
