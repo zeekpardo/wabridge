@@ -1,11 +1,11 @@
 import { getActiveOrganization } from "@auth/lib/server";
 import { PageHeader } from "@shared/components/PageHeader";
-import { WhatsAppTabs } from "@whatsapp/components/WhatsAppTabs";
+import { ControlPanel } from "@whatsapp/components/ControlPanel";
 import { notFound } from "next/navigation";
 
 export async function generateMetadata() {
 	return {
-		title: "WhatsApp",
+		title: "Control Panel",
 	};
 }
 
@@ -23,11 +23,8 @@ export default async function WhatsAppPage({
 
 	return (
 		<>
-			<PageHeader
-				title="WhatsApp"
-				subtitle="Connect WhatsApp numbers and send messages for this organization."
-			/>
-			<WhatsAppTabs />
+			<PageHeader title="Control Panel" subtitle="Manage your WhatsApp subaccounts." />
+			<ControlPanel organizationSlug={organizationSlug} />
 		</>
 	);
 }
