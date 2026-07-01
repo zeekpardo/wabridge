@@ -1,7 +1,7 @@
 # Local dev infra for wabridge (WhatsApp <-> GoHighLevel bridge)
 # Namespaced + ported to avoid clashing with other local supastarter stacks.
 #   Postgres : localhost:5442
-#   Redis    : localhost:6389   (BullMQ worker queues)
+#   Redis    : disabled (single-instance; re-enable when scaling out)
 #   MinIO    : localhost:9010 (S3 API) / 9011 (console)
 
 services:
@@ -23,20 +23,23 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: wabridge-redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6389:6379"
-    volumes:
-      - wabridge_redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # Redis disabled (single-instance; distributed lock runs in-process).
+  # Re-enable together with the Redis block in
+  # packages/integrations/lib/token-refresh/redis-lock.ts when scaling out.
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: wabridge-redis
+  #   restart: unless-stopped
+  #   command: ["redis-server", "--appendonly", "yes"]
+  #   ports:
+  #     - "6389:6379"
+  #   volumes:
+  #     - wabridge_redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   minio:
     image: minio/minio:latest
@@ -74,5 +77,5 @@ services:
 
 volumes:
   wabridge_postgres_data:
-  wabridge_redis_data:
+  # wabridge_redis_data:  # Redis disabled
   wabridge_minio_data:

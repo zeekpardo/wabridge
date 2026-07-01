@@ -1,9 +1,35 @@
-import { randomUUID } from "node:crypto";
+/**
+ * Distributed lock for OAuth token refresh.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * REDIS DISABLED (single-instance deployment).
+ *
+ * The Redis-backed distributed lock below is commented out until we run more
+ * than one app instance. `withDistributedLock` currently runs the work
+ * in-process only — which is exactly what the Redis path did when REDIS_URL was
+ * unset, so behavior is unchanged for a single instance. Re-enable by
+ * uncommenting the block below (and provisioning Redis + REDIS_URL) when we
+ * scale horizontally, so concurrent instances don't refresh the same token at
+ * once.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
 /**
- * Minimal Redis distributed lock using SET NX EX.
- * Falls back to no-op when REDIS_URL is not set (local dev without Redis).
+ * Execute `fn`, returning `{ executed: true, result }`. With Redis disabled this
+ * always runs in-process; the `{ executed: false }` branch (another instance
+ * holds the lock) only happens once the Redis implementation below is restored.
  */
+export async function withDistributedLock<T>(
+	_lockKey: string,
+	fn: () => Promise<T>,
+): Promise<{ executed: true; result: T } | { executed: false }> {
+	const result = await fn();
+	return { executed: true, result };
+}
+
+/* ─── Redis-backed distributed lock (disabled) ────────────────────────────────
+
+import { randomUUID } from "node:crypto";
 
 let redisInstance: import("ioredis").Redis | null = null;
 let redisUnavailable = false;
@@ -71,13 +97,6 @@ async function waitForLockRelease(redis: import("ioredis").Redis, key: string): 
 	}
 }
 
-/**
- * Execute `fn` while holding a distributed Redis lock.
- * Returns `{ executed: true, result }` if this process won the lock,
- * or `{ executed: false }` if another process holds it (after waiting for release).
- *
- * When Redis is unavailable, executes `fn` directly (in-process only).
- */
 export async function withDistributedLock<T>(
 	lockKey: string,
 	fn: () => Promise<T>,
@@ -105,3 +124,5 @@ export async function withDistributedLock<T>(
 	await waitForLockRelease(redis, lockKey);
 	return { executed: false };
 }
+
+──────────────────────────────────────────────────────────────────────────── */
