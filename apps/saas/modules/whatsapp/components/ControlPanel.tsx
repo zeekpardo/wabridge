@@ -20,6 +20,7 @@ import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowUpRightIcon,
+	KeyRoundIcon,
 	PlusIcon,
 	ServerIcon,
 	UsersIcon,
@@ -99,6 +100,7 @@ export function ControlPanel({ organizationSlug }: { organizationSlug: string })
 							key={sub.id}
 							subaccount={sub}
 							href={`/${organizationSlug}/whatsapp/${sub.id}`}
+							embeddedHref={`/embedded/${organizationSlug}/whatsapp/${sub.id}`}
 						/>
 					))}
 					<AddSubaccountCard />
@@ -151,7 +153,15 @@ interface SubaccountStat {
 	connectionsTotal: number;
 }
 
-function SubaccountCard({ subaccount, href }: { subaccount: SubaccountStat; href: string }) {
+function SubaccountCard({
+	subaccount,
+	href,
+	embeddedHref,
+}: {
+	subaccount: SubaccountStat;
+	href: string;
+	embeddedHref: string;
+}) {
 	return (
 		<Card className="gap-3 p-5 hover:-translate-y-0.5 hover:shadow-lg flex flex-col transition-all hover:border-primary/50">
 			<div className="gap-2 flex items-start justify-between">
@@ -185,12 +195,19 @@ function SubaccountCard({ subaccount, href }: { subaccount: SubaccountStat; href
 				</span>
 			</div>
 
-			<Button asChild size="sm" className="gap-1.5">
-				<Link href={href}>
-					Open subaccount
-					<ArrowUpRightIcon className="size-4" />
-				</Link>
-			</Button>
+			<div className="gap-2 flex">
+				<Button asChild size="sm" className="gap-1.5 flex-1">
+					<a href={embeddedHref} target="_blank" rel="noopener noreferrer">
+						<KeyRoundIcon className="size-3.5" />
+						Autologin
+					</a>
+				</Button>
+				<Button asChild size="sm" variant="outline" aria-label="Open subaccount">
+					<Link href={href}>
+						<ArrowUpRightIcon className="size-4" />
+					</Link>
+				</Button>
+			</div>
 		</Card>
 	);
 }
