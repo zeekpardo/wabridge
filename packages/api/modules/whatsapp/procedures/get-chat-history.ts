@@ -3,12 +3,14 @@ import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export interface MessageMedia {
 	kind: string;
-	/** A data URL for image/video thumbnails, or null for non-visual media. */
+	/** A data URL for images and voice/audio, or null for non-inlined media. */
 	dataUrl: string | null;
+	/** The source MIME type (e.g. audio/ogg), when known — drives the player. */
+	mimetype: string | null;
 }
 
 export interface HistoryMessage {
@@ -28,9 +30,10 @@ const MEDIA_TYPES = new Set(["image", "video", "sticker", "audio", "ptt", "voice
 
 /**
  * Split a message into its caption text and media. With includeMedia, OpenWA
- * returns `media: { mimetype, data(base64) }`; `body` is the caption. We only
- * forward image/sticker data as a data URL (bounded size); video/audio/docs get
- * a placeholder rather than shipping multi-MB base64 to the browser.
+ * returns `media: { mimetype, data(base64) }`; `body` is the caption. We inline
+ * images (thumbnails) and voice/audio (playable in the thread) as data URLs;
+ * video/docs get a placeholder rather than shipping multi-MB base64 to the
+ * browser. Voice notes are small, so playing them inline is worth the bytes.
  */
 function extractMedia(
 	type: string,
@@ -46,11 +49,9 @@ function extractMedia(
 		return { body: text, media: null };
 	}
 	const mimetype = media?.mimetype ?? "";
-	const dataUrl =
-		media?.data && mimetype.startsWith("image/")
-			? `data:${mimetype};base64,${media.data}`
-			: null;
-	return { body: text, media: { kind: type, dataUrl } };
+	const inlineable = mimetype.startsWith("image/") || mimetype.startsWith("audio/");
+	const dataUrl = media?.data && inlineable ? `data:${mimetype};base64,${media.data}` : null;
+	return { body: text, media: { kind: type, dataUrl, mimetype: mimetype || null } };
 }
 
 export const getChatHistory = protectedProcedure
@@ -62,18 +63,25 @@ export const getChatHistory = protectedProcedure
 		description:
 			"Reads the real message history for a contact live from WhatsApp (via OpenWA), so past conversations show even for contacts never messaged through WABridge.",
 	})
-	.input(z.object({ chatId: z.string(), limit: z.number().int().min(1).max(200).optional() }))
+	.input(
+		z.object({
+			chatId: z.string(),
+			limit: z.number().int().min(1).max(200).optional(),
+			subaccountId: z.string().optional(),
+		}),
+	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
 		// Which number owns this chat: the conversation's active number, else the default.
-		const conversation = await getConversation(organizationId, input.chatId);
+		const conversation = await getConversation(subaccount.id, input.chatId);
 		const sender = conversation?.activeSessionId
-			? await getWhatsAppSession(organizationId, conversation.activeSessionId)
-			: await getDefaultSession(organizationId);
+			? await getWhatsAppSession(subaccount.id, conversation.activeSessionId)
+			: await getDefaultSession(subaccount.id);
 
 		if (!sender) {
 			return [] as HistoryMessage[];

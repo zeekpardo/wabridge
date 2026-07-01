@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/components/tabs";
+
 import { WhatsAppInbox } from "./inbox/WhatsAppInbox";
 import { WhatsAppNumbers } from "./WhatsAppNumbers";
 

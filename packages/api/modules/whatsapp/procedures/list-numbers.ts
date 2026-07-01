@@ -1,7 +1,8 @@
 import { listSendableSessions } from "@repo/database";
+import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const listNumbers = protectedProcedure
 	.route({
@@ -9,15 +10,18 @@ export const listNumbers = protectedProcedure
 		path: "/whatsapp/numbers",
 		tags: ["WhatsApp"],
 		summary: "List sendable numbers",
-		description: "Ready numbers for the active org, ordered by send priority (for the composer).",
+		description:
+			"Ready numbers for the resolved subaccount, ordered by send priority (for the composer).",
 	})
-	.handler(async ({ context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+	.input(z.object({ subaccountId: z.string().optional() }))
+	.handler(async ({ input, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		const sessions = await listSendableSessions(organizationId);
+		const sessions = await listSendableSessions(subaccount.id);
 		return sessions.map((row) => ({
 			id: row.id,
 			label: row.label,

@@ -1,8 +1,9 @@
 import { getWhatsAppSettings } from "@repo/database";
 import type { GlobalSpintax } from "@repo/whatsapp";
+import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const getSettings = protectedProcedure
 	.route({
@@ -10,15 +11,17 @@ export const getSettings = protectedProcedure
 		path: "/whatsapp/settings",
 		tags: ["WhatsApp"],
 		summary: "Get WhatsApp settings",
-		description: "Global spintax variables for the caller's active organization.",
+		description: "Global spintax variables for the resolved subaccount.",
 	})
-	.handler(async ({ context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+	.input(z.object({ subaccountId: z.string().optional() }))
+	.handler(async ({ input, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		const settings = await getWhatsAppSettings(organizationId);
+		const settings = await getWhatsAppSettings(subaccount.id);
 		const globalSpintax = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
 
 		return { globalSpintax };

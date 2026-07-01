@@ -114,11 +114,7 @@ class OpenWaHttpClient implements OpenWaClient {
 		this.apiKey = config.apiKey;
 	}
 
-	private async request<TResult>(
-		method: string,
-		path: string,
-		body?: unknown,
-	): Promise<TResult> {
+	private async request<TResult>(method: string, path: string, body?: unknown): Promise<TResult> {
 		const headers: Record<string, string> = {
 			"X-API-Key": this.apiKey,
 		};
@@ -181,11 +177,9 @@ class OpenWaHttpClient implements OpenWaClient {
 	}
 
 	requestPairingCode(id: string, phoneNumber: string): Promise<OpenWaPairingCodeResponse> {
-		return this.request<OpenWaPairingCodeResponse>(
-			"POST",
-			`/sessions/${id}/pairing-code`,
-			{ phoneNumber },
-		);
+		return this.request<OpenWaPairingCodeResponse>("POST", `/sessions/${id}/pairing-code`, {
+			phoneNumber,
+		});
 	}
 
 	getChats(id: string): Promise<OpenWaChat[]> {
@@ -217,18 +211,14 @@ class OpenWaHttpClient implements OpenWaClient {
 		kind: OpenWaMediaKind,
 		input: SendMediaInput,
 	): Promise<OpenWaSendTextResult> {
-		return this.request<OpenWaSendTextResult>(
-			"POST",
-			`/sessions/${id}/messages/send-${kind}`,
-			{
-				chatId: input.chatId,
-				...(input.url ? { url: input.url } : {}),
-				...(input.base64 ? { base64: input.base64 } : {}),
-				...(input.mimetype ? { mimetype: input.mimetype } : {}),
-				...(input.filename ? { filename: input.filename } : {}),
-				...(input.caption ? { caption: input.caption } : {}),
-			},
-		);
+		return this.request<OpenWaSendTextResult>("POST", `/sessions/${id}/messages/send-${kind}`, {
+			chatId: input.chatId,
+			...(input.url ? { url: input.url } : {}),
+			...(input.base64 ? { base64: input.base64 } : {}),
+			...(input.mimetype ? { mimetype: input.mimetype } : {}),
+			...(input.filename ? { filename: input.filename } : {}),
+			...(input.caption ? { caption: input.caption } : {}),
+		});
 	}
 
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown> {

@@ -8,6 +8,7 @@ import { Spinner } from "@repo/ui/components/spinner";
 import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
 import { InboxIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+
 import { prettyPhone, relativeTime, toChatId } from "./helpers";
 
 type Chat = RouterOutputs["whatsapp"]["listChats"][number];
@@ -71,7 +72,7 @@ export function ConversationList({
 
 	return (
 		<div className="flex h-full flex-col">
-			<div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+			<div className="gap-2 px-3 py-2.5 flex items-center justify-between border-b">
 				<h3 className="font-semibold text-sm">Chats</h3>
 				<Button
 					variant="ghost"
@@ -84,9 +85,9 @@ export function ConversationList({
 				</Button>
 			</div>
 
-			<div className="border-b p-2">
+			<div className="p-2 border-b">
 				<div className="relative">
-					<SearchIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-4 text-foreground/40" />
+					<SearchIcon className="left-2.5 size-4 absolute top-1/2 -translate-y-1/2 text-foreground/40" />
 					<Input
 						className="h-9 pl-8"
 						placeholder="Search name or number…"
@@ -97,7 +98,7 @@ export function ConversationList({
 			</div>
 
 			{showNewChat && (
-				<div className="flex items-end gap-2 border-b p-3">
+				<div className="gap-2 p-3 flex items-end border-b">
 					<Input
 						// oxlint-disable-next-line no-autofocus
 						autoFocus
@@ -117,20 +118,18 @@ export function ConversationList({
 				</div>
 			)}
 
-			<div className="flex-1 overflow-y-auto p-1.5">
+			<div className="p-1.5 flex-1 overflow-y-auto">
 				{isLoading && conversations.length === 0 ? (
-					<div className="flex justify-center py-12">
+					<div className="py-12 flex justify-center">
 						<Spinner className="size-5" />
 					</div>
 				) : filtered.length === 0 ? (
-					<div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-						<div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+					<div className="gap-2 px-4 py-12 flex flex-col items-center text-center">
+						<div className="size-10 flex items-center justify-center rounded-full bg-primary/10">
 							<InboxIcon className="size-5 text-primary" />
 						</div>
-						<p className="font-medium text-sm">
-							{search ? "No matches" : "No conversations yet"}
-						</p>
-						<p className="text-foreground/60 text-xs">
+						<p className="font-medium text-sm">{search ? "No matches" : "No conversations yet"}</p>
+						<p className="text-xs text-foreground/60">
 							{search
 								? "Try a different name or number."
 								: "Incoming messages appear here, or start a new chat."}
@@ -167,7 +166,7 @@ function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
 			type="button"
 			onClick={onSelect}
 			className={cn(
-				"flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
+				"gap-3 px-2.5 py-2 flex w-full items-center rounded-lg text-left transition-colors hover:bg-muted/60",
 				isSelected && "bg-muted",
 			)}
 		>
@@ -177,25 +176,25 @@ function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
 				</AvatarFallback>
 			</Avatar>
 			<div className="min-w-0 flex-1">
-				<div className="flex items-center justify-between gap-2">
-					<span className={cn("truncate text-sm", hasUnread ? "font-semibold" : "font-medium")}>
+				<div className="gap-2 flex items-center justify-between">
+					<span className={cn("text-sm truncate", hasUnread ? "font-semibold" : "font-medium")}>
 						{name}
 					</span>
 					<span className="shrink-0 text-[11px] text-foreground/40">
 						{relativeTime(chat.lastMessageAt)}
 					</span>
 				</div>
-				<div className="flex items-center justify-between gap-2">
+				<div className="gap-2 flex items-center justify-between">
 					<span
 						className={cn(
-							"truncate text-xs",
+							"text-xs truncate",
 							hasUnread ? "text-foreground/80" : "text-foreground/55",
 						)}
 					>
 						{chat.lastMessagePreview || "No messages yet"}
 					</span>
 					{hasUnread && (
-						<span className="flex size-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
+						<span className="size-5 min-w-5 px-1 flex shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
 							{chat.unreadCount}
 						</span>
 					)}

@@ -3,7 +3,7 @@ import { getWhatsAppSession, listWhatsAppMessagesBySession } from "@repo/databas
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const listMessages = protectedProcedure
 	.route({
@@ -17,19 +17,17 @@ export const listMessages = protectedProcedure
 		z.object({
 			id: z.string(),
 			limit: z.number().int().min(1).max(200).optional(),
+			subaccountId: z.string().optional(),
 		}),
 	)
-	.handler(async ({ input: { id, limit }, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
-			session.activeOrganizationId,
-			user.id,
-		);
+	.handler(async ({ input: { id, limit, subaccountId }, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(session.activeOrganizationId, user.id, subaccountId);
 
-		const row = await getWhatsAppSession(organizationId, id);
+		const row = await getWhatsAppSession(subaccount.id, id);
 
 		if (!row) {
 			throw new ORPCError("NOT_FOUND");
 		}
 
-		return listWhatsAppMessagesBySession(organizationId, row.id, limit);
+		return listWhatsAppMessagesBySession(subaccount.id, row.id, limit);
 	});

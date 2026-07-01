@@ -36,7 +36,7 @@ export async function reconcileWhatsAppSessions(): Promise<ReconcileSummary> {
 			}
 
 			if (!live) {
-				await updateWhatsAppSession(session.organizationId, session.id, {
+				await updateWhatsAppSession(session.subaccountId, session.id, {
 					status: "disconnected",
 					needsQr: true,
 				});
@@ -46,7 +46,7 @@ export async function reconcileWhatsAppSessions(): Promise<ReconcileSummary> {
 
 			if (live.status === "ready") {
 				if (session.status !== "ready") {
-					await updateWhatsAppSession(session.organizationId, session.id, { status: "ready" });
+					await updateWhatsAppSession(session.subaccountId, session.id, { status: "ready" });
 				}
 				continue;
 			}
@@ -54,7 +54,7 @@ export async function reconcileWhatsAppSessions(): Promise<ReconcileSummary> {
 			if (live.status === "disconnected" || live.status === "failed") {
 				// Reconnect using persisted creds — no QR needed in the common case.
 				await openwa.startSession(session.openwaSessionId);
-				await updateWhatsAppSession(session.organizationId, session.id, {
+				await updateWhatsAppSession(session.subaccountId, session.id, {
 					status: "authenticating",
 				});
 				summary.restarted++;
@@ -63,7 +63,7 @@ export async function reconcileWhatsAppSessions(): Promise<ReconcileSummary> {
 
 			// Any other transient status (qr_ready, initializing, …) — just sync it.
 			if (live.status !== session.status) {
-				await updateWhatsAppSession(session.organizationId, session.id, { status: live.status });
+				await updateWhatsAppSession(session.subaccountId, session.id, { status: live.status });
 			}
 		} catch (error) {
 			summary.errors++;

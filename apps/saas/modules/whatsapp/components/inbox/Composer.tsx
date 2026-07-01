@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@repo/ui";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
@@ -12,13 +13,17 @@ import {
 	ArrowUpIcon,
 	ClockIcon,
 	FileIcon,
+	MicIcon,
 	PaperclipIcon,
 	ShuffleIcon,
 	SmileIcon,
+	SquareIcon,
+	Trash2Icon,
 	XIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+
 import { ChipEditor, type ChipEditorHandle } from "./ChipEditor";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
@@ -31,9 +36,23 @@ interface StagedFile {
 	previewUrl: string;
 }
 
+/** Pick the best voice-note container the browser can record. */
+function pickAudioMime(): string {
+	const candidates = ["audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/webm"];
+	if (typeof MediaRecorder !== "undefined") {
+		for (const type of candidates) {
+			if (MediaRecorder.isTypeSupported(type)) {
+				return type;
+			}
+		}
+	}
+	return "audio/webm";
+}
+
 interface ComposerProps {
 	chatId: string;
 	fromSessionId: string | null;
+	subaccountId?: string;
 	onSent: () => void;
 }
 
@@ -44,11 +63,16 @@ function hasSendableContent(segments: MessageSegment[]): boolean {
 	);
 }
 
-export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
+export function Composer({ chatId, fromSessionId, subaccountId, onSent }: ComposerProps) {
 	const editorRef = useRef<ChipEditorHandle>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const recorderRef = useRef<MediaRecorder | null>(null);
+	const chunksRef = useRef<Blob[]>([]);
+	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const [segments, setSegments] = useState<MessageSegment[]>([]);
 	const [files, setFiles] = useState<StagedFile[]>([]);
+	const [recording, setRecording] = useState(false);
+	const [recordSeconds, setRecordSeconds] = useState(0);
 	const [emojiOpen, setEmojiOpen] = useState(false);
 	const [spintaxOpen, setSpintaxOpen] = useState(false);
 	const [spintaxInput, setSpintaxInput] = useState("");
@@ -81,10 +105,13 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			preview.reset();
 			return;
 		}
-		const handle = setTimeout(() => previewMutate({ text: raw }), 400);
+		const handle = setTimeout(() => previewMutate({ text: raw, subaccountId }), 400);
 		return () => clearTimeout(handle);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [segments]);
+
+	// Stop any in-flight recording timer when the composer unmounts.
+	useEffect(() => stopTimer, []);
 
 	function onFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
 		const list = Array.from(event.target.files ?? []);
@@ -111,6 +138,87 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			reader.readAsDataURL(file);
 		}
 		event.target.value = "";
+	}
+
+	function stopTimer() {
+		if (timerRef.current) {
+			clearInterval(timerRef.current);
+			timerRef.current = null;
+		}
+	}
+
+	async function startRecording() {
+		if (recording) {
+			return;
+		}
+		let stream: MediaStream;
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		} catch {
+			toastError("Microphone access was denied.");
+			return;
+		}
+		const mimetype = pickAudioMime();
+		const recorder = new MediaRecorder(stream, { mimeType: mimetype });
+		chunksRef.current = [];
+		recorder.ondataavailable = (event) => {
+			if (event.data.size > 0) {
+				chunksRef.current.push(event.data);
+			}
+		};
+		recorder.onstop = () => {
+			stopTimer();
+			for (const track of stream.getTracks()) {
+				track.stop();
+			}
+			const blob = new Blob(chunksRef.current, { type: mimetype });
+			const reader = new FileReader();
+			reader.onload = () => {
+				const dataUrl = String(reader.result);
+				const base64 = dataUrl.split(",")[1] ?? "";
+				if (!base64) {
+					return;
+				}
+				setFiles((prev) => [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						name: `voice-message.${mimetype.includes("ogg") ? "ogg" : "webm"}`,
+						mimetype,
+						base64,
+						previewUrl: dataUrl,
+					},
+				]);
+			};
+			reader.readAsDataURL(blob);
+			setRecording(false);
+			setRecordSeconds(0);
+		};
+		recorderRef.current = recorder;
+		recorder.start();
+		setRecording(true);
+		setRecordSeconds(0);
+		timerRef.current = setInterval(() => setRecordSeconds((seconds) => seconds + 1), 1000);
+	}
+
+	function stopRecording() {
+		recorderRef.current?.stop();
+	}
+
+	function cancelRecording() {
+		const recorder = recorderRef.current;
+		if (!recorder) {
+			return;
+		}
+		recorder.onstop = () => {
+			stopTimer();
+			for (const track of recorder.stream.getTracks()) {
+				track.stop();
+			}
+			setRecording(false);
+			setRecordSeconds(0);
+		};
+		recorder.stop();
 	}
 
 	function addSpintax() {
@@ -149,22 +257,29 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			text: raw,
 			attachments: attachments.length ? attachments : undefined,
 			fromSessionId: fromSessionId ?? undefined,
+			subaccountId,
 		});
 	}
 
 	const showPreview = preview.data && hasSendableContent(segments);
 
 	return (
-		<div className="flex flex-col gap-2 border-t bg-card/40 p-3">
+		<div className="gap-2 p-3 flex flex-col border-t bg-card/40">
 			{files.length > 0 && (
-				<div className="flex flex-wrap gap-2">
+				<div className="gap-2 flex flex-wrap">
 					{files.map((file) => (
 						<div key={file.id} className="relative">
 							{file.mimetype.startsWith("image/") ? (
 								// oxlint-disable-next-line jsx-a11y/alt-text
 								<img src={file.previewUrl} alt="" className="size-16 rounded-lg object-cover" />
+							) : file.mimetype.startsWith("audio/") ? (
+								<div className="h-16 px-2 flex items-center rounded-lg border bg-muted">
+									<audio controls src={file.previewUrl} className="h-9 w-48">
+										<track kind="captions" />
+									</audio>
+								</div>
 							) : (
-								<div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border bg-muted p-1 text-center">
+								<div className="size-16 gap-1 p-1 flex flex-col items-center justify-center rounded-lg border bg-muted text-center">
 									<FileIcon className="size-5 text-foreground/60" />
 									<span className="w-full truncate text-[9px] text-foreground/60">{file.name}</span>
 								</div>
@@ -172,7 +287,7 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 							<button
 								type="button"
 								aria-label="Remove attachment"
-								className="-right-1.5 -top-1.5 absolute flex size-5 items-center justify-center rounded-full bg-foreground text-background"
+								className="-right-1.5 -top-1.5 size-5 absolute flex items-center justify-center rounded-full bg-foreground text-background"
 								onClick={() => setFiles((prev) => prev.filter((f) => f.id !== file.id))}
 							>
 								<XIcon className="size-3" />
@@ -183,16 +298,46 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			)}
 
 			{showPreview && (
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs">
-					<span className="shrink-0 font-medium text-foreground/50">Preview</span>
+				<div className="gap-x-2 gap-y-1 px-2.5 py-1.5 text-xs flex flex-wrap items-center rounded-lg bg-muted/50">
+					<span className="font-medium shrink-0 text-foreground/50">Preview</span>
 					<span className="min-w-0 flex-1 truncate">
 						{preview.data?.actions.map((a) => a.text ?? `[${a.kind}]`).join("  ") || "—"}
 					</span>
 					{preview.data?.meta.delayMs ? (
-						<span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600">
+						<span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 shrink-0">
 							delay {preview.data.meta.delayMs}ms
 						</span>
 					) : null}
+				</div>
+			)}
+
+			{recording && (
+				<div className="gap-3 border-red-500/40 bg-red-500/5 px-3 py-2 flex items-center rounded-2xl border">
+					<span className="size-2.5 animate-pulse bg-red-500 rounded-full" />
+					<span className="font-medium text-red-600 text-sm tabular-nums">
+						Recording {Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, "0")}
+					</span>
+					<div className="gap-1 ml-auto flex items-center">
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-8 text-foreground/60"
+							aria-label="Cancel recording"
+							onClick={cancelRecording}
+						>
+							<Trash2Icon className="size-4" />
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							className="h-8 gap-1.5 px-3 rounded-full"
+							onClick={stopRecording}
+						>
+							<SquareIcon className="size-3.5 fill-current" />
+							Stop
+						</Button>
+					</div>
 				</div>
 			)}
 
@@ -203,8 +348,8 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 					onChange={setSegments}
 					onEnter={runSend}
 				/>
-				<div className="flex items-center justify-between gap-2 px-2 pb-2">
-					<div className="flex items-center gap-0.5">
+				<div className="gap-2 px-2 pb-2 flex items-center justify-between">
+					<div className="gap-0.5 flex items-center">
 						<input
 							ref={fileInputRef}
 							type="file"
@@ -223,6 +368,17 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 							<PaperclipIcon className="size-4" />
 						</Button>
 
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className={cn("size-8 text-foreground/60", recording && "text-red-600")}
+							aria-label={recording ? "Stop recording" : "Record voice message"}
+							onClick={recording ? stopRecording : startRecording}
+						>
+							<MicIcon className="size-4" />
+						</Button>
+
 						<Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
 							<PopoverTrigger asChild>
 								<Button
@@ -235,7 +391,7 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 									<SmileIcon className="size-4" />
 								</Button>
 							</PopoverTrigger>
-							<PopoverContent align="start" className="w-auto border-0 p-0">
+							<PopoverContent align="start" className="p-0 w-auto border-0">
 								<EmojiPicker
 									onEmojiClick={(emojiData) => editorRef.current?.insertText(emojiData.emoji)}
 									lazyLoadEmojis
@@ -251,14 +407,14 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="h-8 gap-1 px-2 text-foreground/60 text-xs"
+									className="h-8 gap-1 px-2 text-xs text-foreground/60"
 								>
 									<ShuffleIcon className="size-3.5" />
 									Variable
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-72">
-								<div className="flex flex-col gap-2">
+								<div className="gap-2 flex flex-col">
 									<Label className="text-xs">Options (comma-separated)</Label>
 									<Input
 										// oxlint-disable-next-line no-autofocus
@@ -273,7 +429,7 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 											}
 										}}
 									/>
-									<p className="text-foreground/50 text-xs">
+									<p className="text-xs text-foreground/50">
 										Each recipient gets a random option — reduces spam flags.
 									</p>
 									<Button size="sm" onClick={addSpintax}>
@@ -289,16 +445,16 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="h-8 gap-1 px-2 text-foreground/60 text-xs"
+									className="h-8 gap-1 px-2 text-xs text-foreground/60"
 								>
 									<ClockIcon className="size-3.5" />
 									Delay
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-64">
-								<div className="flex flex-col gap-2">
+								<div className="gap-2 flex flex-col">
 									<Label className="text-xs">Random delay (seconds)</Label>
-									<div className="flex items-center gap-2">
+									<div className="gap-2 flex items-center">
 										<Input
 											type="number"
 											min={0}
@@ -306,7 +462,7 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 											value={delayMin}
 											onChange={(e) => setDelayMin(e.target.value)}
 										/>
-										<span className="text-foreground/50 text-xs">to</span>
+										<span className="text-xs text-foreground/50">to</span>
 										<Input
 											type="number"
 											min={0}

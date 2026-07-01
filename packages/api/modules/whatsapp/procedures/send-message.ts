@@ -8,16 +8,11 @@ import {
 	setConversationActiveSession,
 	touchConversationOutbound,
 } from "@repo/database";
-import {
-	type GlobalSpintax,
-	processMessage,
-	sendProcessedMessage,
-	toChatId,
-} from "@repo/whatsapp";
+import { type GlobalSpintax, processMessage, sendProcessedMessage, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 const attachmentSchema = z.object({
 	url: z.string().url().optional(),
@@ -43,20 +38,22 @@ export const sendMessage = protectedProcedure
 				text: z.string().default(""),
 				attachments: z.array(attachmentSchema).optional(),
 				fromSessionId: z.string().optional(),
+				subaccountId: z.string().optional(),
 			})
 			.refine((value) => Boolean(value.chatId || value.toPhone), {
 				message: "Either chatId or toPhone is required.",
 			}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
 		const chatId = input.chatId ?? toChatId(input.toPhone ?? "");
 
-		const settings = await getWhatsAppSettings(organizationId);
+		const settings = await getWhatsAppSettings(subaccount.id);
 		const globals = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
 
 		const processed = processMessage({
@@ -69,24 +66,29 @@ export const sendMessage = protectedProcedure
 		let sender: Awaited<ReturnType<typeof getWhatsAppSession>> | null = null;
 
 		if (processed.numberOverride) {
-			sender = await getSessionByPriority(organizationId, processed.numberOverride.priority);
+			sender = await getSessionByPriority(subaccount.id, processed.numberOverride.priority);
 			if (!sender) {
 				throw new ORPCError("NOT_FOUND", {
 					message: `No number with priority ${processed.numberOverride.priority}.`,
 				});
 			}
 			if (processed.numberOverride.scope === "session") {
-				await setConversationActiveSession(organizationId, chatId, sender.id);
+				await setConversationActiveSession({
+					subaccountId: subaccount.id,
+					organizationId: subaccount.organizationId,
+					chatId,
+					sessionId: sender.id,
+				});
 			}
 		} else if (input.fromSessionId) {
-			sender = await getWhatsAppSession(organizationId, input.fromSessionId);
+			sender = await getWhatsAppSession(subaccount.id, input.fromSessionId);
 		} else {
-			const conversation = await getConversation(organizationId, chatId);
+			const conversation = await getConversation(subaccount.id, chatId);
 			if (conversation?.activeSessionId) {
-				sender = await getWhatsAppSession(organizationId, conversation.activeSessionId);
+				sender = await getWhatsAppSession(subaccount.id, conversation.activeSessionId);
 			}
 			if (!sender) {
-				sender = await getDefaultSession(organizationId);
+				sender = await getDefaultSession(subaccount.id);
 			}
 		}
 
@@ -103,7 +105,8 @@ export const sendMessage = protectedProcedure
 			{
 				openwaSessionId: sender.openwaSessionId,
 				sessionRowId: sender.id,
-				organizationId,
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
 				chatId,
 			},
 			processed,
@@ -111,7 +114,13 @@ export const sendMessage = protectedProcedure
 
 		const firstText = processed.actions.find((action) => action.text)?.text;
 		const preview = firstText ?? `[${processed.actions[0]?.kind ?? "message"}]`;
-		await touchConversationOutbound({ organizationId, chatId, sessionId: sender.id, preview });
+		await touchConversationOutbound({
+			subaccountId: subaccount.id,
+			organizationId: subaccount.organizationId,
+			chatId,
+			sessionId: sender.id,
+			preview,
+		});
 
 		return { ...result, processed, fromSessionId: sender.id };
 	});

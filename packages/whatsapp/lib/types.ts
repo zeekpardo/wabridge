@@ -61,8 +61,7 @@ export const OPENWA_WEBHOOK_EVENTS = {
 	sessionDisconnected: "session.disconnected",
 } as const;
 
-export type OpenWaWebhookEvent =
-	(typeof OPENWA_WEBHOOK_EVENTS)[keyof typeof OPENWA_WEBHOOK_EVENTS];
+export type OpenWaWebhookEvent = (typeof OPENWA_WEBHOOK_EVENTS)[keyof typeof OPENWA_WEBHOOK_EVENTS];
 
 export interface OpenWaWebhookRegistration {
 	url: string;

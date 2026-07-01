@@ -1,13 +1,10 @@
+import { randomBytes } from "node:crypto";
+
 import { ORPCError } from "@orpc/server";
 import { countWhatsAppSessions, createWhatsAppSession } from "@repo/database";
 import { logger } from "@repo/logs";
 import { getBaseUrl } from "@repo/utils";
-import {
-	createOpenWaClient,
-	OPENWA_WEBHOOK_EVENTS,
-	type OpenWaWebhookEvent,
-} from "@repo/whatsapp";
-import { randomBytes } from "node:crypto";
+import { createOpenWaClient, OPENWA_WEBHOOK_EVENTS, type OpenWaWebhookEvent } from "@repo/whatsapp";
 import { customAlphabet } from "nanoid";
 
 // OpenWA session names allow ONLY letters, numbers, and hyphens (no underscores).
@@ -15,7 +12,7 @@ const sessionSuffix = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 10)
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 const WEBHOOK_EVENTS: OpenWaWebhookEvent[] = Object.values(OPENWA_WEBHOOK_EVENTS);
 
@@ -31,22 +28,20 @@ export const connectNumber = protectedProcedure
 	.input(
 		z.object({
 			label: z.string().max(100).optional(),
+			subaccountId: z.string().optional(),
 		}),
 	)
-	.handler(async ({ input: { label }, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
-			session.activeOrganizationId,
-			user.id,
-		);
+	.handler(async ({ input: { label, subaccountId }, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(session.activeOrganizationId, user.id, subaccountId);
 
-		// Next send-priority for this org (1 = first/highest). Powers #switch|N.
-		const priority = (await countWhatsAppSessions(organizationId)) + 1;
+		// Next send-priority for this subaccount (1 = first/highest). Powers #switch|N.
+		const priority = (await countWhatsAppSessions(subaccount.id)) + 1;
 
 		const openwa = createOpenWaClient();
 
 		// Globally-unique OpenWA session name. Letters/numbers/hyphens only
-		// (OpenWA rejects underscores); cuid orgId is lowercase-alphanumeric.
-		const openwaName = `org-${organizationId}-${sessionSuffix()}`;
+		// (OpenWA rejects underscores); cuid ids are lowercase-alphanumeric.
+		const openwaName = `sub-${subaccount.id}-${sessionSuffix()}`;
 		const webhookSecret = randomBytes(32).toString("hex");
 
 		const baseUrl = getBaseUrl(
@@ -67,7 +62,8 @@ export const connectNumber = protectedProcedure
 			});
 
 			return await createWhatsAppSession({
-				organizationId,
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
 				openwaSessionId: created.id,
 				openwaName,
 				workerBaseUrl: process.env.OPENWA_BASE_URL as string,
@@ -79,7 +75,7 @@ export const connectNumber = protectedProcedure
 				priority,
 			});
 		} catch (error) {
-			logger.error(error, { ctx: "whatsapp.connectNumber", organizationId });
+			logger.error(error, { ctx: "whatsapp.connectNumber", subaccountId: subaccount.id });
 			throw new ORPCError("INTERNAL_SERVER_ERROR");
 		}
 	});

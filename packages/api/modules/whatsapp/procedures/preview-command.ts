@@ -3,7 +3,7 @@ import { type GlobalSpintax, processMessage } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 const attachmentSchema = z.object({
 	url: z.string().url().optional(),
@@ -25,15 +25,17 @@ export const previewCommand = protectedProcedure
 		z.object({
 			text: z.string().default(""),
 			attachments: z.array(attachmentSchema).optional(),
+			subaccountId: z.string().optional(),
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		const settings = await getWhatsAppSettings(organizationId);
+		const settings = await getWhatsAppSettings(subaccount.id);
 		const globals = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
 
 		return processMessage({

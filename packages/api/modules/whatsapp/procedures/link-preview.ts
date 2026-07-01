@@ -103,8 +103,7 @@ export const linkPreview = protectedProcedure
 				metaContent(html, "og:description") ??
 				metaContent(html, "twitter:description") ??
 				metaContent(html, "description");
-			let image =
-				metaContent(html, "og:image") ?? metaContent(html, "twitter:image") ?? null;
+			let image = metaContent(html, "og:image") ?? metaContent(html, "twitter:image") ?? null;
 			if (image && !/^https?:\/\//i.test(image)) {
 				try {
 					image = new URL(image, url).toString();

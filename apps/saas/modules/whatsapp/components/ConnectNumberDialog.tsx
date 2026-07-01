@@ -18,9 +18,10 @@ import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, SmartphoneIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { SessionStatusBadge, isConnected } from "./SessionStatusBadge";
 
-export function ConnectNumberDialog() {
+export function ConnectNumberDialog({ subaccountId }: { subaccountId?: string }) {
 	const queryClient = useQueryClient();
 	const [open, setOpen] = useState(false);
 	const [label, setLabel] = useState("");
@@ -47,7 +48,7 @@ export function ConnectNumberDialog() {
 
 	// Live status — poll while the session is still coming up.
 	const sessionQuery = useQuery({
-		...orpc.whatsapp.getSession.queryOptions({ input: { id: sessionId ?? "" } }),
+		...orpc.whatsapp.getSession.queryOptions({ input: { id: sessionId ?? "", subaccountId } }),
 		enabled: !!sessionId,
 		refetchInterval: (query) => (isConnected(query.state.data?.status ?? "") ? false : 2500),
 	});
@@ -57,7 +58,7 @@ export function ConnectNumberDialog() {
 
 	// QR — poll while the session is waiting to be scanned.
 	const qrQuery = useQuery({
-		...orpc.whatsapp.getQr.queryOptions({ input: { id: sessionId ?? "" } }),
+		...orpc.whatsapp.getQr.queryOptions({ input: { id: sessionId ?? "", subaccountId } }),
 		enabled: !!sessionId && !connected,
 		refetchInterval: connected ? false : 2500,
 	});
@@ -100,8 +101,8 @@ export function ConnectNumberDialog() {
 				</DialogHeader>
 
 				{!sessionId ? (
-					<div className="flex flex-col gap-4">
-						<div className="flex flex-col gap-1.5">
+					<div className="gap-4 flex flex-col">
+						<div className="gap-1.5 flex flex-col">
 							<Label htmlFor="wa-label">Label (optional)</Label>
 							<Input
 								id="wa-label"
@@ -111,19 +112,21 @@ export function ConnectNumberDialog() {
 							/>
 						</div>
 						<Button
-							onClick={() => connect.mutate({ label: label || undefined })}
+							onClick={() => connect.mutate({ label: label || undefined, subaccountId })}
 							loading={connect.isPending}
 						>
 							Start & show QR
 						</Button>
 					</div>
 				) : connected ? (
-					<div className="flex flex-col items-center gap-3 py-6 text-center">
-						<div className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10">
+					<div className="gap-3 py-6 flex flex-col items-center text-center">
+						<div className="size-12 bg-emerald-500/10 flex items-center justify-center rounded-full">
 							<SmartphoneIcon className="size-6 text-emerald-500" />
 						</div>
-						<p className="font-medium">Connected{sessionQuery.data?.phone ? ` — ${sessionQuery.data.phone}` : ""}</p>
-						<p className="text-foreground/60 text-sm">This number is now linked and ready.</p>
+						<p className="font-medium">
+							Connected{sessionQuery.data?.phone ? ` — ${sessionQuery.data.phone}` : ""}
+						</p>
+						<p className="text-sm text-foreground/60">This number is now linked and ready.</p>
 						<Button
 							onClick={() => {
 								toastSuccess("WhatsApp number connected");
@@ -145,12 +148,12 @@ export function ConnectNumberDialog() {
 						</TabsList>
 
 						<TabsContent value="qr">
-							<div className="flex flex-col items-center gap-3 py-2">
-								<div className="flex items-center gap-2 text-sm">
+							<div className="gap-3 py-2 flex flex-col items-center">
+								<div className="gap-2 text-sm flex items-center">
 									<span className="text-foreground/60">Status:</span>
 									<SessionStatusBadge status={status} />
 								</div>
-								<div className="flex size-64 items-center justify-center rounded-lg border bg-white p-2">
+								<div className="size-64 bg-white p-2 flex items-center justify-center rounded-lg border">
 									{qrQuery.data?.qrCode ? (
 										// eslint-disable-next-line @next/next/no-img-element
 										<img src={qrQuery.data.qrCode} alt="WhatsApp QR code" className="size-full" />
@@ -158,16 +161,16 @@ export function ConnectNumberDialog() {
 										<Spinner className="size-6" />
 									)}
 								</div>
-								<p className="text-foreground/60 max-w-xs text-center text-xs">
-									On your phone: WhatsApp → Settings → Linked Devices → Link a Device, then scan. The
-									code refreshes automatically.
+								<p className="max-w-xs text-xs text-center text-foreground/60">
+									On your phone: WhatsApp → Settings → Linked Devices → Link a Device, then scan.
+									The code refreshes automatically.
 								</p>
 							</div>
 						</TabsContent>
 
 						<TabsContent value="pairing">
-							<div className="flex flex-col gap-3 py-2">
-								<div className="flex flex-col gap-1.5">
+							<div className="gap-3 py-2 flex flex-col">
+								<div className="gap-1.5 flex flex-col">
 									<Label htmlFor="wa-phone">Phone number (digits only, with country code)</Label>
 									<Input
 										id="wa-phone"
@@ -181,13 +184,17 @@ export function ConnectNumberDialog() {
 									variant="secondary"
 									disabled={phone.length < 8}
 									loading={pairing.isPending}
-									onClick={() => sessionId && pairing.mutate({ id: sessionId, phoneNumber: phone })}
+									onClick={() =>
+										sessionId && pairing.mutate({ id: sessionId, phoneNumber: phone, subaccountId })
+									}
 								>
 									Get pairing code
 								</Button>
 								{pairingCode && (
-									<div className="rounded-lg border p-3 text-center">
-										<p className="text-foreground/60 text-xs">Enter this code in WhatsApp → Link a Device → Link with phone number</p>
+									<div className="p-3 rounded-lg border text-center">
+										<p className="text-xs text-foreground/60">
+											Enter this code in WhatsApp → Link a Device → Link with phone number
+										</p>
 										<p className="mt-1 font-mono text-2xl tracking-widest">{pairingCode}</p>
 									</div>
 								)}

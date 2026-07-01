@@ -161,9 +161,7 @@ export class GoHighLevelClient {
 		const res = await this.request<GHLApiResponse<GHLContact>>(`/contacts/?${params.toString()}`);
 		// Normalize phone for comparison
 		const normalized = phone.replace(/\D/g, "");
-		return (res.contacts ?? []).filter((c) =>
-			c.phone?.replace(/\D/g, "").includes(normalized),
-		);
+		return (res.contacts ?? []).filter((c) => c.phone?.replace(/\D/g, "").includes(normalized));
 	}
 
 	/**
@@ -235,13 +233,12 @@ export class GoHighLevelClient {
 		}
 
 		await sleep(CALL_DELAY_MS);
-		const created = await this.request<{ conversation?: GHLConversation } & Partial<GHLConversation>>(
-			"/conversations/",
-			{
-				method: "POST",
-				body: JSON.stringify({ locationId, contactId }),
-			},
-		);
+		const created = await this.request<
+			{ conversation?: GHLConversation } & Partial<GHLConversation>
+		>("/conversations/", {
+			method: "POST",
+			body: JSON.stringify({ locationId, contactId }),
+		});
 		return created.conversation ?? (created as GHLConversation);
 	}
 

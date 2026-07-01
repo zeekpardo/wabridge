@@ -2,7 +2,7 @@ import { upsertWhatsAppSettings } from "@repo/database";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const updateSettings = protectedProcedure
 	.route({
@@ -16,15 +16,17 @@ export const updateSettings = protectedProcedure
 		z.object({
 			// Map of variable name -> list of variations, e.g. { SPINTAX_1: ["Hi", "Hello"] }.
 			globalSpintax: z.record(z.string(), z.array(z.string())),
+			subaccountId: z.string().optional(),
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		await upsertWhatsAppSettings(organizationId, { globalSpintax: input.globalSpintax });
+		await upsertWhatsAppSettings(subaccount.id, { globalSpintax: input.globalSpintax });
 
 		return { globalSpintax: input.globalSpintax };
 	});

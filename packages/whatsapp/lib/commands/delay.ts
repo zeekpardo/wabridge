@@ -25,6 +25,9 @@ export function extractDelay(text: string, rng: Rng = Math.random): DelayResult 
 	const hi = Math.max(a, b);
 	const delayMs = lo + Math.floor(rng() * (hi - lo + 1));
 
-	const cleaned = text.replace(DELAY_RE, "").replace(/[ \t]+$/gm, "").trimEnd();
+	const cleaned = text
+		.replace(DELAY_RE, "")
+		.replace(/[ \t]+$/gm, "")
+		.trimEnd();
 	return { text: cleaned, delayMs };
 }

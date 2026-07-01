@@ -52,33 +52,39 @@ export const OrganizationScalarFieldEnumSchema = z.enum(['id', 'name', 'slug', '
 
 export type OrganizationScalarFieldEnum = z.infer<typeof OrganizationScalarFieldEnumSchema>;
 
+// File: SubaccountScalarFieldEnum.schema.ts
+
+export const SubaccountScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'name', 'ghlLocationId', 'provisioningSource', 'status', 'whiteLabel', 'createdAt', 'updatedAt'])
+
+export type SubaccountScalarFieldEnum = z.infer<typeof SubaccountScalarFieldEnumSchema>;
+
 // File: GoHighLevelConnectionScalarFieldEnum.schema.ts
 
-export const GoHighLevelConnectionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'locationId', 'companyId', 'userId', 'accessToken', 'refreshToken', 'tokenExpiresAt', 'conversationProviderId', 'webhooksEnabled', 'firstSyncInProgress', 'needsReconnect', 'syncConfig', 'createdAt', 'updatedAt'])
+export const GoHighLevelConnectionScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'locationId', 'companyId', 'userId', 'accessToken', 'refreshToken', 'tokenExpiresAt', 'conversationProviderId', 'webhooksEnabled', 'firstSyncInProgress', 'needsReconnect', 'syncConfig', 'createdAt', 'updatedAt'])
 
 export type GoHighLevelConnectionScalarFieldEnum = z.infer<typeof GoHighLevelConnectionScalarFieldEnumSchema>;
 
 // File: WhatsAppSessionScalarFieldEnum.schema.ts
 
-export const WhatsAppSessionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'openwaSessionId', 'openwaName', 'workerBaseUrl', 'label', 'phone', 'jid', 'status', 'webhookSecret', 'needsQr', 'priority', 'lastError', 'connectedAt', 'createdAt', 'updatedAt'])
+export const WhatsAppSessionScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'openwaSessionId', 'openwaName', 'workerBaseUrl', 'label', 'phone', 'jid', 'status', 'webhookSecret', 'needsQr', 'priority', 'lastError', 'connectedAt', 'createdAt', 'updatedAt'])
 
 export type WhatsAppSessionScalarFieldEnum = z.infer<typeof WhatsAppSessionScalarFieldEnumSchema>;
 
 // File: WhatsAppMessageScalarFieldEnum.schema.ts
 
-export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'idempotencyKey', 'timestamp', 'createdAt'])
+export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'idempotencyKey', 'timestamp', 'createdAt'])
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
 
 // File: WhatsAppConversationScalarFieldEnum.schema.ts
 
-export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'chatId', 'contactName', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
+export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'chatId', 'contactName', 'ghlContactId', 'ownerId', 'tags', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
 
 export type WhatsAppConversationScalarFieldEnum = z.infer<typeof WhatsAppConversationScalarFieldEnumSchema>;
 
 // File: WhatsAppSettingsScalarFieldEnum.schema.ts
 
-export const WhatsAppSettingsScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'globalSpintax', 'createdAt', 'updatedAt'])
+export const WhatsAppSettingsScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'globalSpintax', 'createdAt', 'updatedAt'])
 
 export type WhatsAppSettingsScalarFieldEnum = z.infer<typeof WhatsAppSettingsScalarFieldEnumSchema>;
 
@@ -291,11 +297,28 @@ export const OrganizationSchema = z.object({
 export type OrganizationType = z.infer<typeof OrganizationSchema>;
 
 
+// File: Subaccount.schema.ts
+
+export const SubaccountSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  ghlLocationId: z.string().nullish(),
+  provisioningSource: z.string().default("manual"),
+  status: z.string().default("active"),
+  whiteLabel: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type SubaccountType = z.infer<typeof SubaccountSchema>;
+
+
 // File: GoHighLevelConnection.schema.ts
 
 export const GoHighLevelConnectionSchema = z.object({
   id: z.string(),
-  organizationId: z.string(),
+  subaccountId: z.string(),
   locationId: z.string(),
   companyId: z.string().nullish(),
   userId: z.string().nullish(),
@@ -319,6 +342,7 @@ export type GoHighLevelConnectionType = z.infer<typeof GoHighLevelConnectionSche
 export const WhatsAppSessionSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
+  subaccountId: z.string(),
   openwaSessionId: z.string(),
   openwaName: z.string(),
   workerBaseUrl: z.string(),
@@ -343,6 +367,7 @@ export type WhatsAppSessionType = z.infer<typeof WhatsAppSessionSchema>;
 export const WhatsAppMessageSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
+  subaccountId: z.string(),
   sessionId: z.string(),
   direction: z.string(),
   waMessageId: z.string().nullish(),
@@ -364,8 +389,12 @@ export type WhatsAppMessageType = z.infer<typeof WhatsAppMessageSchema>;
 export const WhatsAppConversationSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
+  subaccountId: z.string(),
   chatId: z.string(),
   contactName: z.string().nullish(),
+  ghlContactId: z.string().nullish(),
+  ownerId: z.string().nullish(),
+  tags: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
   activeSessionId: z.string().nullish(),
   lastMessageAt: z.date().nullish(),
   lastMessagePreview: z.string().nullish(),
@@ -382,7 +411,7 @@ export type WhatsAppConversationType = z.infer<typeof WhatsAppConversationSchema
 
 export const WhatsAppSettingsSchema = z.object({
   id: z.string(),
-  organizationId: z.string(),
+  subaccountId: z.string(),
   globalSpintax: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
   createdAt: z.date(),
   updatedAt: z.date(),

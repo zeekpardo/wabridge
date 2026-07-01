@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { getDefaultSubaccount, getSubaccount } from "@repo/database";
 
 import { verifyOrganizationMembership } from "../../organizations/lib/membership";
 
@@ -28,4 +29,52 @@ export async function requireActiveOrganizationId(
 	}
 
 	return activeOrganizationId;
+}
+
+export interface ResolvedSubaccount {
+	id: string;
+	organizationId: string;
+	name: string;
+	ghlLocationId: string | null;
+}
+
+/**
+ * The scoping choke point for all WhatsApp/GHL data. Resolves and authorizes a
+ * subaccount for the caller:
+ *
+ *  1. The active agency organization is read from the session and membership is
+ *     verified (never trusts a client-supplied org id).
+ *  2. If a `subaccountId` is given, it must belong to that agency; otherwise the
+ *     agency's default (single) subaccount is used — so existing single-tenant
+ *     callers keep working without passing an id.
+ *
+ * Throws `FORBIDDEN` when the subaccount isn't owned by the caller's agency and
+ * `NOT_FOUND` when the agency has no subaccount yet.
+ */
+export async function resolveSubaccount(
+	activeOrganizationId: string | null | undefined,
+	userId: string,
+	subaccountId?: string | null,
+): Promise<ResolvedSubaccount> {
+	const organizationId = await requireActiveOrganizationId(activeOrganizationId, userId);
+
+	const subaccount = subaccountId
+		? await getSubaccount(organizationId, subaccountId)
+		: await getDefaultSubaccount(organizationId);
+
+	if (!subaccount) {
+		if (subaccountId) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Subaccount not found in this agency.",
+			});
+		}
+		throw new ORPCError("NOT_FOUND", { message: "No subaccount available." });
+	}
+
+	return {
+		id: subaccount.id,
+		organizationId: subaccount.organizationId,
+		name: subaccount.name,
+		ghlLocationId: subaccount.ghlLocationId,
+	};
 }

@@ -149,7 +149,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
 	return (
 		<div className="relative">
 			{isEmpty && placeholder && (
-				<div className="pointer-events-none absolute left-3.5 top-3 text-foreground/40 text-sm">
+				<div className="left-3.5 top-3 text-sm pointer-events-none absolute text-foreground/40">
 					{placeholder}
 				</div>
 			)}
@@ -163,7 +163,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
 				tabIndex={0}
 				contentEditable
 				suppressContentEditableWarning
-				className="min-h-11 whitespace-pre-wrap break-words px-3.5 py-3 text-sm outline-none"
+				className="min-h-11 px-3.5 py-3 text-sm break-words whitespace-pre-wrap outline-none"
 				onInput={emitChange}
 				onKeyDown={(event) => {
 					if (event.key === "Enter" && !event.shiftKey) {

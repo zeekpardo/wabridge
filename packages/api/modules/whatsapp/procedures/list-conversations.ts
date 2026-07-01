@@ -1,7 +1,8 @@
 import { listConversations } from "@repo/database";
+import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const listConversationsProcedure = protectedProcedure
 	.route({
@@ -9,13 +10,15 @@ export const listConversationsProcedure = protectedProcedure
 		path: "/whatsapp/conversations",
 		tags: ["WhatsApp"],
 		summary: "List conversations",
-		description: "Inbox: one thread per contact for the active organization, newest first.",
+		description: "Inbox: one thread per contact for the resolved subaccount, newest first.",
 	})
-	.handler(async ({ context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+	.input(z.object({ subaccountId: z.string().optional() }))
+	.handler(async ({ input, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		return listConversations(organizationId);
+		return listConversations(subaccount.id);
 	});

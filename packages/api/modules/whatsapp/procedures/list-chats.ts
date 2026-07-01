@@ -1,8 +1,9 @@
 import { listConversations, listSendableSessions } from "@repo/database";
 import { type OpenWaChat, createOpenWaClient } from "@repo/whatsapp";
+import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 interface ChatListItem {
 	chatId: string;
@@ -105,24 +106,24 @@ export const listChats = protectedProcedure
 		tags: ["WhatsApp"],
 		summary: "List all WhatsApp chats",
 		description:
-			"All chats pulled from the org's connected number(s) via OpenWA, merged and overlaid with tracked conversation state (unread, active number).",
+			"All chats pulled from the subaccount's connected number(s) via OpenWA, merged and overlaid with tracked conversation state (unread, active number).",
 	})
-	.handler(async ({ context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+	.input(z.object({ subaccountId: z.string().optional() }))
+	.handler(async ({ input, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		const sessions = await listSendableSessions(organizationId);
+		const sessions = await listSendableSessions(subaccount.id);
 		if (sessions.length === 0) {
 			return [] as ChatListItem[];
 		}
 
 		const openwa = createOpenWaClient();
 		const chatArrays = await Promise.all(
-			sessions.map((row) =>
-				openwa.getChats(row.openwaSessionId).catch(() => [] as OpenWaChat[]),
-			),
+			sessions.map((row) => openwa.getChats(row.openwaSessionId).catch(() => [] as OpenWaChat[])),
 		);
 
 		// Merge chats across numbers, keeping the most recent per chatId.
@@ -139,7 +140,7 @@ export const listChats = protectedProcedure
 			}
 		}
 
-		const conversations = await listConversations(organizationId);
+		const conversations = await listConversations(subaccount.id);
 		const convoByChat = new Map(conversations.map((c) => [c.chatId, c]));
 
 		const items: ChatListItem[] = [];
@@ -174,9 +175,7 @@ export const listChats = protectedProcedure
 		}
 
 		const deduped = dedupeByContact(items);
-		deduped.sort(
-			(a, b) => (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0),
-		);
+		deduped.sort((a, b) => (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0));
 
 		return deduped;
 	});

@@ -50,7 +50,7 @@ export async function webhookHandler(req: Request): Promise<Response> {
 	}
 
 	try {
-		await processEvent(row.id, row.organizationId, payload);
+		await processEvent(row.id, row.subaccountId, row.organizationId, payload);
 	} catch (error) {
 		logger.error(error, { ctx: "whatsapp.webhook.process", event: payload.event });
 		return new Response("Processing error.", { status: 500 });
@@ -61,6 +61,7 @@ export async function webhookHandler(req: Request): Promise<Response> {
 
 async function processEvent(
 	sessionId: string,
+	subaccountId: string,
 	organizationId: string,
 	payload: ReturnType<typeof parseOpenWaWebhookPayload>,
 ): Promise<void> {
@@ -79,6 +80,7 @@ async function processEvent(
 			const type = String(data.type ?? "text");
 
 			await createWhatsAppMessage({
+				subaccountId,
 				organizationId,
 				sessionId,
 				direction: outbound ? "outbound" : "inbound",
@@ -97,7 +99,13 @@ async function processEvent(
 			if (chatId) {
 				const preview = body ? body.slice(0, 140) : `[${type}]`;
 				if (outbound) {
-					await touchConversationOutbound({ organizationId, chatId, sessionId, preview });
+					await touchConversationOutbound({
+						subaccountId,
+						organizationId,
+						chatId,
+						sessionId,
+						preview,
+					});
 				} else {
 					const contactName =
 						typeof data.pushName === "string"
@@ -106,6 +114,7 @@ async function processEvent(
 								? data.notifyName
 								: null;
 					await upsertConversationInbound({
+						subaccountId,
 						organizationId,
 						chatId,
 						sessionId,
@@ -129,7 +138,7 @@ async function processEvent(
 		case OPENWA_WEBHOOK_EVENTS.sessionAuthenticated:
 		case OPENWA_WEBHOOK_EVENTS.sessionDisconnected: {
 			const status = typeof data.status === "string" ? data.status : undefined;
-			await updateWhatsAppSession(organizationId, sessionId, {
+			await updateWhatsAppSession(subaccountId, sessionId, {
 				...(status ? { status } : {}),
 				...(payload.event === OPENWA_WEBHOOK_EVENTS.sessionAuthenticated
 					? { needsQr: false, connectedAt: new Date() }
@@ -140,7 +149,7 @@ async function processEvent(
 			break;
 		}
 		case OPENWA_WEBHOOK_EVENTS.sessionQr: {
-			await updateWhatsAppSession(organizationId, sessionId, { needsQr: true });
+			await updateWhatsAppSession(subaccountId, sessionId, { needsQr: true });
 			break;
 		}
 		default:

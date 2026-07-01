@@ -11,6 +11,9 @@ export interface SendTarget {
 	openwaSessionId: string;
 	/** The WhatsAppSession row id (for message logging). */
 	sessionRowId: string;
+	/** The subaccount that owns the sending number. */
+	subaccountId: string;
+	/** The owning agency organization (denormalized for admin queries). */
 	organizationId: string;
 	/** Destination chat id, e.g. `15551234567@c.us`. */
 	chatId: string;
@@ -57,6 +60,7 @@ export async function sendProcessedMessage(
 					});
 
 		await createWhatsAppMessage({
+			subaccountId: target.subaccountId,
 			organizationId: target.organizationId,
 			sessionId: target.sessionRowId,
 			direction: "outbound",

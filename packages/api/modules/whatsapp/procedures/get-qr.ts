@@ -4,7 +4,7 @@ import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const getQr = protectedProcedure
 	.route({
@@ -17,15 +17,13 @@ export const getQr = protectedProcedure
 	.input(
 		z.object({
 			id: z.string(),
+			subaccountId: z.string().optional(),
 		}),
 	)
-	.handler(async ({ input: { id }, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
-			session.activeOrganizationId,
-			user.id,
-		);
+	.handler(async ({ input: { id, subaccountId }, context: { user, session } }) => {
+		const subaccount = await resolveSubaccount(session.activeOrganizationId, user.id, subaccountId);
 
-		const row = await getWhatsAppSession(organizationId, id);
+		const row = await getWhatsAppSession(subaccount.id, id);
 
 		if (!row) {
 			throw new ORPCError("NOT_FOUND");

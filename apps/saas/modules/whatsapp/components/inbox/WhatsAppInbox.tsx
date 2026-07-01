@@ -12,29 +12,40 @@ import {
 } from "@repo/ui/components/select";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeftIcon, MessageSquareIcon } from "lucide-react";
+import { ChevronLeftIcon, MessageSquareIcon, PanelRightIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Composer } from "./Composer";
-import { ConversationList } from "./ConversationList";
-import { MessageThread } from "./MessageThread";
-import { prettyPhone } from "./helpers";
 
-export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
+import { Composer } from "./Composer";
+import { ContactDetailsPanel } from "./ContactDetailsPanel";
+import { ConversationList } from "./ConversationList";
+import { prettyPhone } from "./helpers";
+import { MessageThread } from "./MessageThread";
+
+export function WhatsAppInbox({
+	embedded = false,
+	subaccountId,
+}: {
+	embedded?: boolean;
+	subaccountId?: string;
+}) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+	const [detailsOpen, setDetailsOpen] = useState(false);
 
 	// Full chat list pulled from OpenWA (all contacts), overlaid with our tracked
 	// conversation state. Heavier than the DB-only list, so polled less often.
 	const conversationsQuery = useQuery({
-		...orpc.whatsapp.listChats.queryOptions(),
+		...orpc.whatsapp.listChats.queryOptions({ input: { subaccountId } }),
 		refetchInterval: 15000,
 	});
 
-	const numbersQuery = useQuery(orpc.whatsapp.listNumbers.queryOptions());
+	const numbersQuery = useQuery(
+		orpc.whatsapp.listNumbers.queryOptions({ input: { subaccountId } }),
+	);
 
 	const threadQuery = useQuery({
 		...orpc.whatsapp.getThread.queryOptions({
-			input: { chatId: selectedChatId ?? "", limit: 100 },
+			input: { chatId: selectedChatId ?? "", limit: 100, subaccountId },
 		}),
 		enabled: !!selectedChatId,
 		refetchInterval: selectedChatId ? 4000 : false,
@@ -44,7 +55,7 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	// — not polled — so past conversations show even for never-messaged contacts.
 	const historyQuery = useQuery({
 		...orpc.whatsapp.getChatHistory.queryOptions({
-			input: { chatId: selectedChatId ?? "", limit: 50 },
+			input: { chatId: selectedChatId ?? "", limit: 50, subaccountId },
 		}),
 		enabled: !!selectedChatId,
 		staleTime: 60_000,
@@ -63,7 +74,7 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 				body: string | null;
 				type: string;
 				timestamp: Date | string;
-				media?: { kind: string; dataUrl: string | null } | null;
+				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 			}
 		>();
 		for (const m of threadQuery.data?.messages ?? []) {
@@ -121,7 +132,7 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	return (
 		<Card
 			className={cn(
-				"flex overflow-hidden p-0",
+				"p-0 relative flex overflow-hidden",
 				embedded
 					? "h-[100dvh] rounded-none border-0 shadow-none"
 					: "h-[calc(100vh-16rem)] min-h-[32rem]",
@@ -129,8 +140,8 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 		>
 			<div
 				className={cn(
-					"w-full shrink-0 border-r md:w-1/4 md:min-w-56",
-					selectedChatId ? "hidden md:block" : "block",
+					"md:w-1/4 md:min-w-56 w-full shrink-0 border-r",
+					selectedChatId ? "md:block hidden" : "block",
 				)}
 			>
 				<ConversationList
@@ -141,21 +152,21 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 				/>
 			</div>
 
-			<div className={cn("flex-1 flex-col", selectedChatId ? "flex" : "hidden md:flex")}>
+			<div className={cn("flex-1 flex-col", selectedChatId ? "flex" : "md:flex hidden")}>
 				{!selectedChatId ? (
-					<div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-						<div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+					<div className="gap-2 flex flex-1 flex-col items-center justify-center text-center">
+						<div className="size-12 flex items-center justify-center rounded-full bg-primary/10">
 							<MessageSquareIcon className="size-6 text-primary" />
 						</div>
 						<p className="font-medium">Select a conversation</p>
-						<p className="text-foreground/60 text-sm">
+						<p className="text-sm text-foreground/60">
 							Pick a chat on the left, or start a new one.
 						</p>
 					</div>
 				) : (
 					<>
-						<div className="flex items-center justify-between gap-3 border-b p-3">
-							<div className="flex min-w-0 items-center gap-1">
+						<div className="gap-3 p-3 flex items-center justify-between border-b">
+							<div className="min-w-0 gap-1 flex items-center">
 								<Button
 									variant="ghost"
 									size="icon"
@@ -166,22 +177,22 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 									<ChevronLeftIcon className="size-4" />
 								</Button>
 								<div className="min-w-0">
-									<p className="truncate font-medium text-sm">{contactName}</p>
+									<p className="font-medium text-sm truncate">{contactName}</p>
 									{selectedChat?.phone && selectedChat.phone !== contactName ? (
-										<p className="truncate text-foreground/50 text-xs">{selectedChat.phone}</p>
+										<p className="text-xs truncate text-foreground/50">{selectedChat.phone}</p>
 									) : null}
 								</div>
 							</div>
-							<div className="flex items-center gap-2">
-								<span className="text-foreground/60 text-xs">Send from</span>
+							<div className="gap-2 flex items-center">
+								<span className="text-xs sm:inline hidden text-foreground/60">Send from</span>
 								<Select
 									value={activeNumberId}
 									disabled={numbers.length === 0 || setNumber.isPending}
 									onValueChange={(sessionId) =>
-										setNumber.mutate({ chatId: selectedChatId, sessionId })
+										setNumber.mutate({ chatId: selectedChatId, sessionId, subaccountId })
 									}
 								>
-									<SelectTrigger className="w-44">
+									<SelectTrigger className="w-36 sm:w-44">
 										<SelectValue placeholder="No numbers" />
 									</SelectTrigger>
 									<SelectContent>
@@ -192,6 +203,14 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 										))}
 									</SelectContent>
 								</Select>
+								<Button
+									variant={detailsOpen ? "secondary" : "ghost"}
+									size="icon"
+									aria-label="Toggle contact details"
+									onClick={() => setDetailsOpen((open) => !open)}
+								>
+									<PanelRightIcon className="size-4" />
+								</Button>
 							</div>
 						</div>
 
@@ -203,11 +222,22 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 						<Composer
 							chatId={selectedChatId}
 							fromSessionId={activeNumberId || null}
+							subaccountId={subaccountId}
 							onSent={invalidateInbox}
 						/>
 					</>
 				)}
 			</div>
+
+			{selectedChatId && detailsOpen ? (
+				<aside className="inset-0 md:static md:z-auto md:w-80 md:shrink-0 lg:w-96 absolute z-10 border-l bg-card">
+					<ContactDetailsPanel
+						chatId={selectedChatId}
+						subaccountId={subaccountId}
+						onClose={() => setDetailsOpen(false)}
+					/>
+				</aside>
+			) : null}
 		</Card>
 	);
 }

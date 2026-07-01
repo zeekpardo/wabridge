@@ -145,20 +145,48 @@ model Organization {
   invitations        Invitation[]
   purchases          Purchase[]
 
+  // An agency (Organization) owns many subaccounts (one per GHL location).
+  subaccounts           Subaccount[]
+  // Denormalized org back-relations (kept for cross-subaccount/admin queries).
+  whatsAppSessions      WhatsAppSession[]
+  whatsAppMessages      WhatsAppMessage[]
+  whatsAppConversations WhatsAppConversation[]
+
+  @@unique([slug])
+  @@map("organization")
+}
+
+/// A subaccount is one GoHighLevel location under an agency (Organization).
+/// All WhatsApp/GHL data is scoped to a subaccount; the agency is the tenant.
+model Subaccount {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  // The GHL location id, set when this subaccount is linked to GoHighLevel.
+  ghlLocationId  String?      @unique
+  // How the subaccount was created: "manual" | "ghl". Set once, never changed.
+  provisioningSource String   @default("manual")
+  status         String       @default("active")
+  // White-label overrides (logo, brand name, support URL) for this subaccount.
+  whiteLabel     Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
   goHighLevelConnection GoHighLevelConnection?
   whatsAppSessions      WhatsAppSession[]
   whatsAppMessages      WhatsAppMessage[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppSettings      WhatsAppSettings?
 
-  @@unique([slug])
-  @@map("organization")
+  @@index([organizationId])
+  @@map("subaccount")
 }
 
 model GoHighLevelConnection {
   id                     String       @id @default(cuid())
-  organizationId         String       @unique
-  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subaccountId           String       @unique
+  subaccount             Subaccount   @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   locationId             String
   companyId              String?
   userId                 String?
@@ -181,6 +209,8 @@ model WhatsAppSession {
   id              String            @id @default(cuid())
   organizationId  String
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subaccountId    String
+  subaccount      Subaccount        @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   openwaSessionId String            @unique
   openwaName      String            @unique
   workerBaseUrl   String
@@ -200,6 +230,7 @@ model WhatsAppSession {
   activeConversations WhatsAppConversation[] @relation("ConversationActiveSession")
 
   @@index([organizationId])
+  @@index([subaccountId])
   @@map("whatsapp_session")
 }
 
@@ -207,6 +238,8 @@ model WhatsAppMessage {
   id             String          @id @default(cuid())
   organizationId String
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subaccountId   String
+  subaccount     Subaccount      @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   sessionId      String
   session        WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   direction      String
@@ -222,6 +255,7 @@ model WhatsAppMessage {
 
   @@index([sessionId, timestamp])
   @@index([organizationId, chatId, timestamp])
+  @@index([subaccountId, chatId, timestamp])
   @@map("whatsapp_message")
 }
 
@@ -229,9 +263,18 @@ model WhatsAppConversation {
   id                 String           @id @default(cuid())
   organizationId     String
   organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subaccountId       String
+  subaccount         Subaccount       @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   // The contact's chat id (e.g. 15551234567@c.us). One thread per contact.
   chatId             String
   contactName        String?
+  // ─── Contact / CRM prewiring (synced with GoHighLevel once connected) ───
+  // The linked GHL contact id, when this thread has been matched to a contact.
+  ghlContactId       String?
+  // The org member (user id) who owns this contact.
+  ownerId            String?
+  // Contact tags. Held locally now; pushed to / pulled from GHL when connected.
+  tags               Json?
   // Which of the org's numbers currently replies (set by inbound reply-lock or #switch).
   activeSessionId    String?
   activeSession      WhatsAppSession? @relation("ConversationActiveSession", fields: [activeSessionId], references: [id], onDelete: SetNull)
@@ -242,19 +285,19 @@ model WhatsAppConversation {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  @@unique([organizationId, chatId])
-  @@index([organizationId, lastMessageAt])
+  @@unique([subaccountId, chatId])
+  @@index([subaccountId, lastMessageAt])
   @@map("whatsapp_conversation")
 }
 
 model WhatsAppSettings {
-  id             String       @id @default(cuid())
-  organizationId String       @unique
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id            String     @id @default(cuid())
+  subaccountId  String     @unique
+  subaccount    Subaccount @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   // Global spintax variables, e.g. { "SPINTAX_1": ["Hi", "Hello"], ... }.
-  globalSpintax  Json?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  globalSpintax Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@map("whatsapp_settings")
 }

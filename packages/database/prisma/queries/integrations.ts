@@ -1,10 +1,10 @@
 import { db } from "../client";
 
-// ─── GoHighLevel Connection ───────────────────────────────────────────────────
+// ─── GoHighLevel Connection (one per subaccount / GHL location) ───────────────
 
-export async function getGhlConnection(organizationId: string) {
+export async function getGhlConnection(subaccountId: string) {
 	return db.goHighLevelConnection.findUnique({
-		where: { organizationId },
+		where: { subaccountId },
 	});
 }
 
@@ -15,7 +15,7 @@ export async function getGhlConnectionByLocationId(locationId: string) {
 }
 
 export async function upsertGhlConnection(data: {
-	organizationId: string;
+	subaccountId: string;
 	locationId: string;
 	companyId?: string | null;
 	userId?: string | null;
@@ -25,9 +25,9 @@ export async function upsertGhlConnection(data: {
 	conversationProviderId?: string | null;
 }) {
 	return db.goHighLevelConnection.upsert({
-		where: { organizationId: data.organizationId },
+		where: { subaccountId: data.subaccountId },
 		create: {
-			organizationId: data.organizationId,
+			subaccountId: data.subaccountId,
 			locationId: data.locationId,
 			companyId: data.companyId,
 			userId: data.userId,
@@ -51,7 +51,7 @@ export async function upsertGhlConnection(data: {
 }
 
 export async function updateGhlConnection(
-	organizationId: string,
+	subaccountId: string,
 	data: Partial<{
 		accessToken: string;
 		refreshToken: string;
@@ -64,18 +64,18 @@ export async function updateGhlConnection(
 	}>,
 ) {
 	return db.goHighLevelConnection.update({
-		where: { organizationId },
+		where: { subaccountId },
 		data,
 	});
 }
 
-export async function setGhlNeedsReconnect(organizationId: string) {
+export async function setGhlNeedsReconnect(subaccountId: string) {
 	return db.goHighLevelConnection.update({
-		where: { organizationId },
+		where: { subaccountId },
 		data: { needsReconnect: true },
 	});
 }
 
-export async function deleteGhlConnection(organizationId: string) {
-	return db.goHighLevelConnection.delete({ where: { organizationId } });
+export async function deleteGhlConnection(subaccountId: string) {
+	return db.goHighLevelConnection.delete({ where: { subaccountId } });
 }

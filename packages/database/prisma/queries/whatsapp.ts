@@ -3,6 +3,7 @@ import { db } from "../client";
 // ─── WhatsApp Session ─────────────────────────────────────────────────────────
 
 export async function createWhatsAppSession(data: {
+	subaccountId: string;
 	organizationId: string;
 	openwaSessionId: string;
 	openwaName: string;
@@ -17,6 +18,7 @@ export async function createWhatsAppSession(data: {
 }) {
 	return db.whatsAppSession.create({
 		data: {
+			subaccountId: data.subaccountId,
 			organizationId: data.organizationId,
 			openwaSessionId: data.openwaSessionId,
 			openwaName: data.openwaName,
@@ -32,34 +34,34 @@ export async function createWhatsAppSession(data: {
 	});
 }
 
-export async function countWhatsAppSessions(organizationId: string) {
-	return db.whatsAppSession.count({ where: { organizationId } });
+export async function countWhatsAppSessions(subaccountId: string) {
+	return db.whatsAppSession.count({ where: { subaccountId } });
 }
 
-/** The org's number at a given send priority (for #switch|N). */
-export async function getSessionByPriority(organizationId: string, priority: number) {
-	return db.whatsAppSession.findFirst({ where: { organizationId, priority } });
+/** The subaccount's number at a given send priority (for #switch|N). */
+export async function getSessionByPriority(subaccountId: string, priority: number) {
+	return db.whatsAppSession.findFirst({ where: { subaccountId, priority } });
 }
 
-/** Ready numbers for an org, ordered by send priority (for dropdowns + default). */
-export async function listSendableSessions(organizationId: string) {
+/** Ready numbers for a subaccount, ordered by send priority (for dropdowns + default). */
+export async function listSendableSessions(subaccountId: string) {
 	return db.whatsAppSession.findMany({
-		where: { organizationId, status: "ready" },
+		where: { subaccountId, status: "ready" },
 		orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
 	});
 }
 
 /** The default sender: the highest-priority ready number. */
-export async function getDefaultSession(organizationId: string) {
+export async function getDefaultSession(subaccountId: string) {
 	return db.whatsAppSession.findFirst({
-		where: { organizationId, status: "ready" },
+		where: { subaccountId, status: "ready" },
 		orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
 	});
 }
 
-export async function getWhatsAppSession(organizationId: string, id: string) {
+export async function getWhatsAppSession(subaccountId: string, id: string) {
 	return db.whatsAppSession.findFirst({
-		where: { id, organizationId },
+		where: { id, subaccountId },
 	});
 }
 
@@ -69,15 +71,15 @@ export async function getWhatsAppSessionByOpenwaSessionId(openwaSessionId: strin
 	});
 }
 
-export async function listWhatsAppSessions(organizationId: string) {
+export async function listWhatsAppSessions(subaccountId: string) {
 	return db.whatsAppSession.findMany({
-		where: { organizationId },
+		where: { subaccountId },
 		orderBy: { createdAt: "desc" },
 	});
 }
 
 export async function updateWhatsAppSession(
-	organizationId: string,
+	subaccountId: string,
 	id: string,
 	data: Partial<{
 		status: string;
@@ -90,7 +92,7 @@ export async function updateWhatsAppSession(
 	}>,
 ) {
 	const result = await db.whatsAppSession.updateMany({
-		where: { id, organizationId },
+		where: { id, subaccountId },
 		data,
 	});
 
@@ -98,33 +100,33 @@ export async function updateWhatsAppSession(
 		return null;
 	}
 
-	return getWhatsAppSession(organizationId, id);
+	return getWhatsAppSession(subaccountId, id);
 }
 
-export async function deleteWhatsAppSession(organizationId: string, id: string) {
+export async function deleteWhatsAppSession(subaccountId: string, id: string) {
 	const result = await db.whatsAppSession.deleteMany({
-		where: { id, organizationId },
+		where: { id, subaccountId },
 	});
 
 	return result.count > 0;
 }
 
-// ─── WhatsApp Conversations (one thread per contact) ──────────────────────────
+// ─── WhatsApp Conversations (one thread per contact, per subaccount) ──────────
 
 const activeSessionSelect = {
 	select: { id: true, label: true, phone: true, priority: true, status: true },
 } as const;
 
-export async function getConversation(organizationId: string, chatId: string) {
+export async function getConversation(subaccountId: string, chatId: string) {
 	return db.whatsAppConversation.findUnique({
-		where: { organizationId_chatId: { organizationId, chatId } },
+		where: { subaccountId_chatId: { subaccountId, chatId } },
 		include: { activeSession: activeSessionSelect },
 	});
 }
 
-export async function listConversations(organizationId: string) {
+export async function listConversations(subaccountId: string) {
 	return db.whatsAppConversation.findMany({
-		where: { organizationId },
+		where: { subaccountId },
 		orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
 		include: { activeSession: activeSessionSelect },
 	});
@@ -132,6 +134,7 @@ export async function listConversations(organizationId: string) {
 
 /** Inbound arrival: upsert the thread and reply-lock it to the receiving number. */
 export async function upsertConversationInbound(data: {
+	subaccountId: string;
 	organizationId: string;
 	chatId: string;
 	sessionId: string;
@@ -139,8 +142,9 @@ export async function upsertConversationInbound(data: {
 	contactName?: string | null;
 }) {
 	return db.whatsAppConversation.upsert({
-		where: { organizationId_chatId: { organizationId: data.organizationId, chatId: data.chatId } },
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
 		create: {
+			subaccountId: data.subaccountId,
 			organizationId: data.organizationId,
 			chatId: data.chatId,
 			activeSessionId: data.sessionId,
@@ -163,14 +167,16 @@ export async function upsertConversationInbound(data: {
 
 /** Outbound send: refresh the thread and persist the sending number as active. */
 export async function touchConversationOutbound(data: {
+	subaccountId: string;
 	organizationId: string;
 	chatId: string;
 	sessionId: string;
 	preview: string;
 }) {
 	return db.whatsAppConversation.upsert({
-		where: { organizationId_chatId: { organizationId: data.organizationId, chatId: data.chatId } },
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
 		create: {
+			subaccountId: data.subaccountId,
 			organizationId: data.organizationId,
 			chatId: data.chatId,
 			activeSessionId: data.sessionId,
@@ -189,66 +195,131 @@ export async function touchConversationOutbound(data: {
 }
 
 /** Persist the active/sending number for a conversation (dropdown or #switch). */
-export async function setConversationActiveSession(
-	organizationId: string,
-	chatId: string,
-	sessionId: string,
-) {
+export async function setConversationActiveSession(data: {
+	subaccountId: string;
+	organizationId: string;
+	chatId: string;
+	sessionId: string;
+}) {
 	return db.whatsAppConversation.upsert({
-		where: { organizationId_chatId: { organizationId, chatId } },
-		create: { organizationId, chatId, activeSessionId: sessionId },
-		update: { activeSessionId: sessionId },
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
+		create: {
+			subaccountId: data.subaccountId,
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			activeSessionId: data.sessionId,
+		},
+		update: { activeSessionId: data.sessionId },
 	});
 }
 
-export async function markConversationRead(organizationId: string, chatId: string) {
+/**
+ * Set the contact owner for a conversation. Upserts so a never-messaged contact
+ * (present only as an OpenWA chat) can still be assigned an owner.
+ */
+export async function setConversationOwner(data: {
+	subaccountId: string;
+	organizationId: string;
+	chatId: string;
+	ownerId: string | null;
+}) {
+	return db.whatsAppConversation.upsert({
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
+		create: {
+			subaccountId: data.subaccountId,
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			ownerId: data.ownerId,
+		},
+		update: { ownerId: data.ownerId },
+	});
+}
+
+/** Overwrite a conversation's contact tags (deduped, order preserved). */
+export async function setConversationTags(data: {
+	subaccountId: string;
+	organizationId: string;
+	chatId: string;
+	tags: string[];
+}) {
+	const unique = [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))];
+	return db.whatsAppConversation.upsert({
+		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
+		create: {
+			subaccountId: data.subaccountId,
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			tags: unique,
+		},
+		update: { tags: unique },
+	});
+}
+
+/** Agency members with their user profile — powers the owner dropdown. */
+export async function listOrganizationMembers(organizationId: string) {
+	return db.member.findMany({
+		where: { organizationId },
+		orderBy: { createdAt: "asc" },
+		select: {
+			userId: true,
+			role: true,
+			user: { select: { id: true, name: true, email: true, image: true } },
+		},
+	});
+}
+
+export async function markConversationRead(subaccountId: string, chatId: string) {
 	return db.whatsAppConversation.updateMany({
-		where: { organizationId, chatId },
+		where: { subaccountId, chatId },
 		data: { unreadCount: 0 },
 	});
 }
 
 /** Thread messages for a contact (oldest first), capped to the last `limit`. */
-export async function listThreadMessages(organizationId: string, chatId: string, limit = 50) {
+export async function listThreadMessages(subaccountId: string, chatId: string, limit = 50) {
 	const rows = await db.whatsAppMessage.findMany({
-		where: { organizationId, chatId },
+		where: { subaccountId, chatId },
 		orderBy: { timestamp: "desc" },
 		take: limit,
 	});
 	return rows.reverse();
 }
 
-// ─── WhatsApp Settings (per org) ──────────────────────────────────────────────
+// ─── WhatsApp Settings (per subaccount) ───────────────────────────────────────
 
-export async function getWhatsAppSettings(organizationId: string) {
-	return db.whatsAppSettings.findUnique({ where: { organizationId } });
+export async function getWhatsAppSettings(subaccountId: string) {
+	return db.whatsAppSettings.findUnique({ where: { subaccountId } });
 }
 
 export async function upsertWhatsAppSettings(
-	organizationId: string,
+	subaccountId: string,
 	data: { globalSpintax?: unknown },
 ) {
 	return db.whatsAppSettings.upsert({
-		where: { organizationId },
-		create: { organizationId, globalSpintax: data.globalSpintax ?? undefined },
+		where: { subaccountId },
+		create: { subaccountId, globalSpintax: data.globalSpintax ?? undefined },
 		update: { globalSpintax: data.globalSpintax ?? undefined },
 	});
 }
 
 /**
  * Cross-tenant listing for operator/admin surfaces and the reconciler. NOT
- * org-scoped — callers must be admin/system. Includes the owning organization.
+ * scoped — callers must be admin/system. Includes the owning subaccount + org.
  */
 export async function listAllWhatsAppSessions() {
 	return db.whatsAppSession.findMany({
 		orderBy: { createdAt: "desc" },
-		include: { organization: { select: { id: true, slug: true, name: true } } },
+		include: {
+			organization: { select: { id: true, slug: true, name: true } },
+			subaccount: { select: { id: true, name: true } },
+		},
 	});
 }
 
 // ─── WhatsApp Message ─────────────────────────────────────────────────────────
 
 export async function createWhatsAppMessage(data: {
+	subaccountId: string;
 	organizationId: string;
 	sessionId: string;
 	direction: string;
@@ -288,6 +359,7 @@ export async function createWhatsAppMessage(data: {
 
 	return db.whatsAppMessage.create({
 		data: {
+			subaccountId: data.subaccountId,
 			organizationId: data.organizationId,
 			sessionId: data.sessionId,
 			direction: data.direction,
@@ -319,12 +391,12 @@ export async function updateWhatsAppMessageStatus(
 }
 
 export async function listWhatsAppMessagesBySession(
-	organizationId: string,
+	subaccountId: string,
 	sessionId: string,
 	limit = 50,
 ) {
 	return db.whatsAppMessage.findMany({
-		where: { sessionId, organizationId },
+		where: { sessionId, subaccountId },
 		orderBy: { timestamp: "desc" },
 		take: limit,
 	});

@@ -3,7 +3,7 @@ import { getWhatsAppSession, setConversationActiveSession } from "@repo/database
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { requireActiveOrganizationId } from "../lib/active-organization";
+import { resolveSubaccount } from "../lib/active-organization";
 
 export const setConversationNumber = protectedProcedure
 	.route({
@@ -13,17 +13,29 @@ export const setConversationNumber = protectedProcedure
 		summary: "Set a conversation's active number",
 		description: "Persist which of the org's numbers replies to a contact (the UI 'Send from').",
 	})
-	.input(z.object({ chatId: z.string(), sessionId: z.string() }))
+	.input(
+		z.object({
+			chatId: z.string(),
+			sessionId: z.string(),
+			subaccountId: z.string().optional(),
+		}),
+	)
 	.handler(async ({ input, context: { user, session } }) => {
-		const organizationId = await requireActiveOrganizationId(
+		const subaccount = await resolveSubaccount(
 			session.activeOrganizationId,
 			user.id,
+			input.subaccountId,
 		);
 
-		const target = await getWhatsAppSession(organizationId, input.sessionId);
+		const target = await getWhatsAppSession(subaccount.id, input.sessionId);
 		if (!target) {
-			throw new ORPCError("NOT_FOUND", { message: "Number not found for this organization." });
+			throw new ORPCError("NOT_FOUND", { message: "Number not found for this subaccount." });
 		}
 
-		return setConversationActiveSession(organizationId, input.chatId, input.sessionId);
+		return setConversationActiveSession({
+			subaccountId: subaccount.id,
+			organizationId: subaccount.organizationId,
+			chatId: input.chatId,
+			sessionId: input.sessionId,
+		});
 	});
