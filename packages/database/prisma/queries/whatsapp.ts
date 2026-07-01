@@ -13,6 +13,7 @@ export async function createWhatsAppSession(data: {
 	phone?: string | null;
 	jid?: string | null;
 	needsQr?: boolean;
+	priority?: number;
 }) {
 	return db.whatsAppSession.create({
 		data: {
@@ -26,7 +27,33 @@ export async function createWhatsAppSession(data: {
 			phone: data.phone,
 			jid: data.jid,
 			needsQr: data.needsQr ?? true,
+			priority: data.priority ?? 0,
 		},
+	});
+}
+
+export async function countWhatsAppSessions(organizationId: string) {
+	return db.whatsAppSession.count({ where: { organizationId } });
+}
+
+/** The org's number at a given send priority (for #switch|N). */
+export async function getSessionByPriority(organizationId: string, priority: number) {
+	return db.whatsAppSession.findFirst({ where: { organizationId, priority } });
+}
+
+/** Ready numbers for an org, ordered by send priority (for dropdowns + default). */
+export async function listSendableSessions(organizationId: string) {
+	return db.whatsAppSession.findMany({
+		where: { organizationId, status: "ready" },
+		orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
+	});
+}
+
+/** The default sender: the highest-priority ready number. */
+export async function getDefaultSession(organizationId: string) {
+	return db.whatsAppSession.findFirst({
+		where: { organizationId, status: "ready" },
+		orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
 	});
 }
 
@@ -80,6 +107,115 @@ export async function deleteWhatsAppSession(organizationId: string, id: string) 
 	});
 
 	return result.count > 0;
+}
+
+// ─── WhatsApp Conversations (one thread per contact) ──────────────────────────
+
+const activeSessionSelect = {
+	select: { id: true, label: true, phone: true, priority: true, status: true },
+} as const;
+
+export async function getConversation(organizationId: string, chatId: string) {
+	return db.whatsAppConversation.findUnique({
+		where: { organizationId_chatId: { organizationId, chatId } },
+		include: { activeSession: activeSessionSelect },
+	});
+}
+
+export async function listConversations(organizationId: string) {
+	return db.whatsAppConversation.findMany({
+		where: { organizationId },
+		orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
+		include: { activeSession: activeSessionSelect },
+	});
+}
+
+/** Inbound arrival: upsert the thread and reply-lock it to the receiving number. */
+export async function upsertConversationInbound(data: {
+	organizationId: string;
+	chatId: string;
+	sessionId: string;
+	preview: string;
+	contactName?: string | null;
+}) {
+	return db.whatsAppConversation.upsert({
+		where: { organizationId_chatId: { organizationId: data.organizationId, chatId: data.chatId } },
+		create: {
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			activeSessionId: data.sessionId,
+			contactName: data.contactName ?? undefined,
+			lastMessageAt: new Date(),
+			lastMessagePreview: data.preview,
+			lastDirection: "inbound",
+			unreadCount: 1,
+		},
+		update: {
+			activeSessionId: data.sessionId,
+			...(data.contactName ? { contactName: data.contactName } : {}),
+			lastMessageAt: new Date(),
+			lastMessagePreview: data.preview,
+			lastDirection: "inbound",
+			unreadCount: { increment: 1 },
+		},
+	});
+}
+
+/** Outbound send: refresh the thread and persist the sending number as active. */
+export async function touchConversationOutbound(data: {
+	organizationId: string;
+	chatId: string;
+	sessionId: string;
+	preview: string;
+}) {
+	return db.whatsAppConversation.upsert({
+		where: { organizationId_chatId: { organizationId: data.organizationId, chatId: data.chatId } },
+		create: {
+			organizationId: data.organizationId,
+			chatId: data.chatId,
+			activeSessionId: data.sessionId,
+			lastMessageAt: new Date(),
+			lastMessagePreview: data.preview,
+			lastDirection: "outbound",
+			unreadCount: 0,
+		},
+		update: {
+			activeSessionId: data.sessionId,
+			lastMessageAt: new Date(),
+			lastMessagePreview: data.preview,
+			lastDirection: "outbound",
+		},
+	});
+}
+
+/** Persist the active/sending number for a conversation (dropdown or #switch). */
+export async function setConversationActiveSession(
+	organizationId: string,
+	chatId: string,
+	sessionId: string,
+) {
+	return db.whatsAppConversation.upsert({
+		where: { organizationId_chatId: { organizationId, chatId } },
+		create: { organizationId, chatId, activeSessionId: sessionId },
+		update: { activeSessionId: sessionId },
+	});
+}
+
+export async function markConversationRead(organizationId: string, chatId: string) {
+	return db.whatsAppConversation.updateMany({
+		where: { organizationId, chatId },
+		data: { unreadCount: 0 },
+	});
+}
+
+/** Thread messages for a contact (oldest first), capped to the last `limit`. */
+export async function listThreadMessages(organizationId: string, chatId: string, limit = 50) {
+	const rows = await db.whatsAppMessage.findMany({
+		where: { organizationId, chatId },
+		orderBy: { timestamp: "desc" },
+		take: limit,
+	});
+	return rows.reverse();
 }
 
 // ─── WhatsApp Settings (per org) ──────────────────────────────────────────────

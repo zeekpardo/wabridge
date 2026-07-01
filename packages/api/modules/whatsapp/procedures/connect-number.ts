@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { createWhatsAppSession } from "@repo/database";
+import { countWhatsAppSessions, createWhatsAppSession } from "@repo/database";
 import { logger } from "@repo/logs";
 import { getBaseUrl } from "@repo/utils";
 import {
@@ -39,6 +39,9 @@ export const connectNumber = protectedProcedure
 			user.id,
 		);
 
+		// Next send-priority for this org (1 = first/highest). Powers #switch|N.
+		const priority = (await countWhatsAppSessions(organizationId)) + 1;
+
 		const openwa = createOpenWaClient();
 
 		// Globally-unique OpenWA session name. Letters/numbers/hyphens only
@@ -73,6 +76,7 @@ export const connectNumber = protectedProcedure
 				label,
 				phone: created.phone ?? null,
 				jid: created.jid ?? null,
+				priority,
 			});
 		} catch (error) {
 			logger.error(error, { ctx: "whatsapp.connectNumber", organizationId });

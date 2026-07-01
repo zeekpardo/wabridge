@@ -1,8 +1,10 @@
 import {
 	createWhatsAppMessage,
 	getWhatsAppSessionByOpenwaSessionId,
+	touchConversationOutbound,
 	updateWhatsAppMessageStatus,
 	updateWhatsAppSession,
+	upsertConversationInbound,
 } from "@repo/database";
 import { logger } from "@repo/logs";
 
@@ -72,19 +74,46 @@ async function processEvent(
 			// waMessageId (in createWhatsAppMessage) collapses the API-send row and
 			// its message.sent webhook echo into one.
 			const outbound = payload.event === OPENWA_WEBHOOK_EVENTS.messageSent;
+			const chatId = String(data.chatId ?? "");
+			const body = typeof data.body === "string" ? data.body : null;
+			const type = String(data.type ?? "text");
+
 			await createWhatsAppMessage({
 				organizationId,
 				sessionId,
 				direction: outbound ? "outbound" : "inbound",
-				chatId: String(data.chatId ?? ""),
+				chatId,
 				fromMe: outbound ? true : Boolean(data.fromMe ?? false),
-				type: String(data.type ?? "text"),
-				body: typeof data.body === "string" ? data.body : null,
+				type,
+				body,
 				status: typeof data.status === "string" ? data.status : outbound ? "sent" : null,
 				waMessageId: typeof data.id === "string" ? data.id : null,
 				idempotencyKey: payload.idempotencyKey,
 				timestamp: parseTimestamp(payload.timestamp),
 			});
+
+			// Keep the conversation thread fresh. Inbound reply-locks the thread to
+			// the receiving number; outbound just refreshes it.
+			if (chatId) {
+				const preview = body ? body.slice(0, 140) : `[${type}]`;
+				if (outbound) {
+					await touchConversationOutbound({ organizationId, chatId, sessionId, preview });
+				} else {
+					const contactName =
+						typeof data.pushName === "string"
+							? data.pushName
+							: typeof data.notifyName === "string"
+								? data.notifyName
+								: null;
+					await upsertConversationInbound({
+						organizationId,
+						chatId,
+						sessionId,
+						preview,
+						contactName,
+					});
+				}
+			}
 			break;
 		}
 		case OPENWA_WEBHOOK_EVENTS.messageAck: {

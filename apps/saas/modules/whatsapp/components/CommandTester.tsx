@@ -79,10 +79,10 @@ export function CommandTester({ sessionId }: { sessionId: string }) {
 
 	function runSend() {
 		send.mutate({
-			id: sessionId,
 			toPhone,
 			text,
 			attachments: attachments.length ? attachments : undefined,
+			fromSessionId: sessionId,
 		});
 	}
 
