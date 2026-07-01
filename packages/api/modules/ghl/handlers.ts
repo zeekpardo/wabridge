@@ -229,7 +229,10 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 		return Response.json({ error: "Missing SSO payload" }, { status: 400 });
 	}
 
-	let payload: { locationId?: string; userId?: string };
+	// GHL's decrypted SSO payload names the sub-account `activeLocation` (not
+	// `locationId`); `userId` is the GHL user. Accept `locationId` as a fallback
+	// for any host that uses the alternate name.
+	let payload: { activeLocation?: string; locationId?: string; userId?: string };
 	try {
 		payload = decryptGhlSsoPayload(encrypted, ssoKey);
 	} catch (error) {
@@ -237,16 +240,17 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 		return Response.json({ error: "Could not decrypt SSO payload" }, { status: 400 });
 	}
 
-	if (!payload.locationId) {
+	const locationId = payload.activeLocation ?? payload.locationId;
+	if (!locationId) {
 		return Response.json({ error: "No location in SSO payload" }, { status: 400 });
 	}
 
-	const subaccount = await getSubaccountByLocationId(payload.locationId);
+	const subaccount = await getSubaccountByLocationId(locationId);
 	if (!subaccount) {
 		return Response.json({ error: "Location not linked to a subaccount" }, { status: 404 });
 	}
 	// Defensive: only mint when a connection actually exists for this location.
-	const connection = await getGhlConnectionByLocationId(payload.locationId);
+	const connection = await getGhlConnectionByLocationId(locationId);
 
 	const token = mintEmbeddedToken({
 		organizationId: subaccount.organizationId,
@@ -258,6 +262,10 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 
 	const response = Response.json({
 		ok: true,
+		// Returned so the client can store it and send it as `x-embedded-token` —
+		// the primary auth path, since third-party cookies are blocked in the GHL
+		// iframe. The cookie below is a best-effort fallback for hosts that allow it.
+		token,
 		subaccountId: subaccount.id,
 		organizationSlug: org?.slug ?? null,
 		hasConnection: Boolean(connection),

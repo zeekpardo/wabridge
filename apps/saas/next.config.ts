@@ -7,6 +7,9 @@ const withNextIntl = nextIntlPlugin("./modules/i18n/request.ts");
 
 const nextConfig: NextConfig = {
 	transpilePackages: ["@repo/api", "@repo/auth", "@repo/database", "@repo/ui"],
+	// Let dev asset requests (fonts, HMR) through when the app is reached via a
+	// tunnel host instead of localhost (GHL local testing). Dev-only; ignored in prod.
+	allowedDevOrigins: ["*.trycloudflare.com", "*.ngrok-free.app", "*.ngrok.app"],
 	images: {
 		remotePatterns: [
 			{

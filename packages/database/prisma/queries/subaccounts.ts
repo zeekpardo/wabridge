@@ -40,6 +40,11 @@ export async function getSubaccountByLocationId(ghlLocationId: string) {
 	return db.subaccount.findUnique({ where: { ghlLocationId } });
 }
 
+/** Unscoped lookup by id — callers must verify membership of `organizationId`. */
+export async function getSubaccountById(id: string) {
+	return db.subaccount.findUnique({ where: { id } });
+}
+
 /** The agency's default (oldest) subaccount — the single-subaccount fallback. */
 export async function getDefaultSubaccount(organizationId: string) {
 	return db.subaccount.findFirst({

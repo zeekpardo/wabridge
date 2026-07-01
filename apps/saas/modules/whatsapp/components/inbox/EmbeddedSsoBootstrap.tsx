@@ -1,5 +1,6 @@
 "use client";
 
+import { EMBEDDED_TOKEN_STORAGE_KEY } from "@shared/lib/orpc-client";
 import { useEffect } from "react";
 
 /**
@@ -18,9 +19,9 @@ export function EmbeddedSsoBootstrap() {
 		if (typeof window === "undefined" || window.parent === window) {
 			return;
 		}
-		// The embedded cookie is HttpOnly (JS can't read it), so use a one-shot
-		// flag to avoid re-exchanging + reloading in a loop after it's set.
-		if (window.sessionStorage.getItem("wabridge_embedded_done") === "1") {
+		// If we already hold an embedded token (survives reloads via localStorage),
+		// the oRPC client is already authenticating via header — nothing to do.
+		if (window.localStorage.getItem(EMBEDDED_TOKEN_STORAGE_KEY)) {
 			return;
 		}
 
@@ -38,9 +39,15 @@ export function EmbeddedSsoBootstrap() {
 					credentials: "include",
 					body: JSON.stringify({ key: encrypted }),
 				});
-				if (res.ok) {
-					// Cookie is set; refetch inbox data under the embedded session.
-					window.sessionStorage.setItem("wabridge_embedded_done", "1");
+				if (!res.ok) {
+					return;
+				}
+				const data = (await res.json()) as { token?: string };
+				if (data.token) {
+					// Persist the token so the oRPC client sends it as `x-embedded-token`
+					// on every call — the auth path that survives third-party-cookie
+					// blocking. Reload so already-mounted queries refetch with the header.
+					window.localStorage.setItem(EMBEDDED_TOKEN_STORAGE_KEY, data.token);
 					window.location.reload();
 				}
 			} catch {

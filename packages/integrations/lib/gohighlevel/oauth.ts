@@ -8,7 +8,7 @@ const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
  * plus the conversation/message scopes required for the SMS bridge.
  */
 const GHL_SCOPES =
-	"contacts.readonly contacts.write locations.readonly locations/customFields.readonly locations/customFields.write conversations.readonly conversations/message.readonly conversations/message.write";
+	"contacts.readonly contacts.write locations.readonly conversations.readonly conversations.write conversations/message.readonly conversations/message.write";
 
 export function getGhlAuthUrl(state?: string): string {
 	const clientId = process.env.GOHIGHLEVEL_CLIENT_ID;

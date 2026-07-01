@@ -43,7 +43,7 @@ export const app = new Hono()
 	.get("/ghl/oauth/callback", (c) => ghlCallbackHandler(c.req.raw))
 	.post("/ghl-sso/decrypt", (c) => ghlSsoDecryptHandler(c.req.raw))
 	// Conversation-provider Delivery URL (SMS takeover — GHL → WhatsApp)
-	.post("/ghl/provider/outbound", (c) => ghlProviderOutboundHandler(c.req.raw))
+	.post("/providers/sms/outbound", (c) => ghlProviderOutboundHandler(c.req.raw))
 	// Health check
 	.get("/health", (c) => c.text("OK"))
 	// oRPC handlers (for RPC and OpenAPI)

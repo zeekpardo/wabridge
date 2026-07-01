@@ -126,7 +126,7 @@ CRON_SECRET=<random>                         # guards the reconcile cron
 # GoHighLevel (once the marketplace app exists — see Phase 4)
 GOHIGHLEVEL_CLIENT_ID=
 GOHIGHLEVEL_CLIENT_SECRET=
-GOHIGHLEVEL_REDIRECT_URI=https://app.<domain>/api/ghl/oauth/callback
+GOHIGHLEVEL_REDIRECT_URI=https://app.<domain>/oauth/callback
 GOHIGHLEVEL_CONVERSATION_PROVIDER_ID=        # WhatsApp custom-channel provider (Option A)
 GOHIGHLEVEL_WEBHOOK_PUBLIC_KEY=              # Ed25519 key for Delivery URL verification
 GHL_SSO_KEY=                                 # decrypts the embedded Custom Page payload
@@ -165,11 +165,11 @@ The GHL code is env-gated; it returns `501`/`404` until configured.
 1. Create the **marketplace app** (marketplace.gohighlevel.com): scopes
    `conversations.write`, `conversations/message.write`, `conversations/message.readonly`,
    `contacts.readonly`, `contacts.write`, `conversations.readonly`. Redirect URI =
-   `https://app.<domain>/api/ghl/oauth/callback`. Set the client id/secret + SSO key
+   `https://app.<domain>/oauth/callback`. Set the client id/secret + SSO key
    + webhook public key in the `saas` env.
 2. **SMS provider (Option B — takeover):** create a Conversation Provider, Type
    `SMS`, **do not** check "Is this a Custom Conversation Provider", Delivery URL =
-   `https://app.<domain>/api/ghl/provider/outbound`. Store its id as the
+   `https://app.<domain>/api/providers/sms/outbound`. Store its id as the
    subaccount's `smsProviderId`. Enable per sub-account:
    Settings → Phone Numbers → Advanced → SMS Provider.
 3. **Custom Page:** point the embedded page at
