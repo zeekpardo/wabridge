@@ -4,29 +4,32 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@repo/ui/components/popover";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@repo/ui/components/select";
 import { toastError } from "@repo/ui/components/toast";
 import { buildCommandString, type MessageSegment } from "@repo/whatsapp/commands";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowUpIcon, ClockIcon, ShuffleIcon } from "lucide-react";
+import {
+	ArrowUpIcon,
+	ClockIcon,
+	FileIcon,
+	PaperclipIcon,
+	ShuffleIcon,
+	SmileIcon,
+	XIcon,
+} from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { ChipEditor, type ChipEditorHandle } from "./ChipEditor";
-import { type MessageType, guessMimetype } from "./helpers";
 
-const TYPE_OPTIONS: { value: MessageType; label: string }[] = [
-	{ value: "text", label: "Text" },
-	{ value: "image", label: "Image" },
-	{ value: "video", label: "Video" },
-	{ value: "audio", label: "Audio" },
-	{ value: "document", label: "Document" },
-];
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+
+interface StagedFile {
+	id: string;
+	name: string;
+	mimetype: string;
+	base64: string;
+	previewUrl: string;
+}
 
 interface ComposerProps {
 	chatId: string;
@@ -43,11 +46,10 @@ function hasSendableContent(segments: MessageSegment[]): boolean {
 
 export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 	const editorRef = useRef<ChipEditorHandle>(null);
-	const [type, setType] = useState<MessageType>("text");
-	const [mediaUrl, setMediaUrl] = useState("");
-	const [filename, setFilename] = useState("");
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [segments, setSegments] = useState<MessageSegment[]>([]);
-
+	const [files, setFiles] = useState<StagedFile[]>([]);
+	const [emojiOpen, setEmojiOpen] = useState(false);
 	const [spintaxOpen, setSpintaxOpen] = useState(false);
 	const [spintaxInput, setSpintaxInput] = useState("");
 	const [delayOpen, setDelayOpen] = useState(false);
@@ -61,8 +63,7 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			onSuccess: () => {
 				editorRef.current?.clear();
 				setSegments([]);
-				setMediaUrl("");
-				setFilename("");
+				setFiles([]);
 				preview.reset();
 				onSent();
 			},
@@ -70,34 +71,47 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 		}),
 	);
 
-	const isMedia = type !== "text";
-	const attachments =
-		isMedia && mediaUrl.trim()
-			? [
-					{
-						url: mediaUrl.trim(),
-						mimetype: guessMimetype(mediaUrl.trim(), type),
-						filename: filename.trim() || undefined,
-					},
-				]
-			: undefined;
+	const canSend = hasSendableContent(segments) || files.length > 0;
 
-	const canSend = hasSendableContent(segments) || (attachments?.length ?? 0) > 0;
-
-	// Debounced live preview whenever the message or media changes.
+	// Debounced live preview of the text (files are shown separately).
 	const previewMutate = preview.mutate;
 	useEffect(() => {
 		const raw = buildCommandString(segments);
-		if (raw.trim().length === 0 && !attachments) {
+		if (raw.trim().length === 0) {
 			preview.reset();
 			return;
 		}
-		const handle = setTimeout(() => {
-			previewMutate({ text: raw, attachments });
-		}, 400);
+		const handle = setTimeout(() => previewMutate({ text: raw }), 400);
 		return () => clearTimeout(handle);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [segments, mediaUrl, filename, type]);
+	}, [segments]);
+
+	function onFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+		const list = Array.from(event.target.files ?? []);
+		for (const file of list) {
+			if (file.size > 16 * 1024 * 1024) {
+				toastError(`${file.name} is over 16 MB`);
+				continue;
+			}
+			const reader = new FileReader();
+			reader.onload = () => {
+				const dataUrl = String(reader.result);
+				const base64 = dataUrl.split(",")[1] ?? "";
+				setFiles((prev) => [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						name: file.name,
+						mimetype: file.type || "application/octet-stream",
+						base64,
+						previewUrl: dataUrl,
+					},
+				]);
+			};
+			reader.readAsDataURL(file);
+		}
+		event.target.value = "";
+	}
 
 	function addSpintax() {
 		const options = spintaxInput
@@ -125,25 +139,46 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			return;
 		}
 		const raw = buildCommandString(editorRef.current?.getSegments() ?? segments);
-		send.mutate({ chatId, text: raw, attachments, fromSessionId: fromSessionId ?? undefined });
+		const attachments = files.map((file) => ({
+			base64: file.base64,
+			mimetype: file.mimetype,
+			filename: file.name,
+		}));
+		send.mutate({
+			chatId,
+			text: raw,
+			attachments: attachments.length ? attachments : undefined,
+			fromSessionId: fromSessionId ?? undefined,
+		});
 	}
 
-	const showPreview = preview.data && canSend;
+	const showPreview = preview.data && hasSendableContent(segments);
 
 	return (
 		<div className="flex flex-col gap-2 border-t bg-card/40 p-3">
-			{isMedia && (
-				<div className="flex flex-col gap-2 sm:flex-row">
-					<Input
-						placeholder="Media URL (https://…)"
-						value={mediaUrl}
-						onChange={(e) => setMediaUrl(e.target.value)}
-					/>
-					<Input
-						placeholder={type === "document" ? "Filename (optional)" : "Caption (optional)"}
-						value={filename}
-						onChange={(e) => setFilename(e.target.value)}
-					/>
+			{files.length > 0 && (
+				<div className="flex flex-wrap gap-2">
+					{files.map((file) => (
+						<div key={file.id} className="relative">
+							{file.mimetype.startsWith("image/") ? (
+								// oxlint-disable-next-line jsx-a11y/alt-text
+								<img src={file.previewUrl} alt="" className="size-16 rounded-lg object-cover" />
+							) : (
+								<div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border bg-muted p-1 text-center">
+									<FileIcon className="size-5 text-foreground/60" />
+									<span className="w-full truncate text-[9px] text-foreground/60">{file.name}</span>
+								</div>
+							)}
+							<button
+								type="button"
+								aria-label="Remove attachment"
+								className="-right-1.5 -top-1.5 absolute flex size-5 items-center justify-center rounded-full bg-foreground text-background"
+								onClick={() => setFiles((prev) => prev.filter((f) => f.id !== file.id))}
+							>
+								<XIcon className="size-3" />
+							</button>
+						</div>
+					))}
 				</div>
 			)}
 
@@ -164,26 +199,51 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 			<div className="rounded-2xl border bg-card focus-within:ring-1 focus-within:ring-primary">
 				<ChipEditor
 					ref={editorRef}
-					placeholder={
-						isMedia ? "Optional caption…" : "Type a message, or add a variable / delay chip…"
-					}
+					placeholder="Type a message, or add an emoji / file / variable…"
 					onChange={setSegments}
 					onEnter={runSend}
 				/>
 				<div className="flex items-center justify-between gap-2 px-2 pb-2">
 					<div className="flex items-center gap-0.5">
-						<Select value={type} onValueChange={(value) => setType(value as MessageType)}>
-							<SelectTrigger className="h-8 w-[6.5rem] border-0 text-xs shadow-none">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{TYPE_OPTIONS.map((option) => (
-									<SelectItem key={option.value} value={option.value}>
-										{option.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
+						<input
+							ref={fileInputRef}
+							type="file"
+							multiple
+							className="hidden"
+							onChange={onFilesSelected}
+						/>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-8 text-foreground/60"
+							aria-label="Attach file"
+							onClick={() => fileInputRef.current?.click()}
+						>
+							<PaperclipIcon className="size-4" />
+						</Button>
+
+						<Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className="size-8 text-foreground/60"
+									aria-label="Emoji"
+								>
+									<SmileIcon className="size-4" />
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-auto border-0 p-0">
+								<EmojiPicker
+									onEmojiClick={(emojiData) => editorRef.current?.insertText(emojiData.emoji)}
+									lazyLoadEmojis
+									width={320}
+									height={380}
+								/>
+							</PopoverContent>
+						</Popover>
 
 						<Popover open={spintaxOpen} onOpenChange={setSpintaxOpen}>
 							<PopoverTrigger asChild>
@@ -255,9 +315,6 @@ export function Composer({ chatId, fromSessionId, onSent }: ComposerProps) {
 											onChange={(e) => setDelayMax(e.target.value)}
 										/>
 									</div>
-									<p className="text-foreground/50 text-xs">
-										Waits a random time in this range before sending.
-									</p>
 									<Button size="sm" onClick={addDelay}>
 										Add delay
 									</Button>

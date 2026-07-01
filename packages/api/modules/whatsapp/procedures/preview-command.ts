@@ -6,7 +6,8 @@ import { protectedProcedure } from "../../../orpc/procedures";
 import { requireActiveOrganizationId } from "../lib/active-organization";
 
 const attachmentSchema = z.object({
-	url: z.string().url(),
+	url: z.string().url().optional(),
+	base64: z.string().optional(),
 	mimetype: z.string().optional(),
 	filename: z.string().optional(),
 });

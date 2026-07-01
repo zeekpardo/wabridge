@@ -62,6 +62,7 @@ export function processMessage(input: ProcessInput): ProcessedMessage {
 			actions.push({
 				kind: mediaKind(attachment.mimetype),
 				url: attachment.url,
+				base64: attachment.base64,
 				filename: attachment.filename,
 				mimetype: attachment.mimetype,
 				text: first && text ? text : undefined,

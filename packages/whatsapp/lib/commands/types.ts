@@ -4,9 +4,10 @@ export type Rng = () => number;
 /** Global spintax variables (e.g. SPINTAX_1..6), each a list of variations. */
 export type GlobalSpintax = Record<string, string[]>;
 
-/** An outbound attachment to send alongside/instead of text. */
+/** An outbound attachment to send alongside/instead of text (url OR base64). */
 export interface CommandAttachment {
-	url: string;
+	url?: string;
+	base64?: string;
 	mimetype?: string;
 	filename?: string;
 }
@@ -20,6 +21,8 @@ export interface SendAction {
 	text?: string;
 	/** Media source URL (media kinds only). */
 	url?: string;
+	/** Media as base64 (uploaded files; media kinds only). */
+	base64?: string;
 	filename?: string;
 	mimetype?: string;
 	/** Milliseconds to wait before sending this action (from !/DELAY/x/y/!). */

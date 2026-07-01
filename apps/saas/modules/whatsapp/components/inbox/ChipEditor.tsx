@@ -7,6 +7,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 export interface ChipEditorHandle {
 	insertSpintax: (options: string[]) => void;
 	insertDelay: (minMs: number, maxMs: number) => void;
+	insertText: (text: string) => void;
 	getSegments: () => MessageSegment[];
 	clear: () => void;
 	focus: () => void;
@@ -134,6 +135,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
 	useImperativeHandle(ref, () => ({
 		insertSpintax: (options) => insertNode(makeSpintaxChip(options)),
 		insertDelay: (minMs, maxMs) => insertNode(makeDelayChip(minMs, maxMs)),
+		insertText: (text) => insertNode(document.createTextNode(text)),
 		getSegments: () => (editorRef.current ? readSegments(editorRef.current) : []),
 		clear: () => {
 			if (editorRef.current) {

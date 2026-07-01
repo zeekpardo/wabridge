@@ -50,6 +50,7 @@ export async function sendProcessedMessage(
 				: await openwa.sendMedia(target.openwaSessionId, action.kind as OpenWaMediaKind, {
 						chatId: target.chatId,
 						url: action.url,
+						base64: action.base64,
 						mimetype: action.mimetype,
 						filename: action.filename,
 						caption: action.text,
