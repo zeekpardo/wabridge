@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@repo/ui";
+import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
 import {
 	Select,
@@ -10,7 +12,7 @@ import {
 } from "@repo/ui/components/select";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageSquareIcon } from "lucide-react";
+import { ChevronLeftIcon, MessageSquareIcon } from "lucide-react";
 import { useState } from "react";
 import { Composer } from "./Composer";
 import { ConversationList } from "./ConversationList";
@@ -59,7 +61,12 @@ export function WhatsAppInbox() {
 
 	return (
 		<Card className="flex h-[calc(100vh-16rem)] min-h-[32rem] overflow-hidden p-0">
-			<div className="w-72 shrink-0 border-r">
+			<div
+				className={cn(
+					"w-full shrink-0 border-r md:w-72",
+					selectedChatId ? "hidden md:block" : "block",
+				)}
+			>
 				<ConversationList
 					conversations={conversations}
 					isLoading={conversationsQuery.isLoading}
@@ -68,7 +75,7 @@ export function WhatsAppInbox() {
 				/>
 			</div>
 
-			<div className="flex flex-1 flex-col">
+			<div className={cn("flex-1 flex-col", selectedChatId ? "flex" : "hidden md:flex")}>
 				{!selectedChatId ? (
 					<div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
 						<div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
@@ -82,11 +89,22 @@ export function WhatsAppInbox() {
 				) : (
 					<>
 						<div className="flex items-center justify-between gap-3 border-b p-3">
-							<div className="min-w-0">
-								<p className="truncate font-medium text-sm">{contactName}</p>
-								<p className="truncate text-foreground/50 text-xs">
-									{prettyPhone(selectedChatId)}
-								</p>
+							<div className="flex min-w-0 items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									className="md:hidden"
+									aria-label="Back to conversations"
+									onClick={() => setSelectedChatId(null)}
+								>
+									<ChevronLeftIcon className="size-4" />
+								</Button>
+								<div className="min-w-0">
+									<p className="truncate font-medium text-sm">{contactName}</p>
+									<p className="truncate text-foreground/50 text-xs">
+										{prettyPhone(selectedChatId)}
+									</p>
+								</div>
 							</div>
 							<div className="flex items-center gap-2">
 								<span className="text-foreground/60 text-xs">Send from</span>
