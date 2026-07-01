@@ -5,6 +5,7 @@ import { getQr } from "./procedures/get-qr";
 import { getSession } from "./procedures/get-session";
 import { getSettings } from "./procedures/get-settings";
 import { getThread } from "./procedures/get-thread";
+import { listChats } from "./procedures/list-chats";
 import { listConversationsProcedure } from "./procedures/list-conversations";
 import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
@@ -34,6 +35,7 @@ export const whatsappRouter = {
 	reconcileSessions,
 	// Inbox / conversations
 	listConversations: listConversationsProcedure,
+	listChats,
 	getThread,
 	setConversationNumber,
 	listNumbers,

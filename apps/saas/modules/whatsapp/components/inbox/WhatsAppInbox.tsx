@@ -23,9 +23,11 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
+	// Full chat list pulled from OpenWA (all contacts), overlaid with our tracked
+	// conversation state. Heavier than the DB-only list, so polled less often.
 	const conversationsQuery = useQuery({
-		...orpc.whatsapp.listConversations.queryOptions(),
-		refetchInterval: 5000,
+		...orpc.whatsapp.listChats.queryOptions(),
+		refetchInterval: 15000,
 	});
 
 	const numbersQuery = useQuery(orpc.whatsapp.listNumbers.queryOptions());
@@ -39,7 +41,7 @@ export function WhatsAppInbox({ embedded = false }: { embedded?: boolean }) {
 	});
 
 	function invalidateInbox() {
-		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listConversations.key() });
+		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listChats.key() });
 		if (selectedChatId) {
 			void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getThread.key() });
 		}

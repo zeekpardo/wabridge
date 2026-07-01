@@ -6,17 +6,21 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Spinner } from "@repo/ui/components/spinner";
 import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
-import { InboxIcon, PlusIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { InboxIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react";
+import { useMemo, useState } from "react";
 import { prettyPhone, relativeTime, toChatId } from "./helpers";
 
-type Conversation = RouterOutputs["whatsapp"]["listConversations"][number];
+type Chat = RouterOutputs["whatsapp"]["listChats"][number];
 
 interface ConversationListProps {
-	conversations: Conversation[];
+	conversations: Chat[];
 	isLoading: boolean;
 	selectedChatId: string | null;
 	onSelect: (chatId: string) => void;
+}
+
+function displayName(chat: Chat): string {
+	return chat.contactName || chat.phone || prettyPhone(chat.chatId);
 }
 
 function avatarText(name: string): string {
@@ -41,6 +45,7 @@ export function ConversationList({
 }: ConversationListProps) {
 	const [showNewChat, setShowNewChat] = useState(false);
 	const [phone, setPhone] = useState("");
+	const [search, setSearch] = useState("");
 
 	function startNewChat() {
 		if (phone.length < 8) {
@@ -50,6 +55,19 @@ export function ConversationList({
 		setPhone("");
 		setShowNewChat(false);
 	}
+
+	const filtered = useMemo(() => {
+		const term = search.trim().toLowerCase();
+		if (!term) {
+			return conversations;
+		}
+		const digits = term.replace(/\D/g, "");
+		return conversations.filter((chat) => {
+			const name = displayName(chat).toLowerCase();
+			const chatDigits = chat.chatId.replace(/\D/g, "");
+			return name.includes(term) || (digits.length > 0 && chatDigits.includes(digits));
+		});
+	}, [conversations, search]);
 
 	return (
 		<div className="flex h-full flex-col">
@@ -64,6 +82,18 @@ export function ConversationList({
 					{showNewChat ? <XIcon className="size-3.5" /> : <PlusIcon className="size-3.5" />}
 					New chat
 				</Button>
+			</div>
+
+			<div className="border-b p-2">
+				<div className="relative">
+					<SearchIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-4 text-foreground/40" />
+					<Input
+						className="h-9 pl-8"
+						placeholder="Search name or number…"
+						value={search}
+						onChange={(e) => setSearch(e.target.value)}
+					/>
+				</div>
 			</div>
 
 			{showNewChat && (
@@ -88,27 +118,31 @@ export function ConversationList({
 			)}
 
 			<div className="flex-1 overflow-y-auto p-1.5">
-				{isLoading ? (
+				{isLoading && conversations.length === 0 ? (
 					<div className="flex justify-center py-12">
 						<Spinner className="size-5" />
 					</div>
-				) : conversations.length === 0 ? (
+				) : filtered.length === 0 ? (
 					<div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
 						<div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
 							<InboxIcon className="size-5 text-primary" />
 						</div>
-						<p className="font-medium text-sm">No conversations yet</p>
+						<p className="font-medium text-sm">
+							{search ? "No matches" : "No conversations yet"}
+						</p>
 						<p className="text-foreground/60 text-xs">
-							Incoming messages appear here, or start a new chat.
+							{search
+								? "Try a different name or number."
+								: "Incoming messages appear here, or start a new chat."}
 						</p>
 					</div>
 				) : (
-					conversations.map((conversation) => (
+					filtered.map((chat) => (
 						<ConversationRow
-							key={conversation.id}
-							conversation={conversation}
-							isSelected={conversation.chatId === selectedChatId}
-							onSelect={() => onSelect(conversation.chatId)}
+							key={chat.chatId}
+							chat={chat}
+							isSelected={chat.chatId === selectedChatId}
+							onSelect={() => onSelect(chat.chatId)}
 						/>
 					))
 				)}
@@ -118,15 +152,15 @@ export function ConversationList({
 }
 
 interface ConversationRowProps {
-	conversation: Conversation;
+	chat: Chat;
 	isSelected: boolean;
 	onSelect: () => void;
 }
 
-function ConversationRow({ conversation, isSelected, onSelect }: ConversationRowProps) {
-	const name = conversation.contactName || prettyPhone(conversation.chatId);
-	const numberLabel = conversation.activeSession?.label || conversation.activeSession?.phone;
-	const hasUnread = conversation.unreadCount > 0;
+function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
+	const name = displayName(chat);
+	const numberLabel = chat.activeSession?.label || chat.activeSession?.phone;
+	const hasUnread = chat.unreadCount > 0;
 
 	return (
 		<button
@@ -139,7 +173,7 @@ function ConversationRow({ conversation, isSelected, onSelect }: ConversationRow
 		>
 			<Avatar className="size-9 shrink-0">
 				<AvatarFallback className={cn("text-xs", isSelected && "bg-primary/15 text-primary")}>
-					{avatarText(name)}
+					{chat.isGroup ? <UsersIcon className="size-4" /> : avatarText(name)}
 				</AvatarFallback>
 			</Avatar>
 			<div className="min-w-0 flex-1">
@@ -148,7 +182,7 @@ function ConversationRow({ conversation, isSelected, onSelect }: ConversationRow
 						{name}
 					</span>
 					<span className="shrink-0 text-[11px] text-foreground/40">
-						{relativeTime(conversation.lastMessageAt)}
+						{relativeTime(chat.lastMessageAt)}
 					</span>
 				</div>
 				<div className="flex items-center justify-between gap-2">
@@ -158,11 +192,11 @@ function ConversationRow({ conversation, isSelected, onSelect }: ConversationRow
 							hasUnread ? "text-foreground/80" : "text-foreground/55",
 						)}
 					>
-						{conversation.lastMessagePreview || "No messages yet"}
+						{chat.lastMessagePreview || "No messages yet"}
 					</span>
 					{hasUnread && (
 						<span className="flex size-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-							{conversation.unreadCount}
+							{chat.unreadCount}
 						</span>
 					)}
 				</div>
