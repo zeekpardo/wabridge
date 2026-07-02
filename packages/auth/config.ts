@@ -1,7 +1,9 @@
 import type { AuthConfig } from "./types";
 
 export const config = {
-	enableSignup: true,
+	// Invite-only: no self-service signup. Accounts are created only by accepting
+	// an organization invitation (enforced server-side by invitationOnlyPlugin).
+	enableSignup: false,
 	enableMagicLink: true,
 	enableSocialLogin: false,
 	enablePasskeys: false,
