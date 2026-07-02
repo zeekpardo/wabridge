@@ -14,8 +14,10 @@ export const config = {
 	organizations: {
 		enable: true,
 		hideOrganization: false,
-		enableUsersToCreateOrganizations: true,
-		requireOrganization: false,
+		// Org-only: every user works inside an organization (no personal account),
+		// and end users can't spin up new orgs (provisioned by an admin/invite).
+		enableUsersToCreateOrganizations: false,
+		requireOrganization: true,
 		forbiddenOrganizationSlugs: [
 			"new-organization",
 			"admin",
