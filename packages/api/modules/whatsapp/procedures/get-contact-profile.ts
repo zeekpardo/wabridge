@@ -46,6 +46,12 @@ export interface ContactProfile {
 		contactId: string | null;
 		/** Deep link into the GHL contact record, when resolvable. */
 		contactUrl: string | null;
+		/**
+		 * GHL's assigned user for this contact, when set. `memberId` is the
+		 * email-matched agency member (null when the assignee isn't a member —
+		 * the panel then shows the assignment instead of "Unassigned").
+		 */
+		assignee: { name: string | null; email: string | null; memberId: string | null } | null;
 	};
 }
 
@@ -109,21 +115,27 @@ export const getContactProfile = protectedProcedure
 		// GHL assignedTo → app member, matched by email via the location's users
 		// (users.readonly). Unmappable assignments fall back to the local owner.
 		let ghlOwnerId: string | null = null;
+		let ghlAssignee: ContactProfile["ghl"]["assignee"] = null;
 		if (client && ghlContact?.assignedTo) {
 			try {
 				const users = await client.getUsers();
 				const assignee = users.find((u) => u.id === ghlContact.assignedTo);
-				const email = assignee?.email?.toLowerCase();
+				const email = assignee?.email?.toLowerCase() ?? null;
 				ghlOwnerId = email
 					? (members.find((member) => member.user.email.toLowerCase() === email)?.userId ?? null)
 					: null;
+				const assigneeName =
+					[assignee?.firstName, assignee?.lastName].filter(Boolean).join(" ") ||
+					assignee?.name ||
+					null;
+				ghlAssignee = { name: assigneeName, email, memberId: ghlOwnerId };
 				if (!ghlOwnerId) {
 					// Mapped by email — a GHL assignee who isn't an agency member (or a
-					// stale user id) can't surface as the owner here.
+					// stale user id) can't surface as a selectable owner here.
 					logger.info("GHL assignee has no matching agency member", {
 						ctx: "whatsapp.contactProfile",
 						assignedTo: ghlContact.assignedTo,
-						assigneeEmail: email ?? null,
+						assigneeEmail: email,
 					});
 				}
 			} catch (error) {
@@ -243,6 +255,7 @@ export const getContactProfile = protectedProcedure
 				connected: Boolean(ghl),
 				contactId: conversation?.ghlContactId ?? null,
 				contactUrl,
+				assignee: ghlAssignee,
 			},
 		};
 	});

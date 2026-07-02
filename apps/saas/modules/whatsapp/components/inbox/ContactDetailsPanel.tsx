@@ -137,6 +137,15 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								))}
 							</SelectContent>
 						</Select>
+						{!profile.ownerId && profile.ghl.assignee && !profile.ghl.assignee.memberId ? (
+							<p className="leading-snug text-[11px] text-foreground/50">
+								Assigned in GoHighLevel to{" "}
+								<span className="text-foreground/70">
+									{profile.ghl.assignee.name || profile.ghl.assignee.email || "a GHL user"}
+								</span>{" "}
+								— invite them as an agency member to sync ownership.
+							</p>
+						) : null}
 					</div>
 
 					{/* Tags */}
