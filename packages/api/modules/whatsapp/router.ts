@@ -13,6 +13,7 @@ import { getThread } from "./procedures/get-thread";
 import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
 import { listContactOwners } from "./procedures/list-contact-owners";
+import { listContactTags } from "./procedures/list-contact-tags";
 import { listConversationsProcedure } from "./procedures/list-conversations";
 import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
@@ -63,4 +64,5 @@ export const whatsappRouter = {
 	setContactOwner,
 	setContactTags,
 	setContactFields,
+	listContactTags,
 };

@@ -29,6 +29,13 @@ export interface GHLContact {
 	updatedAt?: string;
 }
 
+/** A tag defined on the location (Settings → Tags). */
+export interface GHLTag {
+	id: string;
+	name: string;
+	locationId: string;
+}
+
 /** A GHL location user (Settings → My Staff). Requires the users.readonly scope. */
 export interface GHLUser {
 	id: string;

@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar"
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@repo/ui/components/popover";
 import {
 	Select,
 	SelectContent,
@@ -14,7 +15,7 @@ import {
 import { Spinner } from "@repo/ui/components/spinner";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLinkIcon, PlusIcon, UserIcon, XIcon } from "lucide-react";
+import { CheckIcon, ExternalLinkIcon, PlusIcon, SearchIcon, UserIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 const UNASSIGNED = "__unassigned__";
@@ -28,7 +29,7 @@ interface ContactDetailsPanelProps {
 export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDetailsPanelProps) {
 	const queryClient = useQueryClient();
 	const [tagInput, setTagInput] = useState("");
-	const [addingTag, setAddingTag] = useState(false);
+	const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
 	const profileQuery = useQuery({
 		...orpc.whatsapp.getContactProfile.queryOptions({ input: { chatId, subaccountId } }),
@@ -39,9 +40,14 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	const ownersQuery = useQuery(
 		orpc.whatsapp.listContactOwners.queryOptions({ input: { subaccountId } }),
 	);
+	const tagOptionsQuery = useQuery({
+		...orpc.whatsapp.listContactTags.queryOptions({ input: { subaccountId } }),
+		enabled: tagPickerOpen,
+	});
 
 	function invalidateProfile() {
 		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getContactProfile.key() });
+		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listContactTags.key() });
 	}
 
 	const setOwner = useMutation(
@@ -76,7 +82,6 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 			setTags.mutate({ chatId, tag, action: "add", subaccountId });
 		}
 		setTagInput("");
-		setAddingTag(false);
 	}
 
 	return (
@@ -186,37 +191,106 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 									</button>
 								</Badge>
 							))}
-							{addingTag ? (
-								<Input
-									// oxlint-disable-next-line no-autofocus
-									autoFocus
-									value={tagInput}
-									placeholder="Tag name"
-									className="h-7 w-28 text-xs"
-									onChange={(event) => setTagInput(event.target.value)}
-									onBlur={addTag}
-									onKeyDown={(event) => {
-										if (event.key === "Enter") {
-											event.preventDefault();
-											addTag();
-										} else if (event.key === "Escape") {
-											setTagInput("");
-											setAddingTag(false);
-										}
-									}}
-								/>
-							) : (
-								<Button
-									type="button"
-									variant="outline"
-									size="icon"
-									className="size-6 rounded-full"
-									aria-label="Add tag"
-									onClick={() => setAddingTag(true)}
-								>
-									<PlusIcon className="size-3.5" />
-								</Button>
-							)}
+							<Popover
+								open={tagPickerOpen}
+								onOpenChange={(open) => {
+									setTagPickerOpen(open);
+									if (!open) {
+										setTagInput("");
+									}
+								}}
+							>
+								<PopoverTrigger asChild>
+									<Button
+										type="button"
+										variant="outline"
+										size="icon"
+										className="size-6 rounded-full"
+										aria-label="Add tag"
+									>
+										<PlusIcon className="size-3.5" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="start" className="p-1.5 w-64">
+									<div className="gap-1.5 px-1.5 pb-1.5 flex items-center border-b">
+										<SearchIcon className="size-3.5 shrink-0 text-foreground/40" />
+										<input
+											// oxlint-disable-next-line no-autofocus
+											autoFocus
+											value={tagInput}
+											placeholder="Search tags"
+											className="h-7 text-sm w-full bg-transparent outline-none placeholder:text-foreground/40"
+											onChange={(event) => setTagInput(event.target.value)}
+										/>
+									</div>
+									<div className="max-h-56 mt-1 overflow-y-auto">
+										{tagOptionsQuery.isLoading ? (
+											<div className="py-4 flex justify-center">
+												<Spinner className="size-4" />
+											</div>
+										) : (
+											(() => {
+												const query = tagInput.trim().toLowerCase();
+												const options = (tagOptionsQuery.data ?? []).filter(
+													(tag) => !query || tag.toLowerCase().includes(query),
+												);
+												const active = new Set(profile.tags.map((tag) => tag.toLowerCase()));
+												const exactMatch = (tagOptionsQuery.data ?? []).some(
+													(tag) => tag.toLowerCase() === query,
+												);
+												return (
+													<>
+														{options.map((tag) => {
+															const selected = active.has(tag.toLowerCase());
+															return (
+																<button
+																	key={tag}
+																	type="button"
+																	className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+																	disabled={setTags.isPending}
+																	onClick={() =>
+																		setTags.mutate({
+																			chatId,
+																			tag,
+																			action: selected ? "remove" : "add",
+																			subaccountId,
+																		})
+																	}
+																>
+																	<span
+																		className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+																	>
+																		{selected ? <CheckIcon className="size-3" /> : null}
+																	</span>
+																	<span className="truncate">{tag}</span>
+																</button>
+															);
+														})}
+														{query && !exactMatch ? (
+															<button
+																type="button"
+																className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left text-primary hover:bg-foreground/5"
+																disabled={setTags.isPending}
+																onClick={() => {
+																	addTag();
+																}}
+															>
+																<PlusIcon className="size-3.5 shrink-0" />
+																<span className="truncate">Create “{tagInput.trim()}”</span>
+															</button>
+														) : null}
+														{options.length === 0 && !query ? (
+															<p className="px-2 py-3 text-xs text-foreground/50">
+																No tags yet — type to create one.
+															</p>
+														) : null}
+													</>
+												);
+											})()
+										)}
+									</div>
+								</PopoverContent>
+							</Popover>
 						</div>
 					</div>
 

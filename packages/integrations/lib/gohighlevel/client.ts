@@ -11,6 +11,7 @@ import type {
 	GHLLocation,
 	GHLMessageResponse,
 	GHLOutboundMessageInput,
+	GHLTag,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
 	GHLUser,
@@ -205,6 +206,18 @@ export class GoHighLevelClient {
 	async getLocation(): Promise<GHLLocation> {
 		const res = await this.request<{ location: GHLLocation }>(`/locations/${this.locationId}`);
 		return res.location;
+	}
+
+	// ─── Tags ─────────────────────────────────────────────────────────────────
+
+	/**
+	 * The location's tag library (Settings → Tags) — feeds tag pickers so the
+	 * app offers the same options as GHL's own dropdown.
+	 * GET /locations/{locationId}/tags
+	 */
+	async getTags(): Promise<GHLTag[]> {
+		const res = await this.request<{ tags: GHLTag[] }>(`/locations/${this.locationId}/tags`);
+		return res.tags ?? [];
 	}
 
 	// ─── Users ────────────────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ export type {
 	GHLMessageStatus,
 	GHLMessageType,
 	GHLOutboundMessageInput,
+	GHLTag,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
 	GHLUser,
