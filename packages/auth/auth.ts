@@ -224,7 +224,11 @@ export const auth = betterAuth({
 		admin(),
 		passkey(),
 		magicLink({
-			disableSignUp: false,
+			// Invite-only: a magic link must never CREATE an account (that would
+			// bypass invitationOnlyPlugin, which only guards /sign-up/email).
+			// Existing users still sign in via magic link; invited users create
+			// their account through the invitation signup flow first.
+			disableSignUp: true,
 			sendMagicLink: async ({ email, url }, ctx) => {
 				const request = ctx?.request as Request;
 
