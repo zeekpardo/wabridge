@@ -10,6 +10,15 @@ import type { ApiRouterClient } from "@repo/api/orpc/router";
  */
 export const EMBEDDED_TOKEN_STORAGE_KEY = "wabridge_embedded_token";
 
+/**
+ * localStorage key holding the subaccount id the stored embedded token is for.
+ * The token is per-origin, but a GHL agency opens many locations from the same
+ * origin — so the bootstrap re-runs SSO and compares against this to detect that
+ * the current Custom Page is a DIFFERENT location than the token was minted for
+ * (which would otherwise show the first location's data on the second).
+ */
+export const EMBEDDED_SUBACCOUNT_STORAGE_KEY = "wabridge_embedded_subaccount";
+
 /** Detect an Unauthorized (401) error across ORPCError / thrown-Error shapes. */
 function isUnauthorized(error: unknown): boolean {
 	if (!error || typeof error !== "object") {
@@ -47,6 +56,7 @@ const link = new RPCLink({
 			if (typeof window !== "undefined" && isUnauthorized(error)) {
 				if (window.localStorage.getItem(EMBEDDED_TOKEN_STORAGE_KEY)) {
 					window.localStorage.removeItem(EMBEDDED_TOKEN_STORAGE_KEY);
+					window.localStorage.removeItem(EMBEDDED_SUBACCOUNT_STORAGE_KEY);
 					window.location.reload();
 					return;
 				}

@@ -1,6 +1,9 @@
 "use client";
 
-import { EMBEDDED_TOKEN_STORAGE_KEY } from "@shared/lib/orpc-client";
+import {
+	EMBEDDED_SUBACCOUNT_STORAGE_KEY,
+	EMBEDDED_TOKEN_STORAGE_KEY,
+} from "@shared/lib/orpc-client";
 import { useEffect } from "react";
 
 /**
@@ -8,20 +11,21 @@ import { useEffect } from "react";
  *
  * GHL doesn't expose the SSO blob directly — the page requests it via
  * postMessage, GHL replies with the encrypted payload, and we hand it to
- * /api/ghl-sso/decrypt which verifies it and sets the SameSite=None embedded
- * cookie. Once set, the inbox's oRPC calls authenticate via that cookie even
- * though the first-party session cookie is blocked in the third-party frame.
+ * /api/ghl-sso/decrypt which verifies it and returns a token the oRPC client
+ * sends as `x-embedded-token` (third-party cookies are blocked in the frame).
+ *
+ * We ALWAYS re-run the handshake — never trust a stored token blindly. The token
+ * is per-origin, but a GHL agency opens many locations from the same origin, so
+ * a token minted for location A would otherwise be reused on location B and show
+ * A's data. We compare the decrypt's subaccount id against the one the stored
+ * token is for and only swap + reload when the location actually changed (so
+ * same-location reloads don't loop).
  *
  * No-op outside an iframe (first-party / dev), where the normal session works.
  */
 export function EmbeddedSsoBootstrap() {
 	useEffect(() => {
 		if (typeof window === "undefined" || window.parent === window) {
-			return;
-		}
-		// If we already hold an embedded token (survives reloads via localStorage),
-		// the oRPC client is already authenticating via header — nothing to do.
-		if (window.localStorage.getItem(EMBEDDED_TOKEN_STORAGE_KEY)) {
 			return;
 		}
 
@@ -42,14 +46,20 @@ export function EmbeddedSsoBootstrap() {
 				if (!res.ok) {
 					return;
 				}
-				const data = (await res.json()) as { token?: string };
-				if (data.token) {
-					// Persist the token so the oRPC client sends it as `x-embedded-token`
-					// on every call — the auth path that survives third-party-cookie
-					// blocking. Reload so already-mounted queries refetch with the header.
-					window.localStorage.setItem(EMBEDDED_TOKEN_STORAGE_KEY, data.token);
-					window.location.reload();
+				const data = (await res.json()) as { token?: string; subaccountId?: string };
+				if (!data.token || !data.subaccountId) {
+					return;
 				}
+				// Already holding the token for THIS location — nothing to do (avoids a
+				// reload loop, since every decrypt mints a fresh token string).
+				if (window.localStorage.getItem(EMBEDDED_SUBACCOUNT_STORAGE_KEY) === data.subaccountId) {
+					return;
+				}
+				// New/changed location: adopt its token and reload so already-mounted
+				// queries refetch scoped to the right subaccount.
+				window.localStorage.setItem(EMBEDDED_TOKEN_STORAGE_KEY, data.token);
+				window.localStorage.setItem(EMBEDDED_SUBACCOUNT_STORAGE_KEY, data.subaccountId);
+				window.location.reload();
 			} catch {
 				// Leave the first-party session path in place.
 			}
