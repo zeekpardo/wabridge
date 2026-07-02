@@ -7,18 +7,25 @@ import type {
 	GHLContactUpdateInput,
 	GHLConversation,
 	GHLCustomFieldDefinition,
+	GHLCustomFieldFolder,
 	GHLInboundMessageInput,
 	GHLLocation,
 	GHLMessageResponse,
 	GHLOutboundMessageInput,
+	GHLTag,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
+	GHLUser,
 } from "./types";
 
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
 const API_VERSION = "2021-07-28";
 const MAX_RETRIES = 3;
 const CALL_DELAY_MS = 500;
+
+/** Custom-field folders change rarely; memoize per location to avoid N GETs per panel open. */
+const FOLDER_CACHE_TTL_MS = 10 * 60 * 1000;
+const folderCache = new Map<string, { folders: GHLCustomFieldFolder[]; expiresAt: number }>();
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -199,6 +206,44 @@ export class GoHighLevelClient {
 		return res.customFields ?? [];
 	}
 
+	/**
+	 * Resolve the location's custom-field folders. The bulk customFields list
+	 * returns fields only (each with a `parentId`), and there's no working
+	 * folder-list endpoint, so we fetch each distinct folder by id. Cheap in
+	 * practice (few folders) and memoized per location — the field/folder layout
+	 * changes rarely — so a panel open costs at most one refresh, not N calls.
+	 */
+	async getCustomFieldFolders(): Promise<GHLCustomFieldFolder[]> {
+		const cached = folderCache.get(this.locationId);
+		if (cached && cached.expiresAt > Date.now()) {
+			return cached.folders;
+		}
+
+		const fields = await this.getCustomFields();
+		const parentIds = [
+			...new Set(fields.map((f) => f.parentId).filter((id): id is string => !!id)),
+		];
+
+		const folders: GHLCustomFieldFolder[] = [];
+		for (const id of parentIds) {
+			try {
+				const res = await this.request<{
+					customField: GHLCustomFieldDefinition & { name: string };
+				}>(`/locations/${this.locationId}/customFields/${id}`);
+				const folder = res.customField;
+				if (folder?.documentType === "folder") {
+					folders.push({ id: folder.id, name: folder.name, position: folder.position ?? 0 });
+				}
+			} catch {
+				// A folder that can't be resolved just won't appear as a group.
+			}
+		}
+		folders.sort((a, b) => a.position - b.position);
+
+		folderCache.set(this.locationId, { folders, expiresAt: Date.now() + FOLDER_CACHE_TTL_MS });
+		return folders;
+	}
+
 	// ─── Location ───────────────────────────────────────────────────────────────
 
 	async getLocation(): Promise<GHLLocation> {
@@ -206,13 +251,38 @@ export class GoHighLevelClient {
 		return res.location;
 	}
 
+	// ─── Tags ─────────────────────────────────────────────────────────────────
+
+	/**
+	 * The location's tag library (Settings → Tags) — feeds tag pickers so the
+	 * app offers the same options as GHL's own dropdown.
+	 * GET /locations/{locationId}/tags
+	 */
+	async getTags(): Promise<GHLTag[]> {
+		const res = await this.request<{ tags: GHLTag[] }>(`/locations/${this.locationId}/tags`);
+		return res.tags ?? [];
+	}
+
+	// ─── Users ────────────────────────────────────────────────────────────────
+
+	/**
+	 * The location's staff users — used to map GHL `assignedTo` ids to app
+	 * members by email. Requires the users.readonly scope.
+	 * GET /users/?locationId=
+	 */
+	async getUsers(): Promise<GHLUser[]> {
+		const res = await this.request<{ users: GHLUser[] }>(`/users/?locationId=${this.locationId}`);
+		return res.users ?? [];
+	}
+
 	// ─── Conversations / Messages ────────────────────────────────────────────────
 
 	/**
 	 * Find an existing conversation for a contact, creating one if none exists.
+	 * GHL maintains one conversation per contact (per the marketplace docs), so
+	 * the first match is the thread.
 	 * Search: GET /conversations/search?locationId=&contactId=
 	 * Create: POST /conversations/ with { locationId, contactId }
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async getOrCreateConversation(params: {
 		locationId: string;
@@ -243,21 +313,25 @@ export class GoHighLevelClient {
 	}
 
 	/**
-	 * Record an inbound message (WhatsApp → GHL) against a contact's conversation.
+	 * Record an inbound message (WhatsApp → GHL) in a conversation. Per the
+	 * marketplace Conversation Providers docs, the payload is keyed on
+	 * `conversationId` (not contact/location) — resolve it first via
+	 * {@link getOrCreateConversation}. `conversationProviderId` stays omitted for
+	 * the SMS-replace provider (Option B).
 	 * POST /conversations/messages/inbound
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async postInboundMessage(input: GHLInboundMessageInput): Promise<GHLMessageResponse> {
 		return this.request<GHLMessageResponse>("/conversations/messages/inbound", {
 			method: "POST",
 			body: JSON.stringify({
-				conversationProviderId: input.conversationProviderId,
-				locationId: input.locationId,
-				contactId: input.contactId,
-				message: input.message,
-				attachments: input.attachments,
-				direction: input.direction,
 				type: input.type,
+				conversationId: input.conversationId,
+				message: input.message,
+				...(input.conversationProviderId
+					? { conversationProviderId: input.conversationProviderId }
+					: {}),
+				...(input.attachments?.length ? { attachments: input.attachments } : {}),
+				...(input.date ? { date: input.date } : {}),
 			}),
 		});
 	}
@@ -267,29 +341,36 @@ export class GoHighLevelClient {
 	 * conversation timeline shows the sent message. This is distinct from the
 	 * standard "send message" flow (which asks GHL to deliver); here the provider
 	 * delivered the message itself and is only writing the record back.
-	 * POST /conversations/messages/outbound
-	 * TODO: verify endpoint against GHL marketplace docs — GHL's outbound record
-	 * endpoint naming has varied; confirm the exact path/payload before relying on it.
+	 *
+	 * Counter-intuitively this goes through the INBOUND endpoint with
+	 * `direction: "outbound"` — GHL's `/conversations/messages/outbound` is for
+	 * external CALL logs only (its `type` enum rejects "SMS" with a 422).
+	 * Verified live against the API. `conversationProviderId` is required here
+	 * even for the SMS-replace provider.
+	 * POST /conversations/messages/inbound  (direction: "outbound")
 	 */
 	async postOutboundMessageRecord(input: GHLOutboundMessageInput): Promise<GHLMessageResponse> {
-		return this.request<GHLMessageResponse>("/conversations/messages/outbound", {
+		return this.request<GHLMessageResponse>("/conversations/messages/inbound", {
 			method: "POST",
 			body: JSON.stringify({
-				conversationProviderId: input.conversationProviderId,
-				locationId: input.locationId,
-				contactId: input.contactId,
-				message: input.message,
-				attachments: input.attachments,
-				direction: input.direction,
 				type: input.type,
+				conversationId: input.conversationId,
+				message: input.message,
+				direction: "outbound",
+				...(input.conversationProviderId
+					? { conversationProviderId: input.conversationProviderId }
+					: {}),
+				...(input.attachments?.length ? { attachments: input.attachments } : {}),
+				...(input.date ? { date: input.date } : {}),
 			}),
 		});
 	}
 
 	/**
-	 * Update the delivery status of a message (delivered | read | failed | pending).
+	 * Update the delivery status of a message (delivered | read | failed |
+	 * pending). Only the conversation-provider app's token may do this (per the
+	 * marketplace docs), which is us.
 	 * PUT /conversations/messages/{messageId}/status
-	 * TODO: verify endpoint against GHL marketplace docs
 	 */
 	async updateMessageStatus(input: GHLUpdateMessageStatusInput): Promise<void> {
 		await this.request(`/conversations/messages/${input.messageId}/status`, {

@@ -11,6 +11,7 @@ export type {
 export { createGhlRefreshFn } from "./lib/token-refresh/adapters";
 
 export { GoHighLevelClient } from "./lib/gohighlevel/client";
+export { ghlContactDisplayName } from "./lib/gohighlevel/types";
 export type { GoHighLevelClientOptions } from "./lib/gohighlevel/client";
 export { exchangeGhlCode, getGhlAuthUrl, refreshGhlToken } from "./lib/gohighlevel/oauth";
 export { verifyGhlWebhookSignature } from "./lib/gohighlevel/webhook-verify";
@@ -21,6 +22,7 @@ export type {
 	GHLContactUpdateInput,
 	GHLConversation,
 	GHLCustomFieldDefinition,
+	GHLCustomFieldFolder,
 	GHLCustomFieldValue,
 	GHLInboundMessageInput,
 	GHLLocation,
@@ -29,8 +31,10 @@ export type {
 	GHLMessageStatus,
 	GHLMessageType,
 	GHLOutboundMessageInput,
+	GHLTag,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
+	GHLUser,
 } from "./lib/gohighlevel/types";
 
 export { createGoHighLevelClient } from "./lib/client-factories";

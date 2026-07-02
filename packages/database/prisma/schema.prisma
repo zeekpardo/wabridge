@@ -263,6 +263,10 @@ model WhatsAppMessage {
   timestamp      DateTime
   createdAt      DateTime        @default(now())
 
+  // One row per WhatsApp message per session: the API-send write and the
+  // message.sent webhook echo race, and check-then-insert can't close that
+  // window. NULLs are distinct in Postgres, so id-less rows are unaffected.
+  @@unique([sessionId, waMessageId])
   @@index([sessionId, timestamp])
   @@index([organizationId, chatId, timestamp])
   @@index([subaccountId, chatId, timestamp])
@@ -282,6 +286,9 @@ model WhatsAppConversation {
   // ─── Contact / CRM prewiring (synced with GoHighLevel once connected) ───
   // The linked GHL contact id, when this thread has been matched to a contact.
   ghlContactId       String?
+  // The GHL conversation that mirrors this thread. Cached with ghlContactId so
+  // message projections cost zero extra GHL API calls after the first message.
+  ghlConversationId  String?
   // The org member (user id) who owns this contact.
   ownerId            String?
   // Contact tags. Held locally now; pushed to / pulled from GHL when connected.

@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar"
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@repo/ui/components/popover";
 import {
 	Select,
 	SelectContent,
@@ -14,7 +15,17 @@ import {
 import { Spinner } from "@repo/ui/components/spinner";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLinkIcon, PlusIcon, UserIcon, XIcon } from "lucide-react";
+import {
+	CheckIcon,
+	ChevronDownIcon,
+	ChevronRightIcon,
+	ExternalLinkIcon,
+	PlusIcon,
+	SearchIcon,
+	SlidersHorizontalIcon,
+	UserIcon,
+	XIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 const UNASSIGNED = "__unassigned__";
@@ -28,17 +39,72 @@ interface ContactDetailsPanelProps {
 export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDetailsPanelProps) {
 	const queryClient = useQueryClient();
 	const [tagInput, setTagInput] = useState("");
-	const [addingTag, setAddingTag] = useState(false);
+	const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
-	const profileQuery = useQuery(
-		orpc.whatsapp.getContactProfile.queryOptions({ input: { chatId, subaccountId } }),
-	);
+	const profileQuery = useQuery({
+		...orpc.whatsapp.getContactProfile.queryOptions({ input: { chatId, subaccountId } }),
+		// Keep an open panel tracking CRM-side edits (the procedure reads through
+		// to the live GHL contact).
+		refetchInterval: 8000,
+	});
 	const ownersQuery = useQuery(
 		orpc.whatsapp.listContactOwners.queryOptions({ input: { subaccountId } }),
 	);
+	const tagOptionsQuery = useQuery({
+		...orpc.whatsapp.listContactTags.queryOptions({ input: { subaccountId } }),
+		enabled: tagPickerOpen,
+	});
+	const customFieldsQuery = useQuery({
+		...orpc.whatsapp.getCustomFieldGroups.queryOptions({ input: { chatId, subaccountId } }),
+		refetchInterval: 15000,
+	});
+
+	// Which folders show, and which are collapsed — persisted per subaccount so
+	// a curated layout sticks across contacts and sessions (display-only, so
+	// localStorage is enough).
+	const hiddenKey = `wabridge:cf-hidden:${subaccountId ?? "default"}`;
+	const hideEmptyKey = `wabridge:cf-hide-empty:${subaccountId ?? "default"}`;
+	const [hiddenFolders, setHiddenFolders] = useState<Set<string>>(() => readIdSet(hiddenKey));
+	const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+	const [hideEmptyFields, setHideEmptyFields] = useState<boolean>(() => readFlag(hideEmptyKey));
+	const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
+
+	function toggleHideEmpty() {
+		setHideEmptyFields((prev) => {
+			const next = !prev;
+			writeFlag(hideEmptyKey, next);
+			return next;
+		});
+	}
+
+	function toggleHiddenFolder(id: string) {
+		setHiddenFolders((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			writeIdSet(hiddenKey, next);
+			return next;
+		});
+	}
+
+	function toggleCollapsedFolder(id: string) {
+		setCollapsedFolders((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+	}
 
 	function invalidateProfile() {
 		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getContactProfile.key() });
+		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.listContactTags.key() });
 	}
 
 	const setOwner = useMutation(
@@ -47,6 +113,22 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	const setTags = useMutation(
 		orpc.whatsapp.setContactTags.mutationOptions({ onSuccess: invalidateProfile }),
 	);
+	const setFields = useMutation(
+		orpc.whatsapp.setContactFields.mutationOptions({ onSuccess: invalidateProfile }),
+	);
+
+	const [editingField, setEditingField] = useState<{ key: string; value: string } | null>(null);
+
+	function saveField() {
+		if (!editingField) {
+			return;
+		}
+		const { key, value } = editingField;
+		setEditingField(null);
+		if (key === "firstName" || key === "lastName" || key === "email") {
+			setFields.mutate({ chatId, subaccountId, [key]: value.trim() });
+		}
+	}
 
 	const profile = profileQuery.data;
 	const owners = ownersQuery.data ?? [];
@@ -57,7 +139,6 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 			setTags.mutate({ chatId, tag, action: "add", subaccountId });
 		}
 		setTagInput("");
-		setAddingTag(false);
 	}
 
 	return (
@@ -67,7 +148,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 				<Button
 					variant="ghost"
 					size="icon"
-					className="size-7 text-foreground/60"
+					className="size-7 text-foreground/75"
 					aria-label="Close contact details"
 					onClick={onClose}
 				>
@@ -92,7 +173,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						<div className="min-w-0 flex-1">
 							<p className="font-semibold text-sm truncate">{profile.name}</p>
 							{profile.phone ? (
-								<p className="text-xs truncate text-foreground/50">{profile.phone}</p>
+								<p className="text-xs truncate text-foreground/65">{profile.phone}</p>
 							) : null}
 						</div>
 						{profile.ghl.contactUrl ? (
@@ -101,7 +182,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								target="_blank"
 								rel="noopener noreferrer"
 								aria-label="Open in GoHighLevel"
-								className="text-foreground/50 hover:text-foreground"
+								className="text-foreground/65 hover:text-foreground"
 							>
 								<ExternalLinkIcon className="size-4" />
 							</a>
@@ -110,7 +191,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 
 					{/* Owner */}
 					<div className="gap-1.5 flex flex-col">
-						<span className="font-medium text-xs text-foreground/60">Owner</span>
+						<span className="font-medium text-xs text-foreground/75">Owner</span>
 						<Select
 							value={profile.ownerId ?? UNASSIGNED}
 							disabled={setOwner.isPending}
@@ -124,7 +205,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						>
 							<SelectTrigger className="h-9">
 								<div className="gap-2 flex items-center">
-									<UserIcon className="size-3.5 text-foreground/50" />
+									<UserIcon className="size-3.5 text-foreground/65" />
 									<SelectValue placeholder="Unassigned" />
 								</div>
 							</SelectTrigger>
@@ -137,11 +218,20 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								))}
 							</SelectContent>
 						</Select>
+						{!profile.ownerId && profile.ghl.assignee && !profile.ghl.assignee.memberId ? (
+							<p className="leading-snug text-[11px] text-foreground/65">
+								Assigned in GoHighLevel to{" "}
+								<span className="text-foreground/80">
+									{profile.ghl.assignee.name || profile.ghl.assignee.email || "a GHL user"}
+								</span>{" "}
+								— invite them as an agency member to sync ownership.
+							</p>
+						) : null}
 					</div>
 
 					{/* Tags */}
 					<div className="gap-1.5 flex flex-col">
-						<span className="font-medium text-xs text-foreground/60">
+						<span className="font-medium text-xs text-foreground/75">
 							Tags ({profile.tags.length})
 						</span>
 						<div className="gap-1.5 flex flex-wrap items-center">
@@ -158,66 +248,316 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 									</button>
 								</Badge>
 							))}
-							{addingTag ? (
-								<Input
-									// oxlint-disable-next-line no-autofocus
-									autoFocus
-									value={tagInput}
-									placeholder="Tag name"
-									className="h-7 w-28 text-xs"
-									onChange={(event) => setTagInput(event.target.value)}
-									onBlur={addTag}
-									onKeyDown={(event) => {
-										if (event.key === "Enter") {
-											event.preventDefault();
-											addTag();
-										} else if (event.key === "Escape") {
-											setTagInput("");
-											setAddingTag(false);
-										}
-									}}
-								/>
-							) : (
-								<Button
-									type="button"
-									variant="outline"
-									size="icon"
-									className="size-6 rounded-full"
-									aria-label="Add tag"
-									onClick={() => setAddingTag(true)}
-								>
-									<PlusIcon className="size-3.5" />
-								</Button>
-							)}
+							<Popover
+								open={tagPickerOpen}
+								onOpenChange={(open) => {
+									setTagPickerOpen(open);
+									if (!open) {
+										setTagInput("");
+									}
+								}}
+							>
+								<PopoverTrigger asChild>
+									<Button
+										type="button"
+										variant="outline"
+										size="icon"
+										className="size-6 rounded-full"
+										aria-label="Add tag"
+									>
+										<PlusIcon className="size-3.5" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="start" className="p-1.5 w-64">
+									<div className="gap-1.5 px-1.5 pb-1.5 flex items-center border-b">
+										<SearchIcon className="size-3.5 shrink-0 text-foreground/55" />
+										<input
+											// oxlint-disable-next-line no-autofocus
+											autoFocus
+											value={tagInput}
+											placeholder="Search tags"
+											className="h-7 text-sm w-full bg-transparent outline-none placeholder:text-foreground/55"
+											onChange={(event) => setTagInput(event.target.value)}
+										/>
+									</div>
+									<div className="max-h-56 mt-1 overflow-y-auto">
+										{tagOptionsQuery.isLoading ? (
+											<div className="py-4 flex justify-center">
+												<Spinner className="size-4" />
+											</div>
+										) : (
+											(() => {
+												const query = tagInput.trim().toLowerCase();
+												const options = (tagOptionsQuery.data ?? []).filter(
+													(tag) => !query || tag.toLowerCase().includes(query),
+												);
+												const active = new Set(profile.tags.map((tag) => tag.toLowerCase()));
+												const exactMatch = (tagOptionsQuery.data ?? []).some(
+													(tag) => tag.toLowerCase() === query,
+												);
+												return (
+													<>
+														{options.map((tag) => {
+															const selected = active.has(tag.toLowerCase());
+															return (
+																<button
+																	key={tag}
+																	type="button"
+																	className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+																	disabled={setTags.isPending}
+																	onClick={() =>
+																		setTags.mutate({
+																			chatId,
+																			tag,
+																			action: selected ? "remove" : "add",
+																			subaccountId,
+																		})
+																	}
+																>
+																	<span
+																		className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+																	>
+																		{selected ? <CheckIcon className="size-3" /> : null}
+																	</span>
+																	<span className="truncate">{tag}</span>
+																</button>
+															);
+														})}
+														{query && !exactMatch ? (
+															<button
+																type="button"
+																className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left text-primary hover:bg-foreground/5"
+																disabled={setTags.isPending}
+																onClick={() => {
+																	addTag();
+																}}
+															>
+																<PlusIcon className="size-3.5 shrink-0" />
+																<span className="truncate">Create “{tagInput.trim()}”</span>
+															</button>
+														) : null}
+														{options.length === 0 && !query ? (
+															<p className="px-2 py-3 text-xs text-foreground/65">
+																No tags yet — type to create one.
+															</p>
+														) : null}
+													</>
+												);
+											})()
+										)}
+									</div>
+								</PopoverContent>
+							</Popover>
 						</div>
 					</div>
 
 					{/* Fields */}
 					<div className="gap-2 p-3 flex flex-col rounded-lg border bg-background">
-						<span className="font-medium text-xs text-foreground/60">Contact</span>
+						<span className="font-medium text-xs text-foreground/75">Contact</span>
 						{profile.fields.map((field) => (
 							<div key={field.key} className="gap-0.5 flex flex-col">
-								<span className="text-[11px] text-foreground/50">{field.label}</span>
-								<span className="text-sm">{field.value || "—"}</span>
+								<span className="text-[11px] text-foreground/65">{field.label}</span>
+								{editingField?.key === field.key ? (
+									<Input
+										// oxlint-disable-next-line no-autofocus
+										autoFocus
+										value={editingField.value}
+										className="h-7 text-sm"
+										onChange={(event) =>
+											setEditingField({ key: field.key, value: event.target.value })
+										}
+										onBlur={saveField}
+										onKeyDown={(event) => {
+											if (event.key === "Enter") {
+												event.preventDefault();
+												saveField();
+											} else if (event.key === "Escape") {
+												setEditingField(null);
+											}
+										}}
+									/>
+								) : field.editable ? (
+									<button
+										type="button"
+										className="text-sm -mx-1 rounded px-1 text-left hover:bg-foreground/5"
+										title={`Edit ${field.label.toLowerCase()}`}
+										onClick={() => setEditingField({ key: field.key, value: field.value ?? "" })}
+									>
+										{field.value || <span className="text-foreground/55">—</span>}
+									</button>
+								) : (
+									<span className="text-sm">{field.value || "—"}</span>
+								)}
 							</div>
 						))}
 					</div>
 
-					{/* GHL status */}
-					<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
-						{profile.ghl.connected ? (
-							<p className="text-foreground/60">
-								Synced with GoHighLevel. Owner and tag changes will propagate to the contact.
-							</p>
-						) : (
-							<p className="text-foreground/60">
+					{/* Custom fields, grouped by GHL folder */}
+					{(customFieldsQuery.data?.folders.length ?? 0) > 0 ? (
+						<div className="gap-2 flex flex-col">
+							<div className="flex items-center justify-between">
+								<span className="font-medium text-xs text-foreground/75">Custom Fields</span>
+								<Popover open={folderSettingsOpen} onOpenChange={setFolderSettingsOpen}>
+									<PopoverTrigger asChild>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											className="size-6 text-foreground/65"
+											aria-label="Choose which folders to show"
+										>
+											<SlidersHorizontalIcon className="size-3.5" />
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent align="end" className="p-1.5 w-60">
+										<button
+											type="button"
+											className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+											onClick={toggleHideEmpty}
+										>
+											<span
+												className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${hideEmptyFields ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+											>
+												{hideEmptyFields ? <CheckIcon className="size-3" /> : null}
+											</span>
+											<span className="truncate">Hide empty fields</span>
+										</button>
+										<div className="my-1 border-t" />
+										<p className="px-1.5 pb-1 text-[11px] text-foreground/65">Folders to display</p>
+										<div className="max-h-64 overflow-y-auto">
+											{(customFieldsQuery.data?.folders ?? []).map((folder) => {
+												const visible = !hiddenFolders.has(folder.id);
+												return (
+													<button
+														key={folder.id}
+														type="button"
+														className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+														onClick={() => toggleHiddenFolder(folder.id)}
+													>
+														<span
+															className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${visible ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+														>
+															{visible ? <CheckIcon className="size-3" /> : null}
+														</span>
+														<span className="truncate">{folder.name}</span>
+													</button>
+												);
+											})}
+										</div>
+									</PopoverContent>
+								</Popover>
+							</div>
+
+							{(customFieldsQuery.data?.folders ?? [])
+								.filter((folder) => !hiddenFolders.has(folder.id))
+								.map((folder) => {
+									const collapsed = collapsedFolders.has(folder.id);
+									const setCount = folder.fields.filter((f) => f.value).length;
+									const shownFields = hideEmptyFields
+										? folder.fields.filter((f) => f.value)
+										: folder.fields;
+									// With "hide empty" on, a folder whose fields are all empty drops out.
+									if (shownFields.length === 0) {
+										return null;
+									}
+									return (
+										<div key={folder.id} className="rounded-lg border bg-background">
+											<button
+												type="button"
+												className="gap-2 px-3 py-2 text-sm flex w-full items-center justify-between"
+												onClick={() => toggleCollapsedFolder(folder.id)}
+											>
+												<span className="gap-1.5 font-medium flex items-center">
+													{collapsed ? (
+														<ChevronRightIcon className="size-3.5 text-foreground/65" />
+													) : (
+														<ChevronDownIcon className="size-3.5 text-foreground/65" />
+													)}
+													{folder.name}
+												</span>
+												<span className="text-[11px] text-foreground/55">
+													{setCount}/{folder.fields.length}
+												</span>
+											</button>
+											{collapsed ? null : (
+												<div className="gap-2 px-3 pt-0 pb-3 flex flex-col">
+													{shownFields.map((field) => (
+														<div key={field.id} className="gap-0.5 flex flex-col">
+															<span className="text-[11px] text-foreground/65">{field.name}</span>
+															<span className="text-sm">
+																{field.value || <span className="text-foreground/55">—</span>}
+															</span>
+														</div>
+													))}
+												</div>
+											)}
+										</div>
+									);
+								})}
+						</div>
+					) : null}
+
+					{/* GHL status — only surfaced when there's something actionable. */}
+					{profile.ghl.connected ? null : (
+						<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
+							<p className="text-foreground/75">
 								<span className="font-medium text-foreground">GoHighLevel not connected.</span>{" "}
 								Owner and tags are saved here and will sync to the contact once you connect GHL.
 							</p>
-						)}
-					</div>
+						</div>
+					)}
 				</div>
 			)}
 		</div>
 	);
+}
+
+/** Read a persisted set of ids (custom-field folder visibility). SSR-safe. */
+function readIdSet(key: string): Set<string> {
+	if (typeof window === "undefined") {
+		return new Set();
+	}
+	try {
+		const raw = window.localStorage.getItem(key);
+		const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+		return new Set(
+			Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [],
+		);
+	} catch {
+		return new Set();
+	}
+}
+
+function writeIdSet(key: string, value: Set<string>): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.localStorage.setItem(key, JSON.stringify([...value]));
+	} catch {
+		// Storage unavailable (private mode / quota) — visibility just won't persist.
+	}
+}
+
+/** Read a persisted boolean flag. SSR-safe; defaults false. */
+function readFlag(key: string): boolean {
+	if (typeof window === "undefined") {
+		return false;
+	}
+	try {
+		return window.localStorage.getItem(key) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function writeFlag(key: string, value: boolean): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.localStorage.setItem(key, value ? "1" : "0");
+	} catch {
+		// Storage unavailable — the flag just won't persist.
+	}
 }

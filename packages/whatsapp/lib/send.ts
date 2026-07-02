@@ -19,8 +19,20 @@ export interface SendTarget {
 	chatId: string;
 }
 
+/** One persisted outbound message row (for downstream projections, e.g. CRM mirroring). */
+export interface SentMessage {
+	/** The WhatsAppMessage row id. */
+	id: string;
+	waMessageId: string | null;
+	body: string | null;
+	type: string;
+	timestamp: Date;
+}
+
 export interface SendResult {
 	sent: number;
+	/** The persisted rows, in send order. */
+	messages: SentMessage[];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -37,7 +49,7 @@ export async function sendProcessedMessage(
 	processed: ProcessedMessage,
 ): Promise<SendResult> {
 	const openwa = createOpenWaClient();
-	let sent = 0;
+	const messages: SentMessage[] = [];
 
 	for (const action of processed.actions) {
 		if (action.delayMs && action.delayMs > 0) {
@@ -59,7 +71,8 @@ export async function sendProcessedMessage(
 						caption: action.text,
 					});
 
-		await createWhatsAppMessage({
+		const timestamp = new Date();
+		const row = await createWhatsAppMessage({
 			subaccountId: target.subaccountId,
 			organizationId: target.organizationId,
 			sessionId: target.sessionRowId,
@@ -69,12 +82,20 @@ export async function sendProcessedMessage(
 			type: action.kind,
 			body: action.text ?? null,
 			status: "sent",
-			waMessageId: result?.id ?? null,
-			timestamp: new Date(),
+			waMessageId: result?.messageId ?? result?.id ?? null,
+			// Sent from our app (messenger/API) — drives the hub's CRM mirroring.
+			origin: "app",
+			timestamp,
 		});
 
-		sent++;
+		messages.push({
+			id: row.id,
+			waMessageId: result?.messageId ?? result?.id ?? null,
+			body: action.text ?? null,
+			type: action.kind,
+			timestamp,
+		});
 	}
 
-	return { sent };
+	return { sent: messages.length, messages };
 }

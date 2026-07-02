@@ -126,7 +126,7 @@ export function ConnectNumberDialog({ subaccountId }: { subaccountId?: string })
 						<p className="font-medium">
 							Connected{sessionQuery.data?.phone ? ` — ${sessionQuery.data.phone}` : ""}
 						</p>
-						<p className="text-sm text-foreground/60">This number is now linked and ready.</p>
+						<p className="text-sm text-foreground/75">This number is now linked and ready.</p>
 						<Button
 							onClick={() => {
 								toastSuccess("WhatsApp number connected");
@@ -150,7 +150,7 @@ export function ConnectNumberDialog({ subaccountId }: { subaccountId?: string })
 						<TabsContent value="qr">
 							<div className="gap-3 py-2 flex flex-col items-center">
 								<div className="gap-2 text-sm flex items-center">
-									<span className="text-foreground/60">Status:</span>
+									<span className="text-foreground/75">Status:</span>
 									<SessionStatusBadge status={status} />
 								</div>
 								<div className="size-64 bg-white p-2 flex items-center justify-center rounded-lg border">
@@ -161,7 +161,7 @@ export function ConnectNumberDialog({ subaccountId }: { subaccountId?: string })
 										<Spinner className="size-6" />
 									)}
 								</div>
-								<p className="max-w-xs text-xs text-center text-foreground/60">
+								<p className="max-w-xs text-xs text-center text-foreground/75">
 									On your phone: WhatsApp → Settings → Linked Devices → Link a Device, then scan.
 									The code refreshes automatically.
 								</p>
@@ -192,7 +192,7 @@ export function ConnectNumberDialog({ subaccountId }: { subaccountId?: string })
 								</Button>
 								{pairingCode && (
 									<div className="p-3 rounded-lg border text-center">
-										<p className="text-xs text-foreground/60">
+										<p className="text-xs text-foreground/75">
 											Enter this code in WhatsApp → Link a Device → Link with phone number
 										</p>
 										<p className="mt-1 font-mono text-2xl tracking-widest">{pairingCode}</p>

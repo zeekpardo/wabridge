@@ -8,11 +8,13 @@ import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 
 import {
+	ghlAppWebhookHandler,
 	ghlAuthorizeHandler,
 	ghlCallbackHandler,
 	ghlProviderOutboundHandler,
 	ghlSsoDecryptHandler,
 } from "./modules/ghl/handlers";
+import { createOpenWaWebhookHooks } from "./modules/messaging/webhook-hooks";
 import { openApiHandler, rpcHandler } from "./orpc/handler";
 
 export { router } from "./orpc/router";
@@ -36,14 +38,17 @@ export const app = new Hono()
 	.on(["POST", "GET"], "/auth/**", (c) => auth.handler(c.req.raw))
 	// Payments webhook handler
 	.post("/webhooks/payments", (c) => paymentsWebhookHandler(c.req.raw))
-	// OpenWA (WhatsApp) webhook handler
-	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw))
+	// OpenWA (WhatsApp) webhook handler — hooks route inbound messages through
+	// the message hub (GHL mirror) and relay delivery acks to GHL.
+	.post("/webhooks/openwa", (c) => openwaWebhookHandler(c.req.raw, createOpenWaWebhookHooks()))
 	// GoHighLevel OAuth install + SSO (embedded Custom Page)
 	.get("/ghl/oauth/authorize", (c) => ghlAuthorizeHandler(c.req.raw))
 	.get("/ghl/oauth/callback", (c) => ghlCallbackHandler(c.req.raw))
 	.post("/ghl-sso/decrypt", (c) => ghlSsoDecryptHandler(c.req.raw))
 	// Conversation-provider Delivery URL (SMS takeover — GHL → WhatsApp)
 	.post("/providers/sms/outbound", (c) => ghlProviderOutboundHandler(c.req.raw))
+	// Marketplace app webhooks (contact lifecycle → local cache refresh)
+	.post("/webhooks/gohighlevel", (c) => ghlAppWebhookHandler(c.req.raw))
 	// Health check
 	.get("/health", (c) => c.text("OK"))
 	// oRPC handlers (for RPC and OpenAPI)

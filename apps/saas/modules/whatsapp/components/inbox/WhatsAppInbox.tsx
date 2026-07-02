@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 
 import { Composer } from "./Composer";
 import { ContactDetailsPanel } from "./ContactDetailsPanel";
+import { ConversationFilters } from "./ConversationFilters";
 import { ConversationList } from "./ConversationList";
 import { prettyPhone } from "./helpers";
 import { MessageThread } from "./MessageThread";
@@ -30,12 +31,26 @@ export function WhatsAppInbox({
 }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-	const [detailsOpen, setDetailsOpen] = useState(false);
+	// Contact details default open on desktop; on mobile the aside is a full
+	// overlay, so it stays opt-in there.
+	const [detailsOpen, setDetailsOpen] = useState(
+		() => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
+	);
+
+	// Conversation-list filters (owner / tag). Cleared = no filter.
+	const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+	const [tagFilter, setTagFilter] = useState<{ tag: string; mode: "has" | "not" } | null>(null);
 
 	// Full chat list pulled from OpenWA (all contacts), overlaid with our tracked
 	// conversation state. Heavier than the DB-only list, so polled less often.
 	const conversationsQuery = useQuery({
-		...orpc.whatsapp.listChats.queryOptions({ input: { subaccountId } }),
+		...orpc.whatsapp.listChats.queryOptions({
+			input: {
+				subaccountId,
+				...(ownerFilter ? { ownerId: ownerFilter } : {}),
+				...(tagFilter ? { tag: tagFilter.tag, tagMode: tagFilter.mode } : {}),
+			},
+		}),
 		refetchInterval: 15000,
 	});
 
@@ -74,9 +89,12 @@ export function WhatsAppInbox({
 				body: string | null;
 				type: string;
 				timestamp: Date | string;
+				status?: string | null;
+				sessionId?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 			}
 		>();
+		// Our DB rows carry status + the sending/receiving session (which number).
 		for (const m of threadQuery.data?.messages ?? []) {
 			byKey.set(m.waMessageId ?? m.id, {
 				id: m.id,
@@ -84,18 +102,29 @@ export function WhatsAppInbox({
 				body: m.body,
 				type: m.type,
 				timestamp: m.timestamp,
+				status: m.status,
+				sessionId: m.sessionId,
 				media: null,
 			});
 		}
+		// OpenWA history carries media thumbnails — merge it in without dropping
+		// the DB row's status/sessionId; history-only rows keep those undefined.
 		for (const m of historyQuery.data ?? []) {
-			byKey.set(m.waMessageId ?? m.id, {
-				id: m.id,
-				direction: m.direction,
-				body: m.body,
-				type: m.type,
-				timestamp: m.timestamp,
-				media: m.media,
-			});
+			const key = m.waMessageId ?? m.id;
+			const existing = byKey.get(key);
+			if (existing) {
+				existing.media = m.media;
+			} else {
+				byKey.set(key, {
+					id: m.id,
+					direction: m.direction,
+					body: m.body,
+					type: m.type,
+					timestamp: m.timestamp,
+					status: m.status,
+					media: m.media,
+				});
+			}
 		}
 		return [...byKey.values()].sort(
 			(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
@@ -149,6 +178,15 @@ export function WhatsAppInbox({
 					isLoading={conversationsQuery.isLoading}
 					selectedChatId={selectedChatId}
 					onSelect={setSelectedChatId}
+					filters={
+						<ConversationFilters
+							subaccountId={subaccountId}
+							ownerFilter={ownerFilter}
+							onOwnerChange={setOwnerFilter}
+							tagFilter={tagFilter}
+							onTagChange={setTagFilter}
+						/>
+					}
 				/>
 			</div>
 
@@ -159,7 +197,7 @@ export function WhatsAppInbox({
 							<MessageSquareIcon className="size-6 text-primary" />
 						</div>
 						<p className="font-medium">Select a conversation</p>
-						<p className="text-sm text-foreground/60">
+						<p className="text-sm text-foreground/75">
 							Pick a chat on the left, or start a new one.
 						</p>
 					</div>
@@ -179,12 +217,12 @@ export function WhatsAppInbox({
 								<div className="min-w-0">
 									<p className="font-medium text-sm truncate">{contactName}</p>
 									{selectedChat?.phone && selectedChat.phone !== contactName ? (
-										<p className="text-xs truncate text-foreground/50">{selectedChat.phone}</p>
+										<p className="text-xs truncate text-foreground/65">{selectedChat.phone}</p>
 									) : null}
 								</div>
 							</div>
 							<div className="gap-2 flex items-center">
-								<span className="text-xs sm:inline hidden text-foreground/60">Send from</span>
+								<span className="text-xs sm:inline hidden text-foreground/75">Send from</span>
 								<Select
 									value={activeNumberId}
 									disabled={numbers.length === 0 || setNumber.isPending}
@@ -217,6 +255,12 @@ export function WhatsAppInbox({
 						<MessageThread
 							messages={threadMessages}
 							isLoading={threadQuery.isLoading || historyQuery.isLoading}
+							contact={{
+								name: contactName,
+								phone: selectedChat?.phone ?? (selectedChatId ? prettyPhone(selectedChatId) : null),
+							}}
+							numbers={numbers}
+							fallbackNumberId={activeNumberId || null}
 						/>
 
 						<Composer

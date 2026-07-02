@@ -149,7 +149,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
 	return (
 		<div className="relative">
 			{isEmpty && placeholder && (
-				<div className="left-3.5 top-3 text-sm pointer-events-none absolute text-foreground/40">
+				<div className="left-3.5 top-3 text-sm pointer-events-none absolute text-foreground/55">
 					{placeholder}
 				</div>
 			)}

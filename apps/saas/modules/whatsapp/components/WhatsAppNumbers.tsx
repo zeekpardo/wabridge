@@ -25,7 +25,7 @@ export function WhatsAppNumbers({ subaccountId }: { subaccountId?: string }) {
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="font-medium text-lg">Connected numbers</h2>
-					<p className="text-sm text-foreground/60">WhatsApp numbers linked to this subaccount.</p>
+					<p className="text-sm text-foreground/75">WhatsApp numbers linked to this subaccount.</p>
 				</div>
 				<ConnectNumberDialog subaccountId={subaccountId} />
 			</div>
@@ -41,7 +41,7 @@ export function WhatsAppNumbers({ subaccountId }: { subaccountId?: string }) {
 					</div>
 					<div>
 						<p className="font-medium">No numbers yet</p>
-						<p className="text-sm text-foreground/60">
+						<p className="text-sm text-foreground/75">
 							Connect your first WhatsApp number to start sending and receiving messages.
 						</p>
 					</div>

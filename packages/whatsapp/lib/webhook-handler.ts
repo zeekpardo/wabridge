@@ -11,13 +11,55 @@ import { logger } from "@repo/logs";
 import { OPENWA_WEBHOOK_EVENTS } from "./types";
 import { parseOpenWaWebhookPayload, verifyOpenWaSignature } from "./webhook";
 
+/** An inbound (contact → us) WhatsApp message, normalized for the hooks. */
+export interface OpenWaInboundMessage {
+	subaccountId: string;
+	organizationId: string;
+	sessionId: string;
+	chatId: string;
+	body: string | null;
+	type: string;
+	waMessageId: string | null;
+	timestamp: Date;
+	/**
+	 * The sender's real phone (MSISDN digits), resolved by OpenWA for `@lid`
+	 * privacy-id senders (RESOLVE_LID_TO_PHONE). Null/absent when unresolvable —
+	 * consumers must NOT fall back to the `@lid` digits, which are not a phone.
+	 */
+	senderPhone?: string | null;
+}
+
+/** A delivery/read receipt for a message we sent. */
+export interface OpenWaMessageAck {
+	subaccountId: string;
+	sessionId: string;
+	waMessageId: string;
+	status: string;
+}
+
+/**
+ * Extension points the API layer injects so higher layers (the message hub,
+ * CRM sync) can react to webhook events without this package depending on
+ * them (@repo/api already depends on @repo/whatsapp).
+ */
+export interface OpenWaWebhookHooks {
+	/**
+	 * Handles an inbound contact message END-TO-END (persistence included) —
+	 * when provided, the handler skips its own message insert and delegates to
+	 * this (the hub persists with the same waMessageId de-dupe).
+	 */
+	onInboundMessage?(event: OpenWaInboundMessage): Promise<void>;
+	/** Fired after the local status update; must not throw. */
+	onMessageAck?(event: OpenWaMessageAck): Promise<void>;
+}
+
 /**
  * Public inbound webhook handler for OpenWA -> us deliveries. Mirrors the
  * payments webhook handler style: reads the raw body, verifies the
  * `X-OpenWA-Signature` HMAC against the target session's stored secret, then
  * processes the event. Returns a `Response`.
  */
-export async function webhookHandler(req: Request): Promise<Response> {
+export async function webhookHandler(req: Request, hooks?: OpenWaWebhookHooks): Promise<Response> {
 	const rawBody = await req.text();
 
 	if (!rawBody) {
@@ -50,7 +92,7 @@ export async function webhookHandler(req: Request): Promise<Response> {
 	}
 
 	try {
-		await processEvent(row.id, row.subaccountId, row.organizationId, payload);
+		await processEvent(row.id, row.subaccountId, row.organizationId, payload, hooks);
 	} catch (error) {
 		logger.error(error, { ctx: "whatsapp.webhook.process", event: payload.event });
 		return new Response("Processing error.", { status: 500 });
@@ -64,6 +106,7 @@ async function processEvent(
 	subaccountId: string,
 	organizationId: string,
 	payload: ReturnType<typeof parseOpenWaWebhookPayload>,
+	hooks?: OpenWaWebhookHooks,
 ): Promise<void> {
 	const data = payload.data as Record<string, unknown>;
 
@@ -72,30 +115,18 @@ async function processEvent(
 		case OPENWA_WEBHOOK_EVENTS.messageSent: {
 			// message.received => inbound; message.sent => outbound (fromMe, whether
 			// sent through our API or directly from the linked phone). Dedup on
-			// waMessageId (in createWhatsAppMessage) collapses the API-send row and
-			// its message.sent webhook echo into one.
+			// waMessageId (in createWhatsAppMessage / the hub) collapses the API-send
+			// row and its message.sent webhook echo into one.
 			const outbound = payload.event === OPENWA_WEBHOOK_EVENTS.messageSent;
 			const chatId = String(data.chatId ?? "");
 			const body = typeof data.body === "string" ? data.body : null;
 			const type = String(data.type ?? "text");
+			const timestamp = parseTimestamp(payload.timestamp);
 
-			await createWhatsAppMessage({
-				subaccountId,
-				organizationId,
-				sessionId,
-				direction: outbound ? "outbound" : "inbound",
-				chatId,
-				fromMe: outbound ? true : Boolean(data.fromMe ?? false),
-				type,
-				body,
-				status: typeof data.status === "string" ? data.status : outbound ? "sent" : null,
-				waMessageId: typeof data.id === "string" ? data.id : null,
-				idempotencyKey: payload.idempotencyKey,
-				timestamp: parseTimestamp(payload.timestamp),
-			});
-
-			// Keep the conversation thread fresh. Inbound reply-locks the thread to
-			// the receiving number; outbound just refreshes it.
+			// Keep the conversation thread fresh BEFORE persisting the message, so
+			// downstream projections (e.g. GHL contact upsert) see the contact name.
+			// Inbound reply-locks the thread to the receiving number; outbound just
+			// refreshes it.
 			if (chatId) {
 				const preview = body ? body.slice(0, 140) : `[${type}]`;
 				if (outbound) {
@@ -123,6 +154,39 @@ async function processEvent(
 					});
 				}
 			}
+
+			// Inbound contact messages route through the hub when wired (persist +
+			// GHL mirror + app notify, de-duped on waMessageId). Outbound echoes and
+			// hook-less deployments keep the direct local insert.
+			if (!outbound && hooks?.onInboundMessage && chatId) {
+				await hooks.onInboundMessage({
+					subaccountId,
+					organizationId,
+					sessionId,
+					chatId,
+					body,
+					type,
+					waMessageId: typeof data.id === "string" ? data.id : null,
+					timestamp,
+					senderPhone: typeof data.senderPhone === "string" ? data.senderPhone : null,
+				});
+				break;
+			}
+
+			await createWhatsAppMessage({
+				subaccountId,
+				organizationId,
+				sessionId,
+				direction: outbound ? "outbound" : "inbound",
+				chatId,
+				fromMe: outbound ? true : Boolean(data.fromMe ?? false),
+				type,
+				body,
+				status: typeof data.status === "string" ? data.status : outbound ? "sent" : null,
+				waMessageId: typeof data.id === "string" ? data.id : null,
+				idempotencyKey: payload.idempotencyKey,
+				timestamp,
+			});
 			break;
 		}
 		case OPENWA_WEBHOOK_EVENTS.messageAck: {
@@ -131,6 +195,9 @@ async function processEvent(
 			const status = typeof data.status === "string" ? data.status : null;
 			if (waMessageId && status) {
 				await updateWhatsAppMessageStatus(sessionId, waMessageId, status);
+				// Let the API layer relay the status upstream (e.g. GHL provider
+				// message status). Best-effort by contract.
+				await hooks?.onMessageAck?.({ subaccountId, sessionId, waMessageId, status });
 			}
 			break;
 		}

@@ -2,8 +2,10 @@ import { adminListSessions } from "./procedures/admin-list-sessions";
 import { connectGoHighLevel } from "./procedures/connect-gohighlevel";
 import { connectNumber } from "./procedures/connect-number";
 import { deleteSession } from "./procedures/delete-session";
+import { disconnectGoHighLevel } from "./procedures/disconnect-gohighlevel";
 import { getChatHistory } from "./procedures/get-chat-history";
 import { getContactProfile } from "./procedures/get-contact-profile";
+import { getCustomFieldGroups } from "./procedures/get-custom-field-groups";
 import { getGhlOAuthUrl } from "./procedures/get-ghl-oauth-url";
 import { getQr } from "./procedures/get-qr";
 import { getSession } from "./procedures/get-session";
@@ -12,6 +14,7 @@ import { getThread } from "./procedures/get-thread";
 import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
 import { listContactOwners } from "./procedures/list-contact-owners";
+import { listContactTags } from "./procedures/list-contact-tags";
 import { listConversationsProcedure } from "./procedures/list-conversations";
 import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
@@ -22,6 +25,7 @@ import { reconcileSessions } from "./procedures/reconcile-sessions";
 import { requestPairingCode } from "./procedures/request-pairing-code";
 import { sendMessage } from "./procedures/send-message";
 import { sendTestMessage } from "./procedures/send-test-message";
+import { setContactFields } from "./procedures/set-contact-fields";
 import { setContactOwner } from "./procedures/set-contact-owner";
 import { setContactTags } from "./procedures/set-contact-tags";
 import { setConversationNumber } from "./procedures/set-conversation-number";
@@ -51,12 +55,16 @@ export const whatsappRouter = {
 	linkPreview,
 	setConversationNumber,
 	listNumbers,
-	// GoHighLevel install (popup OAuth → callback page → connect)
+	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect
 	getGhlOAuthUrl,
 	connectGoHighLevel,
+	disconnectGoHighLevel,
 	// Contact / CRM panel (prewired for GoHighLevel)
 	getContactProfile,
 	listContactOwners,
 	setContactOwner,
 	setContactTags,
+	setContactFields,
+	listContactTags,
+	getCustomFieldGroups,
 };

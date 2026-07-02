@@ -43,8 +43,10 @@ export interface OpenWaPairingCodeResponse {
 
 export interface OpenWaSendTextResult {
 	/**
-	 * Provider message id assigned by WhatsApp, when available.
+	 * Provider message id assigned by WhatsApp, when available. OpenWA's send
+	 * endpoints return this as `messageId`; `id` kept for older payload shapes.
 	 */
+	messageId?: string;
 	id?: string;
 	[key: string]: unknown;
 }

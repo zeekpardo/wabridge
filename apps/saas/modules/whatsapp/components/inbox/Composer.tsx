@@ -280,8 +280,8 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 								</div>
 							) : (
 								<div className="size-16 gap-1 p-1 flex flex-col items-center justify-center rounded-lg border bg-muted text-center">
-									<FileIcon className="size-5 text-foreground/60" />
-									<span className="w-full truncate text-[9px] text-foreground/60">{file.name}</span>
+									<FileIcon className="size-5 text-foreground/75" />
+									<span className="w-full truncate text-[9px] text-foreground/75">{file.name}</span>
 								</div>
 							)}
 							<button
@@ -299,7 +299,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 
 			{showPreview && (
 				<div className="gap-x-2 gap-y-1 px-2.5 py-1.5 text-xs flex flex-wrap items-center rounded-lg bg-muted/50">
-					<span className="font-medium shrink-0 text-foreground/50">Preview</span>
+					<span className="font-medium shrink-0 text-foreground/65">Preview</span>
 					<span className="min-w-0 flex-1 truncate">
 						{preview.data?.actions.map((a) => a.text ?? `[${a.kind}]`).join("  ") || "—"}
 					</span>
@@ -322,7 +322,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 							type="button"
 							variant="ghost"
 							size="icon"
-							className="size-8 text-foreground/60"
+							className="size-8 text-foreground/75"
 							aria-label="Cancel recording"
 							onClick={cancelRecording}
 						>
@@ -361,7 +361,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 							type="button"
 							variant="ghost"
 							size="icon"
-							className="size-8 text-foreground/60"
+							className="size-8 text-foreground/75"
 							aria-label="Attach file"
 							onClick={() => fileInputRef.current?.click()}
 						>
@@ -372,7 +372,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 							type="button"
 							variant="ghost"
 							size="icon"
-							className={cn("size-8 text-foreground/60", recording && "text-red-600")}
+							className={cn("size-8 text-foreground/75", recording && "text-red-600")}
 							aria-label={recording ? "Stop recording" : "Record voice message"}
 							onClick={recording ? stopRecording : startRecording}
 						>
@@ -385,7 +385,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 									type="button"
 									variant="ghost"
 									size="icon"
-									className="size-8 text-foreground/60"
+									className="size-8 text-foreground/75"
 									aria-label="Emoji"
 								>
 									<SmileIcon className="size-4" />
@@ -407,7 +407,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="h-8 gap-1 px-2 text-xs text-foreground/60"
+									className="h-8 gap-1 px-2 text-xs text-foreground/75"
 								>
 									<ShuffleIcon className="size-3.5" />
 									Variable
@@ -429,7 +429,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 											}
 										}}
 									/>
-									<p className="text-xs text-foreground/50">
+									<p className="text-xs text-foreground/65">
 										Each recipient gets a random option — reduces spam flags.
 									</p>
 									<Button size="sm" onClick={addSpintax}>
@@ -445,7 +445,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="h-8 gap-1 px-2 text-xs text-foreground/60"
+									className="h-8 gap-1 px-2 text-xs text-foreground/75"
 								>
 									<ClockIcon className="size-3.5" />
 									Delay
@@ -462,7 +462,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 											value={delayMin}
 											onChange={(e) => setDelayMin(e.target.value)}
 										/>
-										<span className="text-xs text-foreground/50">to</span>
+										<span className="text-xs text-foreground/65">to</span>
 										<Input
 											type="number"
 											min={0}

@@ -22,9 +22,44 @@ export interface GHLContact {
 	gender?: string | null;
 	source?: string | null;
 	attributionSource?: GHLAttributionSource | null;
+	/** GHL user id of the assigned owner, when set. */
+	assignedTo?: string | null;
 	createdBy?: string | null;
 	createdAt?: string;
 	updatedAt?: string;
+}
+
+/** A tag defined on the location (Settings → Tags). */
+export interface GHLTag {
+	id: string;
+	name: string;
+	locationId: string;
+}
+
+/** A GHL location user (Settings → My Staff). Requires the users.readonly scope. */
+export interface GHLUser {
+	id: string;
+	name?: string;
+	firstName?: string;
+	lastName?: string;
+	email?: string;
+	phone?: string;
+	roles?: { type?: string; role?: string; locationIds?: string[] };
+}
+
+/**
+ * A GHL contact's display name. Per the GHL API, list/upsert responses may
+ * populate `firstName`/`lastName` without `name` (or vice versa) — never rely
+ * on either alone. Returns null when the contact has no usable name (e.g.
+ * phone-only contacts), so callers can keep their own fallback.
+ */
+export function ghlContactDisplayName(contact: GHLContact): string | null {
+	const joined = [contact.firstName, contact.lastName]
+		.map((part) => part?.trim())
+		.filter(Boolean)
+		.join(" ");
+	const name = joined || contact.name?.trim() || "";
+	return name.length > 0 ? name : null;
 }
 
 export interface GHLCustomFieldValue {
@@ -39,6 +74,19 @@ export interface GHLCustomFieldDefinition {
 	dataType: string;
 	locationId: string;
 	model: string;
+	/** The containing folder's id (`documentType: "field"` items). */
+	parentId?: string;
+	/** Sort order within the folder. */
+	position?: number;
+	/** "field" | "folder" — the bulk list returns fields only. */
+	documentType?: string;
+}
+
+/** A custom-field folder (Settings → Custom Fields grouping). */
+export interface GHLCustomFieldFolder {
+	id: string;
+	name: string;
+	position: number;
 }
 
 export interface GHLContactCreateInput {
@@ -59,6 +107,8 @@ export interface GHLContactUpdateInput {
 	phone?: string;
 	tags?: string[];
 	customFields?: GHLCustomFieldValue[];
+	/** GHL user id to assign as the contact's owner (null clears the assignment). */
+	assignedTo?: string | null;
 }
 
 export interface GHLApiResponse<T> {
@@ -132,23 +182,27 @@ export interface GHLInboundMessageInput {
 	 * native SMS channel.
 	 */
 	conversationProviderId?: string;
-	locationId: string;
-	contactId: string;
+	/** The GHL conversation to append to (one per contact; see getOrCreateConversation). */
+	conversationId: string;
 	message: string;
+	/** Public attachment URLs. */
 	attachments?: string[];
-	direction: "inbound";
 	type: GHLMessageType;
+	/** Original message time (ISO 8601); defaults to now on GHL's side. */
+	date?: string;
 }
 
 export interface GHLOutboundMessageInput {
 	/** Custom conversation provider id (omit for the SMS-replace provider). */
 	conversationProviderId?: string;
-	locationId: string;
-	contactId: string;
+	/** The GHL conversation to append to (one per contact; see getOrCreateConversation). */
+	conversationId: string;
 	message: string;
+	/** Public attachment URLs. */
 	attachments?: string[];
-	direction: "outbound";
 	type: GHLMessageType;
+	/** Original message time (ISO 8601); defaults to now on GHL's side. */
+	date?: string;
 }
 
 export interface GHLMessageResponse {
