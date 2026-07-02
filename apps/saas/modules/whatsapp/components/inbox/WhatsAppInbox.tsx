@@ -30,7 +30,11 @@ export function WhatsAppInbox({
 }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-	const [detailsOpen, setDetailsOpen] = useState(false);
+	// Contact details default open on desktop; on mobile the aside is a full
+	// overlay, so it stays opt-in there.
+	const [detailsOpen, setDetailsOpen] = useState(
+		() => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
+	);
 
 	// Full chat list pulled from OpenWA (all contacts), overlaid with our tracked
 	// conversation state. Heavier than the DB-only list, so polled less often.
