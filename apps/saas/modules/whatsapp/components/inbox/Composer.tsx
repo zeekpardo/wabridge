@@ -509,7 +509,7 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-64 p-0">
 								{templates.length > 0 ? (
-									<div className="max-h-72 overflow-y-auto p-1">
+									<div className="max-h-72 p-1 overflow-y-auto">
 										{templates.map((template) => (
 											<button
 												key={template.id}
@@ -517,8 +517,8 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 												className="gap-0.5 px-2 py-1.5 flex w-full flex-col rounded-md text-left hover:bg-muted"
 												onClick={() => loadTemplate(template.text)}
 											>
-												<span className="truncate text-sm font-medium">{template.name}</span>
-												<span className="truncate text-[11px] text-foreground/55 font-mono">
+												<span className="text-sm font-medium truncate">{template.name}</span>
+												<span className="font-mono truncate text-[11px] text-foreground/55">
 													{template.text}
 												</span>
 											</button>

@@ -44,40 +44,42 @@ export const listContactVariables = protectedProcedure
 		summary: "GoHighLevel contact merge variables (standard + custom fields)",
 	})
 	.input(z.object({ subaccountId: z.string().optional() }))
-	.handler(async ({ input, context: { user, session } }): Promise<{ variables: ContactVariable[] }> => {
-		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
-		const variables: ContactVariable[] = [...STANDARD_FIELDS];
+	.handler(
+		async ({ input, context: { user, session } }): Promise<{ variables: ContactVariable[] }> => {
+			const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
+			const variables: ContactVariable[] = [...STANDARD_FIELDS];
 
-		const ghl = await getGhlConnection(subaccount.id);
-		if (!ghl) {
-			return { variables };
-		}
-
-		try {
-			const client = await createGoHighLevelClient(subaccount.id);
-			if (!client) {
+			const ghl = await getGhlConnection(subaccount.id);
+			if (!ghl) {
 				return { variables };
 			}
-			const definitions = await client.getCustomFields();
-			for (const def of definitions) {
-				if (def.documentType && def.documentType !== "field") {
-					continue;
+
+			try {
+				const client = await createGoHighLevelClient(subaccount.id);
+				if (!client) {
+					return { variables };
 				}
-				if (def.model && def.model !== "contact") {
-					continue;
+				const definitions = await client.getCustomFields();
+				for (const def of definitions) {
+					if (def.documentType && def.documentType !== "field") {
+						continue;
+					}
+					if (def.model && def.model !== "contact") {
+						continue;
+					}
+					variables.push({
+						label: def.name,
+						token: `{{${def.fieldKey}}}`,
+						group: "Custom fields",
+					});
 				}
-				variables.push({
-					label: def.name,
-					token: `{{${def.fieldKey}}}`,
-					group: "Custom fields",
+			} catch (error) {
+				logger.warn("GHL contact variables fetch failed", {
+					ctx: "whatsapp.contactVariables",
+					error: error instanceof Error ? error.message : String(error),
 				});
 			}
-		} catch (error) {
-			logger.warn("GHL contact variables fetch failed", {
-				ctx: "whatsapp.contactVariables",
-				error: error instanceof Error ? error.message : String(error),
-			});
-		}
 
-		return { variables };
-	});
+			return { variables };
+		},
+	);

@@ -202,7 +202,7 @@ function MessageBubble({
 			<div className={cn("min-w-0 flex flex-1 flex-col", isOutbound ? "items-end" : "items-start")}>
 				<div
 					className={cn(
-						"text-sm shadow-sm sm:max-w-[70%] max-w-[80%] min-w-0 overflow-hidden rounded-2xl break-words",
+						"text-sm shadow-sm sm:max-w-[70%] min-w-0 max-w-[80%] overflow-hidden rounded-2xl break-words",
 						isOutbound
 							? "rounded-br-sm bg-primary text-primary-foreground"
 							: "rounded-bl-sm border bg-card text-foreground",

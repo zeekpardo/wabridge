@@ -1,5 +1,5 @@
-import { getWhatsAppSettings, upsertWhatsAppSettings } from "@repo/database";
 import { ORPCError } from "@orpc/server";
+import { getWhatsAppSettings, upsertWhatsAppSettings } from "@repo/database";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";

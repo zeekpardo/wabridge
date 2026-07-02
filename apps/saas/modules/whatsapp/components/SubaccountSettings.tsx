@@ -122,7 +122,7 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 										}
 									/>
 								</div>
-								<div className="min-w-0 flex-1 gap-1.5 flex flex-col">
+								<div className="min-w-0 gap-1.5 flex flex-1 flex-col">
 									<Label className="text-xs">Variations</Label>
 									<Input
 										placeholder="Hi, Hello, Hey there"
@@ -148,7 +148,7 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 					})}
 
 					{rows.length === 0 && (
-						<p className="py-4 text-center text-sm text-foreground/60 border-2 border-dashed rounded-lg">
+						<p className="py-4 text-sm rounded-lg border-2 border-dashed text-center text-foreground/60">
 							No variables yet.
 						</p>
 					)}

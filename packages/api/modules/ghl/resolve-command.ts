@@ -1,4 +1,4 @@
-import { type GlobalSpintax, processMessage, type Rng } from "@repo/whatsapp";
+import { type GlobalSpintax, processMessage, type Rng } from "@repo/whatsapp/commands";
 
 export interface ResolvedOutboundCommand {
 	/** The concrete text to deliver over WhatsApp (spintax expanded, delay stripped). */

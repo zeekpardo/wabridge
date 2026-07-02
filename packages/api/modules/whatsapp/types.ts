@@ -12,7 +12,10 @@ export type MessageTemplate = z.infer<typeof messageTemplateSchema>;
 
 /** Parse the stored JSON array defensively — bad/legacy rows collapse to []. */
 export function parseMessageTemplates(value: unknown): MessageTemplate[] {
-	return z.array(messageTemplateSchema).catch([]).parse(value ?? []);
+	return z
+		.array(messageTemplateSchema)
+		.catch([])
+		.parse(value ?? []);
 }
 
 /** Cap so a runaway save loop can't bloat the settings row. */

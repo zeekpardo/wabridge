@@ -37,7 +37,10 @@ function nextSpintaxLetter(text: string): string {
 
 /** Substitute GHL merge tokens (`{{contact.x}}`) with a sample contact's values. */
 function fillSampleContact(text: string, values: Record<string, string>): string {
-	return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => values[`{{${key}}}`] ?? match);
+	return text.replace(
+		/\{\{\s*([\w.]+)\s*\}\}/g,
+		(match, key: string) => values[`{{${key}}}`] ?? match,
+	);
 }
 
 export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
@@ -61,7 +64,8 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
 	);
 	const globalVars = useMemo(() => {
-		const globals = (settingsQuery.data?.globalSpintax as Record<string, string[]> | undefined) ?? {};
+		const globals =
+			(settingsQuery.data?.globalSpintax as Record<string, string[]> | undefined) ?? {};
 		return Object.entries(globals)
 			.filter(([, options]) => options.length > 0)
 			.sort(([a], [b]) => a.localeCompare(b));
@@ -170,7 +174,9 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 			return;
 		}
 		const letter = nextSpintaxLetter(text);
-		insertAtCursor(`!/SPINTAX_${letter}/${options.join("/")}/SPINTAX_${letter}/!\${SPINTAX_${letter}}`);
+		insertAtCursor(
+			`!/SPINTAX_${letter}/${options.join("/")}/SPINTAX_${letter}/!\${SPINTAX_${letter}}`,
+		);
 		setSpintaxInput("");
 		setSpintaxOpen(false);
 	}
@@ -224,25 +230,30 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 				<h3 className="font-medium">Bulk message builder</h3>
 				<p className="text-sm text-foreground/75">
 					Write your message and drop in variables or a delay. The box below is the exact command —
-					copy it into GoHighLevel's bulk SMS editor. We resolve it per recipient (random wording and
-					a random pause) so bulk sends read as human.
+					copy it into GoHighLevel's bulk SMS editor. We resolve it per recipient (random wording
+					and a random pause) so bulk sends read as human.
 				</p>
 			</div>
 
-			<div className="grid gap-4 lg:grid-cols-2">
+			<div className="gap-4 lg:grid-cols-2 grid">
 				{/* Left: the single compile-in-place command field + insert helpers. */}
 				<div className="gap-2 flex flex-col">
 					<div className="gap-1.5 flex flex-wrap items-center">
 						<Popover open={globalOpen} onOpenChange={setGlobalOpen}>
 							<PopoverTrigger asChild>
-								<Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
 									<VariableIcon className="size-3.5" />
 									Global variable
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-64 p-0">
 								{globalVars.length > 0 ? (
-									<div className="max-h-72 overflow-y-auto p-1">
+									<div className="max-h-72 p-1 overflow-y-auto">
 										{globalVars.map(([name, options]) => (
 											<button
 												key={name}
@@ -270,7 +281,12 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 
 						<Popover open={spintaxOpen} onOpenChange={setSpintaxOpen}>
 							<PopoverTrigger asChild>
-								<Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
 									<ShuffleIcon className="size-3.5" />
 									Spintax
 								</Button>
@@ -301,7 +317,12 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 
 						<Popover open={delayOpen} onOpenChange={setDelayOpen}>
 							<PopoverTrigger asChild>
-								<Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
 									<ClockIcon className="size-3.5" />
 									Delay
 								</Button>
@@ -326,7 +347,9 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 											onChange={(e) => setDelayMax(e.target.value)}
 										/>
 									</div>
-									<p className="text-xs text-foreground/65">One delay per message — placed at the end.</p>
+									<p className="text-xs text-foreground/65">
+										One delay per message — placed at the end.
+									</p>
 									<Button size="sm" onClick={insertDelay}>
 										Insert delay
 									</Button>
@@ -336,21 +359,26 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 
 						<Popover open={contactVarsOpen} onOpenChange={setContactVarsOpen}>
 							<PopoverTrigger asChild>
-								<Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
 									<UserIcon className="size-3.5" />
 									Contact field
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-64 p-0">
-								<div className="max-h-72 overflow-y-auto p-1">
-									<p className="px-2 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-foreground/50 uppercase">
+								<div className="max-h-72 p-1 overflow-y-auto">
+									<p className="px-2 pt-1.5 pb-1 font-medium tracking-wide text-[11px] text-foreground/50 uppercase">
 										Standard
 									</p>
 									{contactVarGroups.standard.map((variable) => (
 										<button
 											key={variable.token}
 											type="button"
-											className="gap-2 px-2 py-1.5 flex w-full items-center rounded-md text-left text-sm hover:bg-muted"
+											className="gap-2 px-2 py-1.5 text-sm flex w-full items-center rounded-md text-left hover:bg-muted"
 											onClick={() => {
 												insertAtCursor(variable.token);
 												setContactVarsOpen(false);
@@ -363,14 +391,14 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 
 									{contactVarGroups.custom.length > 0 && (
 										<>
-											<p className="px-2 pt-2 pb-1 text-[11px] font-medium tracking-wide text-foreground/50 uppercase">
+											<p className="px-2 pt-2 pb-1 font-medium tracking-wide text-[11px] text-foreground/50 uppercase">
 												Custom fields
 											</p>
 											{contactVarGroups.custom.map((variable) => (
 												<button
 													key={variable.token}
 													type="button"
-													className="px-2 py-1.5 flex w-full items-center rounded-md text-left text-sm hover:bg-muted"
+													className="px-2 py-1.5 text-sm flex w-full items-center rounded-md text-left hover:bg-muted"
 													onClick={() => {
 														insertAtCursor(variable.token);
 														setContactVarsOpen(false);
@@ -386,7 +414,7 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 										<p className="px-2 py-2 text-xs text-foreground/60">Loading custom fields…</p>
 									)}
 								</div>
-								<p className="px-3 py-2 text-[11px] text-foreground/55 border-t">
+								<p className="px-3 py-2 border-t text-[11px] text-foreground/55">
 									GoHighLevel fills these for each contact when it sends.
 								</p>
 							</PopoverContent>
@@ -495,7 +523,7 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 
 					{/* Preview against a real GHL contact so merge fields show filled-in. */}
 					{text.includes("{{") && (
-						<div className="gap-2 flex flex-wrap items-center text-xs">
+						<div className="gap-2 text-xs flex flex-wrap items-center">
 							{sample ? (
 								<>
 									<span className="text-foreground/60">Previewing as</span>
@@ -532,7 +560,7 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 					)}
 
 					{text.trim().length === 0 ? (
-						<p className="py-8 text-center text-sm text-foreground/60">
+						<p className="py-8 text-sm text-center text-foreground/60">
 							Start typing to see how each recipient's message will look.
 						</p>
 					) : (
@@ -583,8 +611,8 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 									onClick={() => loadTemplate(template)}
 									title="Load into the builder"
 								>
-									<p className="truncate text-sm font-medium">{template.name}</p>
-									<p className="truncate text-xs text-foreground/60 font-mono">{template.text}</p>
+									<p className="text-sm font-medium truncate">{template.name}</p>
+									<p className="text-xs font-mono truncate text-foreground/60">{template.text}</p>
 								</button>
 								<Button
 									type="button"

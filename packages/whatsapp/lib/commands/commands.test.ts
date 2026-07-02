@@ -162,7 +162,9 @@ describe("buildCommandString (composer segments -> raw)", () => {
 			{ type: "text", value: " there 👋" },
 			{ type: "delay", minMs: 1000, maxMs: 4000 },
 		]);
-		expect(raw).toBe("!/SPINTAX_A/Hi/Hello/Hey/SPINTAX_A/!${SPINTAX_A} there 👋 !/DELAY/1000/4000/!");
+		expect(raw).toBe(
+			"!/SPINTAX_A/Hi/Hello/Hey/SPINTAX_A/!${SPINTAX_A} there 👋 !/DELAY/1000/4000/!",
+		);
 		const result = processMessage({ text: raw, rng: () => 0 });
 		expect(result.actions[0]?.text).toBe("Hi there 👋");
 		expect(result.actions[0]?.delayMs).toBe(1000);
