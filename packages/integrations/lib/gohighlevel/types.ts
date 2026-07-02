@@ -15,6 +15,11 @@ export interface GHLContact {
 	name?: string;
 	email?: string;
 	phone?: string;
+	companyName?: string;
+	city?: string;
+	state?: string;
+	country?: string;
+	postalCode?: string;
 	locationId: string;
 	tags?: string[];
 	customFields?: GHLCustomFieldValue[];

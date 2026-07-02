@@ -21,6 +21,13 @@ describe("expandSpintax", () => {
 		expect(expandSpintax("${SPINTAX_1}, team", globals, first).text).toBe("Good morning, team");
 	});
 
+	it("expands named (underscore) global spintax variables", () => {
+		const globals = { SPINTAX_FIRST_LINE: ["Good morning", "Hi"] };
+		expect(expandSpintax("${SPINTAX_FIRST_LINE}, team", globals, first).text).toBe(
+			"Good morning, team",
+		);
+	});
+
 	it("lets an inline declaration override a global of the same name", () => {
 		const globals = { SPINTAX_A: ["global"] };
 		const input = "!/SPINTAX_A/local/SPINTAX_A/!${SPINTAX_A}";
@@ -145,5 +152,19 @@ describe("buildCommandString (composer segments -> raw)", () => {
 		const raw = buildCommandString([{ type: "spintax", options: ["one/two", "", "  "] }]);
 		expect(raw).toContain("one two");
 		expect(processMessage({ text: raw, rng: () => 0 }).actions[0]?.text).toBe("one two");
+	});
+
+	it("compiles the settings-builder scenario (text + spintax + delay) as expected", () => {
+		// Mirrors the CommandBuilder verification scenario: a text block, a spintax
+		// block (Hi/Hello/Hey), and a 1-4s delay.
+		const raw = buildCommandString([
+			{ type: "spintax", options: ["Hi", "Hello", "Hey"] },
+			{ type: "text", value: " there 👋" },
+			{ type: "delay", minMs: 1000, maxMs: 4000 },
+		]);
+		expect(raw).toBe("!/SPINTAX_A/Hi/Hello/Hey/SPINTAX_A/!${SPINTAX_A} there 👋 !/DELAY/1000/4000/!");
+		const result = processMessage({ text: raw, rng: () => 0 });
+		expect(result.actions[0]?.text).toBe("Hi there 👋");
+		expect(result.actions[0]?.delayMs).toBe(1000);
 	});
 });

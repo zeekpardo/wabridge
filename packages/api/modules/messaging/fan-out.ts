@@ -35,6 +35,11 @@ export interface CanonicalMessage {
 	 * `@lid` privacy-id chats to a CRM contact — the lid digits are NOT a phone.
 	 */
 	senderPhone?: string | null;
+	/**
+	 * Pre-send human delay (ms) from a `!/DELAY/x/y/!` directive, resolved before
+	 * fan-out. Honoured by `sendOverWhatsApp` (capped) so bulk sends look human.
+	 */
+	sendDelayMs?: number;
 	timestamp: Date;
 }
 

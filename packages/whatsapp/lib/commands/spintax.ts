@@ -2,10 +2,12 @@ import type { GlobalSpintax, Rng } from "./types";
 
 // Inline declaration: !/SPINTAX_A/opt1/opt2/.../SPINTAX_A/!
 // The trailing newline (if any) is consumed so declaration lines vanish cleanly.
-const INLINE_DECL = /!\/SPINTAX_([A-Z0-9]+)\/([\s\S]*?)\/SPINTAX_\1\/!\r?\n?/g;
+// Names are alphanumeric + underscore so global variables can be given readable
+// names (e.g. SPINTAX_GREETING, SPINTAX_FIRST_LINE), not just A-Z / 1-6.
+const INLINE_DECL = /!\/SPINTAX_([A-Z0-9_]+)\/([\s\S]*?)\/SPINTAX_\1\/!\r?\n?/g;
 
-// Usage token: ${SPINTAX_A} / ${SPINTAX_1}
-const USAGE = /\$\{SPINTAX_([A-Z0-9]+)\}/g;
+// Usage token: ${SPINTAX_A} / ${SPINTAX_1} / ${SPINTAX_GREETING}
+const USAGE = /\$\{SPINTAX_([A-Z0-9_]+)\}/g;
 
 function pick(options: string[], rng: Rng): string {
 	if (options.length === 0) {

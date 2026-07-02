@@ -314,6 +314,8 @@ model WhatsAppSettings {
   subaccount    Subaccount @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
   // Global spintax variables, e.g. { "SPINTAX_1": ["Hi", "Hello"], ... }.
   globalSpintax Json?
+  // Saved bulk-message templates: [{ id, name, text, updatedAt }, ...].
+  messageTemplates Json?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
