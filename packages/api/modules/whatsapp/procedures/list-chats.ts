@@ -142,9 +142,13 @@ export const listChats = protectedProcedure
 		const items: ChatListItem[] = [];
 		for (const chat of merged.values()) {
 			const convo = convoByChat.get(chat.id);
+			// Name precedence: a CRM-linked thread carries the CRM's name on the
+			// conversation row (GHL wins when linked); otherwise WhatsApp's live
+			// name (pushName) beats any stale local copy.
+			const crmName = convo?.ghlContactId ? convo.contactName?.trim() : null;
 			items.push({
 				chatId: chat.id,
-				contactName: chat.name ?? convo?.contactName ?? null,
+				contactName: crmName || chat.name || convo?.contactName || null,
 				phone: phoneFromChatId(chat.id),
 				lastMessagePreview: convo?.lastMessagePreview ?? cleanPreview(chat.lastMessage),
 				lastMessageAt: convo?.lastMessageAt ?? new Date(chat.timestamp * 1000),
