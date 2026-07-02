@@ -45,6 +45,9 @@ export const connectGoHighLevel = protectedProcedure
 			refreshToken: encrypt(tokens.refresh_token),
 			tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
 			conversationProviderId: process.env.GOHIGHLEVEL_CONVERSATION_PROVIDER_ID ?? null,
+			// The SMS-replace (Option B) provider id from the marketplace app —
+			// bookkeeping only; Option B API calls don't send a provider id.
+			smsProviderId: process.env.GOHIGHLEVEL_SMS_PROVIDER_ID ?? null,
 		});
 
 		// Link the subaccount to this GHL location (keeps provisioningSource as-is).

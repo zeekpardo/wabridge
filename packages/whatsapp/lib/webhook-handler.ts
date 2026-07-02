@@ -21,6 +21,12 @@ export interface OpenWaInboundMessage {
 	type: string;
 	waMessageId: string | null;
 	timestamp: Date;
+	/**
+	 * The sender's real phone (MSISDN digits), resolved by OpenWA for `@lid`
+	 * privacy-id senders (RESOLVE_LID_TO_PHONE). Null/absent when unresolvable —
+	 * consumers must NOT fall back to the `@lid` digits, which are not a phone.
+	 */
+	senderPhone?: string | null;
 }
 
 /** A delivery/read receipt for a message we sent. */
@@ -162,6 +168,7 @@ async function processEvent(
 					type,
 					waMessageId: typeof data.id === "string" ? data.id : null,
 					timestamp,
+					senderPhone: typeof data.senderPhone === "string" ? data.senderPhone : null,
 				});
 				break;
 			}

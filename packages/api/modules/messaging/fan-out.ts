@@ -30,6 +30,11 @@ export interface CanonicalMessage {
 	waMessageId?: string | null;
 	/** Present for GHL-originated messages (the id to de-dupe + status against). */
 	ghlMessageId?: string | null;
+	/**
+	 * The contact's real phone (MSISDN digits) when known. Required to resolve
+	 * `@lid` privacy-id chats to a CRM contact — the lid digits are NOT a phone.
+	 */
+	senderPhone?: string | null;
 	timestamp: Date;
 }
 

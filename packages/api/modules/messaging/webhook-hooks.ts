@@ -51,6 +51,7 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 					body: event.body,
 					type: event.type,
 					waMessageId: event.waMessageId,
+					senderPhone: event.senderPhone ?? null,
 					timestamp: event.timestamp,
 				},
 				createFanOutDeps(),

@@ -4,14 +4,15 @@ const GHL_AUTHORIZE_URL = "https://marketplace.gohighlevel.com/oauth/chooselocat
 const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 
 /**
- * OAuth scopes requested from GoHighLevel. Includes contacts/locations scopes,
- * the conversation/message scopes required for the SMS bridge, and
- * users.readonly for contact-owner mapping (app member ↔ GHL user by email).
- * NOTE: must match the scopes checked in the marketplace app settings — adding
- * one here requires updating the app AND reinstalling it on test locations.
+ * OAuth scopes requested from GoHighLevel. Includes contacts/locations scopes
+ * plus the conversation/message scopes required for the SMS bridge.
+ * NOTE: must match the scopes checked in the marketplace app settings — a scope
+ * requested here but missing on the app makes GHL's OAuth silently skip the
+ * location chooser and dump the user on the dashboard. users.readonly (for
+ * contact-owner mapping) will be re-added in lockstep with the app settings.
  */
 const GHL_SCOPES =
-	"contacts.readonly contacts.write locations.readonly conversations.readonly conversations.write conversations/message.readonly conversations/message.write users.readonly";
+	"contacts.readonly contacts.write locations.readonly conversations.readonly conversations.write conversations/message.readonly conversations/message.write";
 
 export function getGhlAuthUrl(state?: string): string {
 	const clientId = process.env.GOHIGHLEVEL_CLIENT_ID;

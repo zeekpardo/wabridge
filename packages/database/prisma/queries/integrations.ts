@@ -23,6 +23,7 @@ export async function upsertGhlConnection(data: {
 	refreshToken: string;
 	tokenExpiresAt: Date;
 	conversationProviderId?: string | null;
+	smsProviderId?: string | null;
 }) {
 	return db.goHighLevelConnection.upsert({
 		where: { subaccountId: data.subaccountId },
@@ -35,6 +36,7 @@ export async function upsertGhlConnection(data: {
 			refreshToken: data.refreshToken,
 			tokenExpiresAt: data.tokenExpiresAt,
 			conversationProviderId: data.conversationProviderId,
+			smsProviderId: data.smsProviderId,
 			needsReconnect: false,
 		},
 		update: {
@@ -45,6 +47,7 @@ export async function upsertGhlConnection(data: {
 			refreshToken: data.refreshToken,
 			tokenExpiresAt: data.tokenExpiresAt,
 			conversationProviderId: data.conversationProviderId,
+			smsProviderId: data.smsProviderId,
 			needsReconnect: false,
 		},
 	});

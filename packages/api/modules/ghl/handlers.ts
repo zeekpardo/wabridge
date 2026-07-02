@@ -124,6 +124,9 @@ export async function ghlCallbackHandler(req: Request): Promise<Response> {
 			refreshToken: encrypt(tokens.refresh_token),
 			tokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
 			conversationProviderId: process.env.GOHIGHLEVEL_CONVERSATION_PROVIDER_ID ?? null,
+			// The SMS-replace (Option B) provider id from the marketplace app —
+			// bookkeeping only; Option B API calls don't send a provider id.
+			smsProviderId: process.env.GOHIGHLEVEL_SMS_PROVIDER_ID ?? null,
 		});
 
 		const org = await getOrganizationById(state.organizationId);
@@ -174,6 +177,13 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 
 	const subaccount = await getSubaccountByLocationId(locationId);
 	if (!subaccount) {
+		// A Delivery URL post for a location we don't know — typically the GHL
+		// connection was removed (or connected to a different location) while the
+		// provider is still enabled in that location's SMS settings.
+		logger.warn("Provider outbound for unlinked location", {
+			ctx: "ghl.provider.outbound",
+			locationId,
+		});
 		return new Response("Location not linked.", { status: 404 });
 	}
 	const session = await getDefaultSession(subaccount.id);

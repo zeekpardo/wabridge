@@ -15,10 +15,24 @@ import { createOpenWaClient } from "@repo/whatsapp";
 
 import type { CanonicalMessage, FanOutDeps } from "./fan-out";
 
-/** `15551234567@c.us` → `+15551234567` for GHL contact matching. */
-function phoneFromChatId(chatId: string): string | null {
-	const digits = chatId.replace(/@.*/, "").replace(/\D/g, "");
-	return digits.length >= 6 ? `+${digits}` : null;
+/**
+ * The contact's phone in E.164-ish form for CRM matching. Trust order:
+ * 1. `senderPhone` (OpenWA's `@lid` → phone resolution) — the only valid source
+ *    for privacy-id chats;
+ * 2. the chatId digits, but ONLY for phone-keyed JIDs (`@c.us` /
+ *    `@s.whatsapp.net`) — `@lid` digits are an opaque privacy id, and using
+ *    them would mint a garbage contact in the CRM.
+ */
+function contactPhone(message: CanonicalMessage): string | null {
+	const fromSender = message.senderPhone?.replace(/\D/g, "");
+	if (fromSender && fromSender.length >= 6) {
+		return `+${fromSender}`;
+	}
+	if (/@(c\.us|s\.whatsapp\.net)$/.test(message.chatId)) {
+		const digits = message.chatId.replace(/@.*/, "").replace(/\D/g, "");
+		return digits.length >= 6 ? `+${digits}` : null;
+	}
+	return null;
 }
 
 /** GHL message body for media messages that carry no caption. */
@@ -41,8 +55,15 @@ async function resolveGhlThread(
 		return { conversationId: cached.ghlConversationId };
 	}
 
-	const phone = phoneFromChatId(message.chatId);
+	const phone = contactPhone(message);
 	if (!phone) {
+		// A `@lid` chat with no resolved sender phone: skip the CRM projection
+		// rather than mint a contact from privacy-id digits. The row stays
+		// ghlSynced=false; a later message with a resolved phone links the thread.
+		logger.warn("No contact phone for CRM projection", {
+			ctx: "messaging.fanOut.contactPhone",
+			chatId: message.chatId,
+		});
 		return null;
 	}
 

@@ -1,5 +1,16 @@
 "use client";
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@repo/ui/components/alert-dialog";
 import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
 import { Spinner } from "@repo/ui/components/spinner";
@@ -23,6 +34,17 @@ export function SubaccountWorkspace({
 	const query = useQuery(orpc.subaccounts.get.queryOptions({ input: { id: subaccountId } }));
 
 	const getUrl = useMutation(orpc.whatsapp.getGhlOAuthUrl.mutationOptions());
+
+	const disconnect = useMutation(
+		orpc.whatsapp.disconnectGoHighLevel.mutationOptions({
+			onSuccess: () => {
+				toastSuccess("GoHighLevel disconnected");
+				void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.get.key() });
+			},
+			onError: (error) =>
+				toastError(error instanceof Error ? error.message : "Could not disconnect"),
+		}),
+	);
 
 	async function connectGhl() {
 		try {
@@ -89,14 +111,41 @@ export function SubaccountWorkspace({
 						<p className="text-xs text-foreground/60">CRM connection</p>
 						<p className="font-bold text-lg">{sub.ghl.connected ? "Connected" : "Not connected"}</p>
 					</div>
-					<Button
-						size="sm"
-						variant={sub.ghl.connected ? "outline" : "primary"}
-						loading={getUrl.isPending}
-						onClick={connectGhl}
-					>
-						{sub.ghl.connected ? "Reconnect" : "Connect GoHighLevel"}
-					</Button>
+					<div className="gap-2 flex shrink-0 items-center">
+						<Button
+							size="sm"
+							variant={sub.ghl.connected ? "outline" : "primary"}
+							loading={getUrl.isPending}
+							onClick={connectGhl}
+						>
+							{sub.ghl.connected ? "Reconnect" : "Connect GoHighLevel"}
+						</Button>
+						{sub.ghl.connected ? (
+							<AlertDialog>
+								<AlertDialogTrigger asChild>
+									<Button size="sm" variant="ghost" className="text-destructive">
+										Disconnect
+									</Button>
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>Disconnect GoHighLevel?</AlertDialogTitle>
+										<AlertDialogDescription>
+											Messages stop syncing to GoHighLevel and the SMS takeover goes quiet for this
+											subaccount until you reconnect. WhatsApp numbers, conversations, and messages
+											stay intact and keep working here.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogAction onClick={() => disconnect.mutate({ subaccountId })}>
+											Disconnect
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
+						) : null}
+					</div>
 				</Card>
 
 				<Card className="gap-3 p-4 flex items-center">

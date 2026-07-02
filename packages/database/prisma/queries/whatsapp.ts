@@ -222,6 +222,18 @@ export async function setConversationGhlLink(data: {
 	});
 }
 
+/**
+ * Drop every conversation's cached GHL ids for a subaccount — run on GHL
+ * disconnect so a later connect (possibly to a different location) re-resolves
+ * contacts/conversations instead of posting against stale ids.
+ */
+export async function clearConversationGhlLinks(subaccountId: string) {
+	return db.whatsAppConversation.updateMany({
+		where: { subaccountId },
+		data: { ghlContactId: null, ghlConversationId: null },
+	});
+}
+
 /** Persist the active/sending number for a conversation (dropdown or #switch). */
 export async function setConversationActiveSession(data: {
 	subaccountId: string;
