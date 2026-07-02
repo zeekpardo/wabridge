@@ -2,9 +2,8 @@ import { countSubaccounts, listSubaccountsWithStats } from "@repo/database";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { requireAgencyId } from "../lib/agency";
+import { getSubaccountLimit } from "../lib/plan-limits";
 
-// Plan limits for the agency. Static defaults for now; wired to billing later.
-const DEFAULT_MAX_SUBACCOUNTS = 25;
 const DEFAULT_MAX_CONNECTIONS_PER_SUBACCOUNT = 5;
 
 export const listSubaccounts = protectedProcedure
@@ -19,9 +18,10 @@ export const listSubaccounts = protectedProcedure
 	.handler(async ({ context: { user, session } }) => {
 		const organizationId = await requireAgencyId(session.activeOrganizationId, user.id);
 
-		const [subaccounts, total] = await Promise.all([
+		const [subaccounts, total, limit] = await Promise.all([
 			listSubaccountsWithStats(organizationId),
 			countSubaccounts(organizationId),
+			getSubaccountLimit(organizationId),
 		]);
 
 		const connectionsOnline = subaccounts.reduce((sum, s) => sum + s.connectionsOnline, 0);
@@ -32,7 +32,8 @@ export const listSubaccounts = protectedProcedure
 			subaccounts,
 			limits: {
 				subaccountsUsed: total,
-				subaccountsMax: DEFAULT_MAX_SUBACCOUNTS,
+				// null = unlimited (no active plan yet — e.g. testing phase).
+				subaccountsMax: Number.isFinite(limit) ? limit : null,
 				connectionsPerSubaccountMax: DEFAULT_MAX_CONNECTIONS_PER_SUBACCOUNT,
 				connectionsOnline,
 				connectionsTotal,

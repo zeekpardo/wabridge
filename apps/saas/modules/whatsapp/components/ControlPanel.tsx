@@ -67,7 +67,7 @@ export function ControlPanel({ organizationSlug }: { organizationSlug: string })
 					icon={<UsersIcon className="size-5 text-primary" />}
 					label="Subaccounts"
 					value={`${limits?.subaccountsUsed ?? 0}`}
-					sub={`/ ${limits?.subaccountsMax ?? 0}`}
+					sub={limits?.subaccountsMax != null ? `/ ${limits.subaccountsMax}` : ""}
 				>
 					<div className="gap-1.5 flex items-center">
 						<Badge status="info">GHL: {limits?.ghlConnected ?? 0}</Badge>
