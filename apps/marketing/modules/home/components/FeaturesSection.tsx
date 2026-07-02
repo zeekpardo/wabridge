@@ -32,6 +32,10 @@ interface FeatureTab {
 	}[];
 }
 
+// Feature images hidden until final assets are ready. Flip to true to restore
+// the two-column image + text layout.
+const SHOW_FEATURE_IMAGES = false;
+
 export function FeaturesSection() {
 	const t = useTranslations();
 
@@ -116,13 +120,17 @@ export function FeaturesSection() {
 						const isReversed = index % 2 === 1;
 						return (
 							<div key={tab.id} className="p-6 md:p-8 lg:p-12 rounded-4xl border bg-card">
-								<div className="gap-8 md:grid-cols-2 grid grid-cols-1 items-center">
-									<div
-										className={cn("flex justify-center", {
-											"md:order-2": isReversed,
-										})}
-									>
-										{tab.image && (
+								<div
+									className={cn("gap-8 grid grid-cols-1 items-center", {
+										"md:grid-cols-2": SHOW_FEATURE_IMAGES,
+									})}
+								>
+									{SHOW_FEATURE_IMAGES && tab.image && (
+										<div
+											className={cn("flex justify-center", {
+												"md:order-2": isReversed,
+											})}
+										>
 											<div className="max-w-xl w-full">
 												<Image
 													src={tab.image}
@@ -134,12 +142,12 @@ export function FeaturesSection() {
 													})}
 												/>
 											</div>
-										)}
-									</div>
+										</div>
+									)}
 
 									<div
 										className={cn({
-											"md:order-1": isReversed,
+											"md:order-1": isReversed && SHOW_FEATURE_IMAGES,
 										})}
 									>
 										<h3 className="font-normal text-lg leading-tight md:text-xl lg:text-2xl text-foreground">

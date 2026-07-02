@@ -12,8 +12,8 @@ export function Footer() {
 				<div>
 					<Logo className="opacity-70 grayscale" />
 					<p className="mt-3 text-sm opacity-70">
-						© {new Date().getFullYear()} {config.appName}.{" "}
-						<a href="https://supastarter.dev">{t("common.footer.builtWith")}</a>.
+						{t("common.footer.builtWith")}.
+						<br />© {new Date().getFullYear()} {config.appName}. All rights reserved.
 					</p>
 				</div>
 
@@ -22,12 +22,12 @@ export function Footer() {
 						{t("common.footer.blog")}
 					</LocaleLink>
 
-					<a href="#features" className="block">
+					<a href="/#features" className="block">
 						{t("common.footer.features")}
 					</a>
 
-					<a href="/#pricing" className="block">
-						{t("common.footer.pricing")}
+					<a href="/#faq" className="block">
+						{t("common.menu.faq")}
 					</a>
 				</div>
 

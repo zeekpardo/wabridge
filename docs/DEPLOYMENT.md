@@ -1,9 +1,12 @@
 # Deployment — WABridge on Railway
 
-Production runbook. Two repos deploy as two services in **one Railway project**:
+Production runbook. Services in **one Railway project**:
 
 - **`saas`** — this repo (Next.js app + Hono `/api` + embedded chat UI + GHL wiring).
-  Docker standalone image; **public** domain.
+  Docker standalone image (`Dockerfile` / `railway.toml`); **public** domain.
+- **`marketing`** — this repo, `apps/marketing` (the public WAGOAT site). Docker
+  standalone image (`Dockerfile.marketing` / `railway.marketing.toml`); **public**
+  domain. No database, no secrets — just build-time `NEXT_PUBLIC_*` URLs.
 - **`openwa`** — the OpenWA repo (unofficial WhatsApp API, port 2785). Its own
   Dockerfile + a **persistent Volume**; **private** only.
 
@@ -11,12 +14,18 @@ Plus two plugins: **Postgres** and **Redis**.
 
 ```
 Railway project "wabridge"
-├── saas      Dockerfile + Next standalone      app.<domain>   (public)
-├── openwa    OpenWA Dockerfile + Volume /app/data             (private)
-├── Postgres  plugin        internal → saas ; public → migrate:deploy
-└── Redis     plugin        internal → saas
+├── saas       Dockerfile           + Next standalone   app.<domain>       (public)
+├── marketing  Dockerfile.marketing + Next standalone   www.<domain>       (public)
+├── openwa     OpenWA Dockerfile + Volume /app/data                        (private)
+├── Postgres   plugin        internal → saas ; public → migrate:deploy
+└── Redis      plugin        internal → saas
    external: GoHighLevel cloud (OAuth, SSO, Delivery URL) → saas public domain
 ```
+
+Both `saas` and `marketing` deploy from **this same repo** as separate Railway
+services. Each service points at its own config file under **Settings →
+Config-as-code** (`railway.toml` for saas, `railway.marketing.toml` for
+marketing), so Railway builds the right Dockerfile for each.
 
 Pattern is copied from the manuscript project (also a supastarter monorepo whose
 app is named `saas`): **Docker → Next standalone, migrations run out of band,
@@ -93,7 +102,13 @@ DATABASE_URL=<public> DIRECT_URL=<public> SHADOW_DATABASE_URL=<distinct> \
    `NEXT_PUBLIC_SAAS_URL` (public URLs are inlined at build time). Add a public
    domain (`app.<domain>`). Raise build memory if it OOMs:
    `NODE_OPTIONS=--max-old-space-size=4096` (already baked into the Dockerfile).
-5. **openwa** → New service → deploy the **OpenWA repo** (Docker auto-detected).
+5. **marketing** → New service → deploy **this same repo**. Under **Settings →
+   Config-as-code**, set the path to `railway.marketing.toml` (so it builds
+   `Dockerfile.marketing`, not the saas one). Under **Settings → Build**, add the
+   build args `NEXT_PUBLIC_MARKETING_URL`, `NEXT_PUBLIC_SAAS_URL`, and
+   `NEXT_PUBLIC_DOCS_URL` (all inlined at build time). Add a public domain
+   (`www.<domain>`). No database, Redis, or runtime secrets required.
+6. **openwa** → New service → deploy the **OpenWA repo** (Docker auto-detected).
    - **Attach a Volume mounted at `/app/data`** — Baileys stores WhatsApp auth
      creds here. Without it, every redeploy re-QRs every number. Non-negotiable.
    - **No public domain** — keep it private.
@@ -131,6 +146,17 @@ GOHIGHLEVEL_CONVERSATION_PROVIDER_ID=        # WhatsApp custom-channel provider 
 GOHIGHLEVEL_WEBHOOK_PUBLIC_KEY=              # Ed25519 key for Delivery URL verification
 GHL_SSO_KEY=                                 # decrypts the embedded Custom Page payload
 GHL_FRAME_ANCESTORS=https://app.gohighlevel.com https://*.leadconnectorhq.com
+```
+
+### `marketing` service
+
+No runtime env needed. The only inputs are **build args** (Settings → Build),
+inlined into the client bundle at build time:
+
+```bash
+NEXT_PUBLIC_MARKETING_URL=https://www.<domain>   # its own canonical URL (drives metadataBase / OG images)
+NEXT_PUBLIC_SAAS_URL=https://app.<domain>        # "Start free trial" / login links point here
+NEXT_PUBLIC_DOCS_URL=https://docs.<domain>       # optional; shows the Docs nav link when set
 ```
 
 ### `openwa` service
