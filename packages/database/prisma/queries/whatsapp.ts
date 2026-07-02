@@ -205,6 +205,8 @@ export async function setConversationGhlLink(data: {
 	chatId: string;
 	ghlContactId: string;
 	ghlConversationId?: string | null;
+	/** The CRM's name for the contact — overwrites local (GHL wins when linked). */
+	contactName?: string | null;
 }) {
 	return db.whatsAppConversation.upsert({
 		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
@@ -214,11 +216,25 @@ export async function setConversationGhlLink(data: {
 			chatId: data.chatId,
 			ghlContactId: data.ghlContactId,
 			ghlConversationId: data.ghlConversationId ?? undefined,
+			contactName: data.contactName ?? undefined,
 		},
 		update: {
 			ghlContactId: data.ghlContactId,
 			...(data.ghlConversationId ? { ghlConversationId: data.ghlConversationId } : {}),
+			...(data.contactName ? { contactName: data.contactName } : {}),
 		},
+	});
+}
+
+/** Cache a contact's display name on the thread (feeds the conversation list). */
+export async function setConversationContactName(data: {
+	subaccountId: string;
+	chatId: string;
+	contactName: string;
+}) {
+	return db.whatsAppConversation.updateMany({
+		where: { subaccountId: data.subaccountId, chatId: data.chatId },
+		data: { contactName: data.contactName },
 	});
 }
 

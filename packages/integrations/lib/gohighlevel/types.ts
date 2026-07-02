@@ -27,6 +27,21 @@ export interface GHLContact {
 	updatedAt?: string;
 }
 
+/**
+ * A GHL contact's display name. Per the GHL API, list/upsert responses may
+ * populate `firstName`/`lastName` without `name` (or vice versa) — never rely
+ * on either alone. Returns null when the contact has no usable name (e.g.
+ * phone-only contacts), so callers can keep their own fallback.
+ */
+export function ghlContactDisplayName(contact: GHLContact): string | null {
+	const joined = [contact.firstName, contact.lastName]
+		.map((part) => part?.trim())
+		.filter(Boolean)
+		.join(" ");
+	const name = joined || contact.name?.trim() || "";
+	return name.length > 0 ? name : null;
+}
+
 export interface GHLCustomFieldValue {
 	id: string;
 	value: string | string[];

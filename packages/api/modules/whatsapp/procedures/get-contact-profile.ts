@@ -1,4 +1,15 @@
-import { getConversation, getGhlConnection, listOrganizationMembers } from "@repo/database";
+import {
+	getConversation,
+	getGhlConnection,
+	listOrganizationMembers,
+	setConversationContactName,
+} from "@repo/database";
+import {
+	createGoHighLevelClient,
+	ghlContactDisplayName,
+	type GHLContact,
+} from "@repo/integrations";
+import { logger } from "@repo/logs";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
@@ -75,8 +86,37 @@ export const getContactProfile = protectedProcedure
 			listOrganizationMembers(subaccount.organizationId),
 		]);
 
-		const phone = phoneFromChatId(input.chatId);
-		const name = conversation?.contactName?.trim() || phone || "Unknown contact";
+		// Read-through to the live GHL contact when linked — GHL is the source of
+		// truth for name/email/phone then. Best-effort: a GHL hiccup falls back to
+		// the local snapshot.
+		let ghlContact: GHLContact | null = null;
+		if (ghl && conversation?.ghlContactId) {
+			try {
+				const client = await createGoHighLevelClient(subaccount.id);
+				ghlContact = client ? await client.getContact(conversation.ghlContactId) : null;
+			} catch (error) {
+				logger.warn("GHL contact read-through failed", {
+					ctx: "whatsapp.contactProfile",
+					ghlContactId: conversation.ghlContactId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		const ghlName = ghlContact ? ghlContactDisplayName(ghlContact) : null;
+		const phone = ghlContact?.phone ?? phoneFromChatId(input.chatId);
+		const name = ghlName || conversation?.contactName?.trim() || phone || "Unknown contact";
+
+		// Cache the CRM name on the thread so the conversation list (which never
+		// hits GHL per row) shows renames made in GHL.
+		if (ghlName && ghlName !== conversation?.contactName) {
+			await setConversationContactName({
+				subaccountId: subaccount.id,
+				chatId: input.chatId,
+				contactName: ghlName,
+			});
+		}
+
 		const tags = Array.isArray(conversation?.tags)
 			? (conversation.tags as unknown[]).filter((tag): tag is string => typeof tag === "string")
 			: [];
@@ -88,14 +128,24 @@ export const getContactProfile = protectedProcedure
 				: null;
 
 		const nameParts = name.split(/\s+/);
-		const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : name;
-		const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+		const splitFirst = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : name;
+		const splitLast = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
 
 		const fields: ContactField[] = [
-			{ key: "firstName", label: "First name", value: firstName || null, editable: true },
-			{ key: "lastName", label: "Last name", value: lastName || null, editable: true },
+			{
+				key: "firstName",
+				label: "First name",
+				value: ghlContact?.firstName?.trim() || splitFirst || null,
+				editable: true,
+			},
+			{
+				key: "lastName",
+				label: "Last name",
+				value: ghlContact?.lastName?.trim() || splitLast || null,
+				editable: true,
+			},
 			{ key: "phone", label: "Phone", value: phone, editable: false },
-			{ key: "email", label: "Email", value: null, editable: true },
+			{ key: "email", label: "Email", value: ghlContact?.email?.trim() || null, editable: true },
 		];
 
 		const contactUrl =

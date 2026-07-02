@@ -9,7 +9,11 @@ import {
 	markMessageGhlSynced,
 	setConversationGhlLink,
 } from "@repo/database";
-import { createGoHighLevelClient, type GoHighLevelClient } from "@repo/integrations";
+import {
+	createGoHighLevelClient,
+	ghlContactDisplayName,
+	type GoHighLevelClient,
+} from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 
@@ -67,16 +71,20 @@ async function resolveGhlThread(
 		return null;
 	}
 
-	const contactId =
-		cached?.ghlContactId ??
-		(
-			await client.upsertContact({
-				phone,
-				locationId,
-				...(cached?.contactName ? { name: cached.contactName } : {}),
-				source: "WABridge",
-			})
-		).id;
+	let contactId = cached?.ghlContactId ?? null;
+	let ghlName: string | null = null;
+	if (!contactId) {
+		const contact = await client.upsertContact({
+			phone,
+			locationId,
+			...(cached?.contactName ? { name: cached.contactName } : {}),
+			source: "WABridge",
+		});
+		contactId = contact.id;
+		// When GHL already knew this phone, the upsert returns the existing
+		// contact — adopt its name locally (GHL wins when linked).
+		ghlName = ghlContactDisplayName(contact);
+	}
 
 	const conversation = await client.getOrCreateConversation({ locationId, contactId });
 
@@ -86,6 +94,7 @@ async function resolveGhlThread(
 		chatId: message.chatId,
 		ghlContactId: contactId,
 		ghlConversationId: conversation.id,
+		contactName: ghlName,
 	});
 
 	return { conversationId: conversation.id };
