@@ -35,6 +35,7 @@ import {
 import { createFanOutDeps } from "../messaging/deps";
 import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
+import { disconnectSubaccountFromGhl } from "./disconnect-subaccount";
 import { resolveOutboundCommand } from "./resolve-command";
 import { syncSubaccountNameFromGhl } from "./sync-subaccount-name";
 
@@ -391,6 +392,24 @@ export async function ghlAppWebhookHandler(req: Request): Promise<Response> {
 
 	const type = str(payload.type);
 	const locationId = str(payload.locationId);
+
+	// App lifecycle: the location uninstalled the marketplace app. Tear down its
+	// GHL link so the SaaS reflects "disconnected" (tokens dropped, location
+	// unlinked, cached ids cleared); local WhatsApp data is kept. Idempotent and
+	// recoverable via reconnect. Signature verification: see the TODO above.
+	if (type === "UNINSTALL" && locationId) {
+		const uninstalled = await getSubaccountByLocationId(locationId);
+		if (uninstalled) {
+			await disconnectSubaccountFromGhl(uninstalled);
+			logger.info("GHL app uninstalled; disconnected subaccount", {
+				ctx: "ghl.webhook.uninstall",
+				locationId,
+				subaccountId: uninstalled.id,
+			});
+		}
+		return new Response("OK", { status: 200 });
+	}
+
 	const contactId = str(payload.id) ?? str(payload.contactId);
 	if (!type || !locationId || !contactId || !type.startsWith("Contact")) {
 		return new Response("Ignored.", { status: 200 });
