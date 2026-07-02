@@ -10,6 +10,15 @@ import type { ApiRouterClient } from "@repo/api/orpc/router";
  */
 export const EMBEDDED_TOKEN_STORAGE_KEY = "wabridge_embedded_token";
 
+/** Detect an Unauthorized (401) error across ORPCError / thrown-Error shapes. */
+function isUnauthorized(error: unknown): boolean {
+	if (!error || typeof error !== "object") {
+		return false;
+	}
+	const e = error as { status?: number; code?: string; message?: string };
+	return e.status === 401 || e.code === "UNAUTHORIZED" || /unauthorized/i.test(e.message ?? "");
+}
+
 const link = new RPCLink({
 	url: () => {
 		if (typeof window === "undefined") {
@@ -28,6 +37,19 @@ const link = new RPCLink({
 		onError((error) => {
 			if (error instanceof Error && error.name === "AbortError") {
 				return;
+			}
+
+			// Self-heal a stale/expired embedded token. The SSO bootstrap trusts a
+			// stored token and won't re-run once one exists, so a rejected token would
+			// white-screen the GHL iframe forever. On Unauthorized, drop the token and
+			// reload — the handshake re-mints it. Guarded on a token being present, so
+			// it can fire at most once (after clearing there's nothing to reload for).
+			if (typeof window !== "undefined" && isUnauthorized(error)) {
+				if (window.localStorage.getItem(EMBEDDED_TOKEN_STORAGE_KEY)) {
+					window.localStorage.removeItem(EMBEDDED_TOKEN_STORAGE_KEY);
+					window.location.reload();
+					return;
+				}
 			}
 
 			console.error(error);
