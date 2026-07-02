@@ -1,5 +1,10 @@
 import { ORPCError } from "@orpc/server";
-import { getDefaultSubaccount, getSubaccount } from "@repo/database";
+import {
+	countSubaccounts,
+	getDefaultSubaccount,
+	getSubaccount,
+	getSubaccountById,
+} from "@repo/database";
 
 import { verifyOrganizationMembership } from "../../organizations/lib/membership";
 
@@ -71,7 +76,13 @@ export async function resolveSubaccount(
 			session.embeddedSubaccountId,
 		);
 		if (!embedded) {
-			throw new ORPCError("FORBIDDEN", { message: "Embedded subaccount is no longer valid." });
+			// The token points at a subaccount that no longer exists (e.g. deleted and
+			// recreated). Treat it as UNAUTHORIZED — not FORBIDDEN — so the client
+			// self-heal drops the stale embedded token and the SSO handshake re-mints
+			// a fresh one for the current subaccount, instead of dead-ending.
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "Embedded session is stale — re-authenticating.",
+			});
 		}
 		return {
 			id: embedded.id,
@@ -81,21 +92,39 @@ export async function resolveSubaccount(
 		};
 	}
 
-	const organizationId = await requireActiveOrganizationId(session.activeOrganizationId, userId);
-
-	const subaccount = subaccountId
-		? await getSubaccount(organizationId, subaccountId)
-		: await getDefaultSubaccount(organizationId);
-
-	if (!subaccount) {
-		if (subaccountId) {
+	// Explicit subaccount: authorize by the subaccount's OWN organization, not the
+	// session's active org. A multi-org user's active org can drift from the page
+	// they're viewing; scoping off it would either wrongly deny access or — for
+	// calls that omit the id — silently fall through to another tenant's data.
+	if (subaccountId) {
+		const subaccount = await getSubaccountById(subaccountId);
+		if (!subaccount || !(await verifyOrganizationMembership(subaccount.organizationId, userId))) {
 			throw new ORPCError("FORBIDDEN", {
-				message: "Subaccount not found in this agency.",
+				message: "Subaccount not found in your organizations.",
 			});
 		}
-		throw new ORPCError("NOT_FOUND", { message: "No subaccount available." });
+		return {
+			id: subaccount.id,
+			organizationId: subaccount.organizationId,
+			name: subaccount.name,
+			ghlLocationId: subaccount.ghlLocationId,
+		};
 	}
 
+	// No subaccount specified: safe ONLY when the active org has exactly one.
+	// Silently defaulting to the oldest would leak a sibling subaccount's data
+	// once an agency has several — so fail closed and require the caller to name it.
+	const organizationId = await requireActiveOrganizationId(session.activeOrganizationId, userId);
+	const count = await countSubaccounts(organizationId);
+	if (count > 1) {
+		throw new ORPCError("BAD_REQUEST", {
+			message: "This agency has multiple subaccounts — specify which one.",
+		});
+	}
+	const subaccount = await getDefaultSubaccount(organizationId);
+	if (!subaccount) {
+		throw new ORPCError("NOT_FOUND", { message: "No subaccount available." });
+	}
 	return {
 		id: subaccount.id,
 		organizationId: subaccount.organizationId,

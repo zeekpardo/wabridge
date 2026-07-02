@@ -35,7 +35,9 @@ import {
 import { createFanOutDeps } from "../messaging/deps";
 import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
+import { disconnectSubaccountFromGhl } from "./disconnect-subaccount";
 import { resolveOutboundCommand } from "./resolve-command";
+import { syncSubaccountNameFromGhl } from "./sync-subaccount-name";
 
 function saasBaseUrl(): string {
 	return getBaseUrl(process.env.NEXT_PUBLIC_SAAS_URL, 3000);
@@ -134,6 +136,10 @@ export async function ghlCallbackHandler(req: Request): Promise<Response> {
 			// bookkeeping only; Option B API calls don't send a provider id.
 			smsProviderId: process.env.GOHIGHLEVEL_SMS_PROVIDER_ID ?? null,
 		});
+
+		// Adopt the GHL location name (replaces the `GHL <locationId>` placeholder for
+		// freshly provisioned accounts; refreshes it for linked ones). Best-effort.
+		await syncSubaccountNameFromGhl(subaccountId);
 
 		const org = await getOrganizationById(state.organizationId);
 		const slug = org?.slug ?? "";
@@ -386,6 +392,24 @@ export async function ghlAppWebhookHandler(req: Request): Promise<Response> {
 
 	const type = str(payload.type);
 	const locationId = str(payload.locationId);
+
+	// App lifecycle: the location uninstalled the marketplace app. Tear down its
+	// GHL link so the SaaS reflects "disconnected" (tokens dropped, location
+	// unlinked, cached ids cleared); local WhatsApp data is kept. Idempotent and
+	// recoverable via reconnect. Signature verification: see the TODO above.
+	if (type === "UNINSTALL" && locationId) {
+		const uninstalled = await getSubaccountByLocationId(locationId);
+		if (uninstalled) {
+			await disconnectSubaccountFromGhl(uninstalled);
+			logger.info("GHL app uninstalled; disconnected subaccount", {
+				ctx: "ghl.webhook.uninstall",
+				locationId,
+				subaccountId: uninstalled.id,
+			});
+		}
+		return new Response("OK", { status: 200 });
+	}
+
 	const contactId = str(payload.id) ?? str(payload.contactId);
 	if (!type || !locationId || !contactId || !type.startsWith("Contact")) {
 		return new Response("Ignored.", { status: 200 });

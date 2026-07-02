@@ -1,14 +1,9 @@
 import { ORPCError } from "@orpc/server";
-import {
-	clearConversationGhlLinks,
-	deleteGhlConnection,
-	getGhlConnection,
-	getSubaccountById,
-	updateSubaccount,
-} from "@repo/database";
+import { getSubaccountById } from "@repo/database";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { disconnectSubaccountFromGhl } from "../../ghl/disconnect-subaccount";
 import { verifyOrganizationMembership } from "../../organizations/lib/membership";
 
 /**
@@ -39,15 +34,6 @@ export const disconnectGoHighLevel = protectedProcedure
 			throw new ORPCError("FORBIDDEN");
 		}
 
-		const connection = await getGhlConnection(subaccount.id);
-		if (!connection) {
-			// Nothing to disconnect — treat as success so the UI settles.
-			return { ok: true, disconnected: false };
-		}
-
-		await deleteGhlConnection(subaccount.id);
-		await clearConversationGhlLinks(subaccount.id);
-		await updateSubaccount(subaccount.organizationId, subaccount.id, { ghlLocationId: null });
-
-		return { ok: true, disconnected: true };
+		const disconnected = await disconnectSubaccountFromGhl(subaccount);
+		return { ok: true, disconnected };
 	});

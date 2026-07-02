@@ -1,15 +1,31 @@
 import { ORPCError } from "@orpc/server";
-import { getSubaccountById, updateSubaccount, upsertGhlConnection } from "@repo/database";
+import {
+	createSubaccount,
+	getSubaccountByLocationId,
+	getSubaccountById,
+	updateSubaccount,
+	upsertGhlConnection,
+} from "@repo/database";
 import { encrypt, exchangeGhlCode } from "@repo/integrations";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { syncSubaccountNameFromGhl } from "../../ghl/sync-subaccount-name";
 import { verifyOrganizationMembership } from "../../organizations/lib/membership";
+import { requireAgencyId } from "../../subaccounts/lib/agency";
 
 /**
  * Exchange the GoHighLevel OAuth code (from the install callback page) and store
- * the connection against the subaccount carried in `state`. Runs in the user's
- * authenticated session; access is verified against the subaccount's agency org.
+ * the connection. Two modes, by whether `subaccountId` is present in the state:
+ *
+ * - **Connect** (subaccountId given): link an existing subaccount to the GHL
+ *   location. Used by the per-subaccount "Connect GoHighLevel" button.
+ * - **Provision** (no subaccountId): find-or-create a `ghl`-sourced subaccount for
+ *   the location and link it. Used by the Control Panel "Connect GoHighLevel" add
+ *   flow, where no subaccount exists yet.
+ *
+ * Either way the subaccount name is (re)synced from the GHL location — GHL owns
+ * the name for linked subaccounts.
  */
 export const connectGoHighLevel = protectedProcedure
 	.route({
@@ -18,27 +34,50 @@ export const connectGoHighLevel = protectedProcedure
 		tags: ["WhatsApp"],
 		summary: "Exchange the GHL OAuth code and store the connection",
 	})
-	.input(z.object({ subaccountId: z.string(), code: z.string() }))
-	.handler(async ({ input, context: { user } }) => {
-		const subaccount = await getSubaccountById(input.subaccountId);
-		if (!subaccount) {
-			throw new ORPCError("NOT_FOUND", { message: "Subaccount not found." });
-		}
-		const membership = await verifyOrganizationMembership(subaccount.organizationId, user.id);
-		if (!membership) {
-			throw new ORPCError("FORBIDDEN");
-		}
-
+	.input(z.object({ subaccountId: z.string().optional(), code: z.string() }))
+	.handler(async ({ input, context: { user, session } }) => {
 		const tokens = await exchangeGhlCode(input.code);
 		if (!tokens.locationId) {
 			throw new ORPCError("BAD_REQUEST", {
 				message: "No location returned from GoHighLevel — pick a location during install.",
 			});
 		}
+		const locationId = tokens.locationId;
+
+		// Resolve the target subaccount: the one carried in state, an existing one
+		// already mapped to this location, or a freshly provisioned `ghl` account.
+		let subaccountId: string;
+		let organizationId: string;
+		if (input.subaccountId) {
+			const subaccount = await getSubaccountById(input.subaccountId);
+			if (!subaccount) {
+				throw new ORPCError("NOT_FOUND", { message: "Subaccount not found." });
+			}
+			if (!(await verifyOrganizationMembership(subaccount.organizationId, user.id))) {
+				throw new ORPCError("FORBIDDEN");
+			}
+			subaccountId = subaccount.id;
+			organizationId = subaccount.organizationId;
+		} else {
+			organizationId = await requireAgencyId(session.activeOrganizationId, user.id);
+			const linked = await getSubaccountByLocationId(locationId);
+			if (linked && linked.organizationId === organizationId) {
+				subaccountId = linked.id;
+			} else {
+				const created = await createSubaccount({
+					organizationId,
+					// Placeholder — the name sync below adopts the real GHL location name.
+					name: `GHL ${locationId}`,
+					provisioningSource: "ghl",
+					ghlLocationId: locationId,
+				});
+				subaccountId = created.id;
+			}
+		}
 
 		await upsertGhlConnection({
-			subaccountId: subaccount.id,
-			locationId: tokens.locationId,
+			subaccountId,
+			locationId,
 			companyId: tokens.companyId ?? null,
 			userId: tokens.userId ?? null,
 			accessToken: encrypt(tokens.access_token),
@@ -50,10 +89,9 @@ export const connectGoHighLevel = protectedProcedure
 			smsProviderId: process.env.GOHIGHLEVEL_SMS_PROVIDER_ID ?? null,
 		});
 
-		// Link the subaccount to this GHL location (keeps provisioningSource as-is).
-		await updateSubaccount(subaccount.organizationId, subaccount.id, {
-			ghlLocationId: tokens.locationId,
-		});
+		// Link + adopt the GHL location name (keeps provisioningSource as-is).
+		await updateSubaccount(organizationId, subaccountId, { ghlLocationId: locationId });
+		await syncSubaccountNameFromGhl(subaccountId);
 
-		return { success: true, locationId: tokens.locationId };
+		return { success: true, locationId, subaccountId };
 	});

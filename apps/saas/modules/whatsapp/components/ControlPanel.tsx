@@ -1,5 +1,17 @@
 "use client";
 
+import { GHL_PROVISION_INTENT_KEY } from "@repo/api/modules/whatsapp/ghl-constants";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@repo/ui/components/alert-dialog";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
@@ -15,20 +27,24 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Spinner } from "@repo/ui/components/spinner";
-import { toastError } from "@repo/ui/components/toast";
+import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowUpRightIcon,
 	KeyRoundIcon,
+	PencilLineIcon,
 	PlusIcon,
 	ServerIcon,
+	Trash2Icon,
 	UsersIcon,
 	WifiIcon,
 	WifiOffIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+
+import { openOAuthPopup } from "../lib/oauth-popup";
 
 export function ControlPanel({ organizationSlug }: { organizationSlug: string }) {
 	const query = useQuery(orpc.subaccounts.list.queryOptions({ input: {} }));
@@ -77,11 +93,11 @@ export function ControlPanel({ organizationSlug }: { organizationSlug: string })
 				</StatCard>
 
 				<Card className="gap-1 p-5 flex flex-col">
-					<span className="font-semibold text-indigo-500 text-xs tracking-wide uppercase">New</span>
+					<span className="font-semibold text-indigo-500 text-xs tracking-wide uppercase">Tip</span>
 					<p className="font-medium text-sm">Provision from GoHighLevel</p>
 					<p className="text-xs leading-snug text-foreground/75">
-						Once your marketplace app is live, pull subaccounts straight from your GHL locations.
-						Manual subaccounts work today.
+						Add a subaccount → <strong>Connect GoHighLevel</strong> to pull a location in directly.
+						Its name and ID come from GHL. Or create one manually.
 					</p>
 				</Card>
 			</div>
@@ -147,6 +163,7 @@ interface SubaccountStat {
 	name: string;
 	status: string;
 	provisioningSource: string;
+	ghlLocationId?: string | null;
 	ghlConnected: boolean;
 	connectionsOnline: number;
 	connectionsOffline: number;
@@ -162,12 +179,29 @@ function SubaccountCard({
 	href: string;
 	embeddedHref: string;
 }) {
+	const queryClient = useQueryClient();
+	const remove = useMutation(
+		orpc.subaccounts.delete.mutationOptions({
+			onSuccess: () => {
+				toastSuccess("Subaccount deleted");
+				void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.list.key() });
+			},
+			onError: (error) => toastError(error.message ?? "Could not delete subaccount"),
+		}),
+	);
+
 	return (
 		<Card className="gap-3 p-5 hover:-translate-y-0.5 hover:shadow-lg flex flex-col transition-all hover:border-primary/50">
 			<div className="gap-2 flex items-start justify-between">
 				<div className="min-w-0">
 					<h4 className="font-semibold text-base truncate">{subaccount.name}</h4>
-					<p className="text-xs truncate text-foreground/65">{subaccount.id}</p>
+					{subaccount.ghlLocationId ? (
+						<p className="text-xs truncate text-foreground/65" title={subaccount.ghlLocationId}>
+							Location ID: {subaccount.ghlLocationId}
+						</p>
+					) : (
+						<p className="text-xs truncate text-foreground/65">{subaccount.id}</p>
+					)}
 				</div>
 			</div>
 
@@ -207,6 +241,36 @@ function SubaccountCard({
 						<ArrowUpRightIcon className="size-4" />
 					</Link>
 				</Button>
+				<AlertDialog>
+					<AlertDialogTrigger asChild>
+						<Button
+							size="sm"
+							variant="outline"
+							className="text-red-600 hover:text-red-600"
+							aria-label="Delete subaccount"
+						>
+							<Trash2Icon className="size-4" />
+						</Button>
+					</AlertDialogTrigger>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Delete "{subaccount.name}"?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This permanently removes the subaccount and all of its WhatsApp conversations,
+								messages, and GoHighLevel link. Disconnect its numbers first. This can't be undone.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								className="bg-red-600 text-white hover:bg-red-600/90"
+								onClick={() => remove.mutate({ id: subaccount.id })}
+							>
+								Delete subaccount
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
 		</Card>
 	);
@@ -215,21 +279,67 @@ function SubaccountCard({
 function AddSubaccountCard() {
 	const queryClient = useQueryClient();
 	const [open, setOpen] = useState(false);
+	const [mode, setMode] = useState<"choose" | "manual">("choose");
 	const [name, setName] = useState("");
+	const [connecting, setConnecting] = useState(false);
+
+	function refreshList() {
+		void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.list.key() });
+	}
+
+	function resetAndClose() {
+		setName("");
+		setMode("choose");
+		setOpen(false);
+	}
 
 	const create = useMutation(
 		orpc.subaccounts.create.mutationOptions({
 			onSuccess: () => {
-				void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.list.key() });
-				setName("");
-				setOpen(false);
+				refreshList();
+				resetAndClose();
 			},
 			onError: (error) => toastError(error.message ?? "Could not create subaccount"),
 		}),
 	);
 
+	const provisionUrl = useMutation(orpc.whatsapp.getGhlProvisionUrl.mutationOptions());
+
+	async function connectGoHighLevel() {
+		setConnecting(true);
+		// Carry the provision intent across the OAuth round-trip: GHL drops our
+		// `state` sentinel when the app is already installed on a location, so the
+		// callback also honours this flag to provision rather than show the picker.
+		window.localStorage.setItem(GHL_PROVISION_INTENT_KEY, "1");
+		try {
+			const { url } = await provisionUrl.mutateAsync({});
+			const result = await openOAuthPopup(url);
+			if (result.success) {
+				refreshList();
+				resetAndClose();
+			} else if (result.error) {
+				toastError(result.error);
+			}
+		} catch (error) {
+			toastError(error instanceof Error ? error.message : "Could not start GoHighLevel connect");
+		} finally {
+			// Clear it here too, in case the popup closed before reaching the callback.
+			window.localStorage.removeItem(GHL_PROVISION_INTENT_KEY);
+			setConnecting(false);
+		}
+	}
+
 	return (
-		<Dialog open={open} onOpenChange={setOpen}>
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				setOpen(next);
+				if (!next) {
+					setName("");
+					setMode("choose");
+				}
+			}}
+		>
 			<DialogTrigger asChild>
 				<button
 					type="button"
@@ -242,36 +352,68 @@ function AddSubaccountCard() {
 				</button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-md">
-				<DialogHeader>
-					<DialogTitle>Add a subaccount</DialogTitle>
-					<DialogDescription>
-						Create a manual subaccount. You can connect its WhatsApp numbers and GoHighLevel
-						location from its management page.
-					</DialogDescription>
-				</DialogHeader>
-				<div className="gap-1.5 flex flex-col">
-					<Label htmlFor="sub-name">Name</Label>
-					<Input
-						id="sub-name"
-						placeholder="e.g. Acme Dental — Main"
-						value={name}
-						onChange={(e) => setName(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" && name.trim()) {
-								create.mutate({ name: name.trim(), provisioningSource: "manual" });
-							}
-						}}
-					/>
-				</div>
-				<DialogFooter>
-					<Button
-						disabled={!name.trim()}
-						loading={create.isPending}
-						onClick={() => create.mutate({ name: name.trim(), provisioningSource: "manual" })}
-					>
-						Create subaccount
-					</Button>
-				</DialogFooter>
+				{mode === "choose" ? (
+					<>
+						<DialogHeader>
+							<DialogTitle>Add a subaccount</DialogTitle>
+							<DialogDescription>
+								Connect a GoHighLevel location, or create a manual subaccount.
+							</DialogDescription>
+						</DialogHeader>
+						<div className="gap-2 flex flex-col">
+							<Button loading={connecting} onClick={connectGoHighLevel}>
+								<ArrowUpRightIcon className="mr-1.5 size-4" />
+								Connect GoHighLevel
+							</Button>
+							<p className="px-1 text-xs text-foreground/60">
+								Authorize a location — we name the subaccount after it and keep it in sync. The
+								Location ID is shown on the card.
+							</p>
+							<Button variant="outline" disabled={connecting} onClick={() => setMode("manual")}>
+								<PencilLineIcon className="mr-1.5 size-4" />
+								Create manually
+							</Button>
+						</div>
+					</>
+				) : (
+					<>
+						<DialogHeader>
+							<DialogTitle>Create a manual subaccount</DialogTitle>
+							<DialogDescription>
+								You can connect its WhatsApp numbers and a GoHighLevel location later from its
+								management page.
+							</DialogDescription>
+						</DialogHeader>
+						<div className="gap-1.5 flex flex-col">
+							<Label htmlFor="sub-name">Name</Label>
+							<Input
+								id="sub-name"
+								// oxlint-disable-next-line no-autofocus
+								autoFocus
+								placeholder="e.g. Acme Dental — Main"
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && name.trim()) {
+										create.mutate({ name: name.trim(), provisioningSource: "manual" });
+									}
+								}}
+							/>
+						</div>
+						<DialogFooter className="sm:justify-between">
+							<Button variant="ghost" onClick={() => setMode("choose")}>
+								Back
+							</Button>
+							<Button
+								disabled={!name.trim()}
+								loading={create.isPending}
+								onClick={() => create.mutate({ name: name.trim(), provisioningSource: "manual" })}
+							>
+								Create subaccount
+							</Button>
+						</DialogFooter>
+					</>
+				)}
 			</DialogContent>
 		</Dialog>
 	);
