@@ -15,7 +15,17 @@ import {
 import { Spinner } from "@repo/ui/components/spinner";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckIcon, ExternalLinkIcon, PlusIcon, SearchIcon, UserIcon, XIcon } from "lucide-react";
+import {
+	CheckIcon,
+	ChevronDownIcon,
+	ChevronRightIcon,
+	ExternalLinkIcon,
+	PlusIcon,
+	SearchIcon,
+	SlidersHorizontalIcon,
+	UserIcon,
+	XIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 const UNASSIGNED = "__unassigned__";
@@ -44,6 +54,43 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 		...orpc.whatsapp.listContactTags.queryOptions({ input: { subaccountId } }),
 		enabled: tagPickerOpen,
 	});
+	const customFieldsQuery = useQuery({
+		...orpc.whatsapp.getCustomFieldGroups.queryOptions({ input: { chatId, subaccountId } }),
+		refetchInterval: 15000,
+	});
+
+	// Which folders show, and which are collapsed — persisted per subaccount so
+	// a curated layout sticks across contacts and sessions (display-only, so
+	// localStorage is enough).
+	const hiddenKey = `wabridge:cf-hidden:${subaccountId ?? "default"}`;
+	const [hiddenFolders, setHiddenFolders] = useState<Set<string>>(() => readIdSet(hiddenKey));
+	const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+	const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
+
+	function toggleHiddenFolder(id: string) {
+		setHiddenFolders((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			writeIdSet(hiddenKey, next);
+			return next;
+		});
+	}
+
+	function toggleCollapsedFolder(id: string) {
+		setCollapsedFolders((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+	}
 
 	function invalidateProfile() {
 		void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getContactProfile.key() });
@@ -335,6 +382,91 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						))}
 					</div>
 
+					{/* Custom fields, grouped by GHL folder */}
+					{(customFieldsQuery.data?.folders.length ?? 0) > 0 ? (
+						<div className="gap-2 flex flex-col">
+							<div className="flex items-center justify-between">
+								<span className="font-medium text-xs text-foreground/60">Custom Fields</span>
+								<Popover open={folderSettingsOpen} onOpenChange={setFolderSettingsOpen}>
+									<PopoverTrigger asChild>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											className="size-6 text-foreground/50"
+											aria-label="Choose which folders to show"
+										>
+											<SlidersHorizontalIcon className="size-3.5" />
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent align="end" className="p-1.5 w-60">
+										<p className="px-1.5 pb-1 text-[11px] text-foreground/50">Folders to display</p>
+										<div className="max-h-64 overflow-y-auto">
+											{(customFieldsQuery.data?.folders ?? []).map((folder) => {
+												const visible = !hiddenFolders.has(folder.id);
+												return (
+													<button
+														key={folder.id}
+														type="button"
+														className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+														onClick={() => toggleHiddenFolder(folder.id)}
+													>
+														<span
+															className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${visible ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+														>
+															{visible ? <CheckIcon className="size-3" /> : null}
+														</span>
+														<span className="truncate">{folder.name}</span>
+													</button>
+												);
+											})}
+										</div>
+									</PopoverContent>
+								</Popover>
+							</div>
+
+							{(customFieldsQuery.data?.folders ?? [])
+								.filter((folder) => !hiddenFolders.has(folder.id))
+								.map((folder) => {
+									const collapsed = collapsedFolders.has(folder.id);
+									const setCount = folder.fields.filter((f) => f.value).length;
+									return (
+										<div key={folder.id} className="rounded-lg border bg-background">
+											<button
+												type="button"
+												className="gap-2 px-3 py-2 text-sm flex w-full items-center justify-between"
+												onClick={() => toggleCollapsedFolder(folder.id)}
+											>
+												<span className="gap-1.5 font-medium flex items-center">
+													{collapsed ? (
+														<ChevronRightIcon className="size-3.5 text-foreground/50" />
+													) : (
+														<ChevronDownIcon className="size-3.5 text-foreground/50" />
+													)}
+													{folder.name}
+												</span>
+												<span className="text-[11px] text-foreground/40">
+													{setCount}/{folder.fields.length}
+												</span>
+											</button>
+											{collapsed ? null : (
+												<div className="gap-2 px-3 pt-0 pb-3 flex flex-col">
+													{folder.fields.map((field) => (
+														<div key={field.id} className="gap-0.5 flex flex-col">
+															<span className="text-[11px] text-foreground/50">{field.name}</span>
+															<span className="text-sm">
+																{field.value || <span className="text-foreground/40">—</span>}
+															</span>
+														</div>
+													))}
+												</div>
+											)}
+										</div>
+									);
+								})}
+						</div>
+					) : null}
+
 					{/* GHL status — only surfaced when there's something actionable. */}
 					{profile.ghl.connected ? null : (
 						<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
@@ -348,4 +480,31 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 			)}
 		</div>
 	);
+}
+
+/** Read a persisted set of ids (custom-field folder visibility). SSR-safe. */
+function readIdSet(key: string): Set<string> {
+	if (typeof window === "undefined") {
+		return new Set();
+	}
+	try {
+		const raw = window.localStorage.getItem(key);
+		const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+		return new Set(
+			Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [],
+		);
+	} catch {
+		return new Set();
+	}
+}
+
+function writeIdSet(key: string, value: Set<string>): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.localStorage.setItem(key, JSON.stringify([...value]));
+	} catch {
+		// Storage unavailable (private mode / quota) — visibility just won't persist.
+	}
 }

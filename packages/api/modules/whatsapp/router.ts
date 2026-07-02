@@ -5,6 +5,7 @@ import { deleteSession } from "./procedures/delete-session";
 import { disconnectGoHighLevel } from "./procedures/disconnect-gohighlevel";
 import { getChatHistory } from "./procedures/get-chat-history";
 import { getContactProfile } from "./procedures/get-contact-profile";
+import { getCustomFieldGroups } from "./procedures/get-custom-field-groups";
 import { getGhlOAuthUrl } from "./procedures/get-ghl-oauth-url";
 import { getQr } from "./procedures/get-qr";
 import { getSession } from "./procedures/get-session";
@@ -65,4 +66,5 @@ export const whatsappRouter = {
 	setContactTags,
 	setContactFields,
 	listContactTags,
+	getCustomFieldGroups,
 };

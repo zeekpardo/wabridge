@@ -145,26 +145,8 @@ export const getContactProfile = protectedProcedure
 				});
 			}
 		}
-
-		// Custom field values with their definition names (display-only).
-		let customFields: ContactField[] = [];
-		if (client && ghlContact?.customFields?.length) {
-			try {
-				const definitions = await client.getCustomFields();
-				const nameById = new Map(definitions.map((def) => [def.id, def.name]));
-				customFields = ghlContact.customFields.map((field) => ({
-					key: `custom:${field.id}`,
-					label: nameById.get(field.id) ?? "Custom field",
-					value: Array.isArray(field.value) ? field.value.join(", ") : (field.value ?? null),
-					editable: false,
-				}));
-			} catch (error) {
-				logger.warn("GHL custom fields fetch failed", {
-					ctx: "whatsapp.contactProfile",
-					error: error instanceof Error ? error.message : String(error),
-				});
-			}
-		}
+		// Custom fields are surfaced separately, grouped by folder — see the
+		// getCustomFieldGroups procedure.
 
 		const ghlName = ghlContact ? ghlContactDisplayName(ghlContact) : null;
 		const phone = ghlContact?.phone ?? phoneFromChatId(input.chatId);
@@ -235,7 +217,6 @@ export const getContactProfile = protectedProcedure
 			},
 			{ key: "phone", label: "Phone", value: phone, editable: false },
 			{ key: "email", label: "Email", value: ghlContact?.email?.trim() || null, editable: true },
-			...customFields,
 		];
 
 		const contactUrl =

@@ -74,6 +74,19 @@ export interface GHLCustomFieldDefinition {
 	dataType: string;
 	locationId: string;
 	model: string;
+	/** The containing folder's id (`documentType: "field"` items). */
+	parentId?: string;
+	/** Sort order within the folder. */
+	position?: number;
+	/** "field" | "folder" — the bulk list returns fields only. */
+	documentType?: string;
+}
+
+/** A custom-field folder (Settings → Custom Fields grouping). */
+export interface GHLCustomFieldFolder {
+	id: string;
+	name: string;
+	position: number;
 }
 
 export interface GHLContactCreateInput {

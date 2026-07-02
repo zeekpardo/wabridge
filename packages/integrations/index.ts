@@ -22,6 +22,7 @@ export type {
 	GHLContactUpdateInput,
 	GHLConversation,
 	GHLCustomFieldDefinition,
+	GHLCustomFieldFolder,
 	GHLCustomFieldValue,
 	GHLInboundMessageInput,
 	GHLLocation,

@@ -7,6 +7,7 @@ import type {
 	GHLContactUpdateInput,
 	GHLConversation,
 	GHLCustomFieldDefinition,
+	GHLCustomFieldFolder,
 	GHLInboundMessageInput,
 	GHLLocation,
 	GHLMessageResponse,
@@ -21,6 +22,10 @@ const GHL_API_BASE = "https://services.leadconnectorhq.com";
 const API_VERSION = "2021-07-28";
 const MAX_RETRIES = 3;
 const CALL_DELAY_MS = 500;
+
+/** Custom-field folders change rarely; memoize per location to avoid N GETs per panel open. */
+const FOLDER_CACHE_TTL_MS = 10 * 60 * 1000;
+const folderCache = new Map<string, { folders: GHLCustomFieldFolder[]; expiresAt: number }>();
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -199,6 +204,44 @@ export class GoHighLevelClient {
 			`/locations/${this.locationId}/customFields`,
 		);
 		return res.customFields ?? [];
+	}
+
+	/**
+	 * Resolve the location's custom-field folders. The bulk customFields list
+	 * returns fields only (each with a `parentId`), and there's no working
+	 * folder-list endpoint, so we fetch each distinct folder by id. Cheap in
+	 * practice (few folders) and memoized per location — the field/folder layout
+	 * changes rarely — so a panel open costs at most one refresh, not N calls.
+	 */
+	async getCustomFieldFolders(): Promise<GHLCustomFieldFolder[]> {
+		const cached = folderCache.get(this.locationId);
+		if (cached && cached.expiresAt > Date.now()) {
+			return cached.folders;
+		}
+
+		const fields = await this.getCustomFields();
+		const parentIds = [
+			...new Set(fields.map((f) => f.parentId).filter((id): id is string => !!id)),
+		];
+
+		const folders: GHLCustomFieldFolder[] = [];
+		for (const id of parentIds) {
+			try {
+				const res = await this.request<{
+					customField: GHLCustomFieldDefinition & { name: string };
+				}>(`/locations/${this.locationId}/customFields/${id}`);
+				const folder = res.customField;
+				if (folder?.documentType === "folder") {
+					folders.push({ id: folder.id, name: folder.name, position: folder.position ?? 0 });
+				}
+			} catch {
+				// A folder that can't be resolved just won't appear as a group.
+			}
+		}
+		folders.sort((a, b) => a.position - b.position);
+
+		folderCache.set(this.locationId, { folders, expiresAt: Date.now() + FOLDER_CACHE_TTL_MS });
+		return folders;
 	}
 
 	// ─── Location ───────────────────────────────────────────────────────────────
