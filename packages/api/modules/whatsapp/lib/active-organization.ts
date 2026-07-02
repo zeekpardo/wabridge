@@ -76,7 +76,13 @@ export async function resolveSubaccount(
 			session.embeddedSubaccountId,
 		);
 		if (!embedded) {
-			throw new ORPCError("FORBIDDEN", { message: "Embedded subaccount is no longer valid." });
+			// The token points at a subaccount that no longer exists (e.g. deleted and
+			// recreated). Treat it as UNAUTHORIZED — not FORBIDDEN — so the client
+			// self-heal drops the stale embedded token and the SSO handshake re-mints
+			// a fresh one for the current subaccount, instead of dead-ending.
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "Embedded session is stale — re-authenticating.",
+			});
 		}
 		return {
 			id: embedded.id,
