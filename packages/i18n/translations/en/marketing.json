@@ -1,7 +1,7 @@
 {
 	"blog": {
-		"description": "Read the latest news from our company",
-		"title": "My awesome blog",
+		"description": "News, guides and updates from the WAGOAT team.",
+		"title": "The WAGOAT blog",
 		"back": "Back to blog"
 	},
 	"changelog": {
@@ -26,74 +26,74 @@
 		"title": "Documentation"
 	},
 	"faq": {
-		"description": "Do you have any questions? We have got you covered.",
+		"description": "Everything you need to know about running WhatsApp on WAGOAT.",
 		"title": "Frequently asked questions",
 		"items": {
 			"refundPolicy": {
-				"question": "What is the refund policy?",
-				"answer": "We offer a 30-day money-back guarantee if you're not happy with our product."
+				"question": "Does WAGOAT use the official WhatsApp API?",
+				"answer": "No. WAGOAT connects to the WhatsApp you already have, which lets us offer unlimited messages at a flat monthly price — no per-message costs and no template restrictions."
 			},
 			"cancelSubscription": {
-				"question": "How do I cancel my subscription?",
-				"answer": "You can cancel your subscription by visiting the billing page."
+				"question": "Will my number get banned?",
+				"answer": "We take safety seriously with spintax, proxies and smart sending intervals to keep your numbers protected, and you stay in control of volume and pacing."
 			},
 			"changePlan": {
-				"question": "Can I change my plan?",
-				"answer": "Yes, you can change your plan at any time by visiting the billing page."
+				"question": "Which CRM does WAGOAT work with?",
+				"answer": "WAGOAT connects your WhatsApp to GoHighLevel, syncing every conversation straight into your pipeline. You message customers from the CRM you already use."
 			},
 			"freeTrial": {
 				"question": "Do you offer a free trial?",
-				"answer": "Yes, we offer a 14-day free trial."
+				"answer": "Yes. You can try WAGOAT free for 7 days and cancel anytime."
 			}
 		}
 	},
 	"home": {
 		"hero": {
 			"new": "New:",
-			"featureBadge": "Amazing feature of your SaaS",
-			"title": "Your revolutionary SaaS built with Next.js",
-			"subtitle": "This is a demo application built with supastarter. It will save you a lot of time and effort building your next SaaS.",
-			"getStarted": "Get started",
+			"featureBadge": "Works natively with GoHighLevel",
+			"title": "Connect WhatsApp to your CRM in one scan",
+			"subtitle": "Scan a QR code and your WhatsApp lives inside GoHighLevel. Every chat syncs both ways — no official API, no per-message fees, no new number.",
+			"getStarted": "Start free trial",
 			"documentation": "Documentation",
-			"imageAlt": "Our application",
-			"builtWith": "Built & shipped with these awesome tools"
+			"imageAlt": "The WAGOAT dashboard",
+			"builtWith": "Works with the CRM you already use"
 		},
 		"features": {
-			"badge": "Incredible features",
-			"title": "Features your clients will love",
-			"description": "In this section you can showcase all the features of your SaaS provides and how they can benefit your clients.",
+			"badge": "Features",
+			"title": "WhatsApp that just works with your CRM",
+			"description": "No official API. No template restrictions. No 24-hour rule. Just scan and go.",
 			"feature1": {
-				"title": "Feature 1",
-				"subtitle": "Do more with our amazing SaaS.",
-				"description": "This is a brilliant feature. And below you can see some reasons why. This is basically just a dummy text.",
+				"title": "Connect in one scan",
+				"subtitle": "Your WhatsApp, inside your CRM.",
+				"description": "Scan a QR code and your WhatsApp number is linked to GoHighLevel — no new numbers, no Meta approvals, no waiting.",
 				"benefit1": {
-					"title": "Benefit 1",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "One QR scan",
+					"description": "Link the WhatsApp number you already use in about 30 seconds."
 				},
 				"benefit2": {
-					"title": "Benefit 2",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "No official API",
+					"description": "Skip Meta approvals, message templates and the 24-hour rule entirely."
 				},
 				"benefit3": {
-					"title": "Benefit 3",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "Keep your number",
+					"description": "Use your existing business number — nothing changes for your customers."
 				}
 			},
 			"feature2": {
-				"title": "Feature 2",
-				"subtitle": "Your SaaS can also do this.",
-				"description": "Another dummy text for another feature.",
+				"title": "One inbox, always in sync",
+				"subtitle": "Message from the CRM you already live in.",
+				"description": "Every WhatsApp conversation flows straight into your pipeline, both ways, in real time — so you never leave GoHighLevel to reply.",
 				"benefit1": {
-					"title": "Benefit 1",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "Two-way sync",
+					"description": "Send and receive WhatsApp messages right from GoHighLevel."
 				},
 				"benefit2": {
-					"title": "Benefit 2",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "Every chat logged",
+					"description": "Conversations attach to the contact, so nothing slips through the cracks."
 				},
 				"benefit3": {
-					"title": "Benefit 3",
-					"description": "This is an awesome benefit. And below you can see some reasons why. This is basically just a dummy text."
+					"title": "Unlimited messages",
+					"description": "One flat monthly price with no per-message fees."
 				}
 			}
 		}
@@ -110,7 +110,7 @@
 			}
 		},
 		"submit": "Subscribe",
-		"subtitle": "Be among the first to get access to supastarter.nextjs.",
+		"subtitle": "Be among the first to automate WhatsApp with WAGOAT.",
 		"title": "Get early access"
 	},
 	"notFound": {
@@ -126,7 +126,7 @@
 			"pricing": "Pricing",
 			"privacyPolicy": "Privacy policy",
 			"termsAndConditions": "Terms and conditions",
-			"builtWith": "Built with supastarter"
+			"builtWith": "WhatsApp, inside your CRM"
 		},
 		"menu": {
 			"blog": "Blog",

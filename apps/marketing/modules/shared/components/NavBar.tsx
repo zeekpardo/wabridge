@@ -51,10 +51,6 @@ export function NavBar() {
 		href: string;
 	}[] = [
 		{
-			label: t("common.menu.pricing"),
-			href: "/#pricing",
-		},
-		{
 			label: t("common.menu.faq"),
 			href: "/#faq",
 		},

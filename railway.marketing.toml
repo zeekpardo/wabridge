@@ -1,0 +1,13 @@
+# Railway config for the WAGOAT marketing site (apps/marketing).
+# Deployed as its own service in the same Railway project as `saas`.
+# In the service's Settings → Config-as-code, set the path to this file.
+# Docs: https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.marketing"
+
+[deploy]
+startCommand = "node apps/marketing/.next/standalone/apps/marketing/server.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

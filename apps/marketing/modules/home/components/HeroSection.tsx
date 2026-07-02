@@ -9,6 +9,9 @@ import Image from "next/image";
 import heroImageDark from "../../../public/images/hero-image-dark.png";
 import heroImage from "../../../public/images/hero-image.png";
 
+// Hero screenshot hidden until the final product image is ready. Flip to true to restore.
+const SHOW_HERO_IMAGE = false;
+
 export function HeroSection() {
 	const t = useTranslations();
 
@@ -46,20 +49,22 @@ export function HeroSection() {
 					)}
 				</div>
 
-				<div className="mt-12 lg:mt-16 lg:flex-1 p-4 mx-auto rounded-4xl border border-primary/10 bg-primary/5">
-					<Image
-						src={heroImage}
-						alt={t("home.hero.imageAlt")}
-						className="block rounded-xl dark:hidden"
-						priority
-					/>
-					<Image
-						src={heroImageDark}
-						alt={t("home.hero.imageAlt")}
-						className="hidden rounded-xl dark:block"
-						priority
-					/>
-				</div>
+				{SHOW_HERO_IMAGE && (
+					<div className="mt-12 lg:mt-16 lg:flex-1 p-4 mx-auto rounded-4xl border border-primary/10 bg-primary/5">
+						<Image
+							src={heroImage}
+							alt={t("home.hero.imageAlt")}
+							className="block rounded-xl dark:hidden"
+							priority
+						/>
+						<Image
+							src={heroImageDark}
+							alt={t("home.hero.imageAlt")}
+							className="hidden rounded-xl dark:block"
+							priority
+						/>
+					</div>
+				)}
 			</div>
 		</div>
 	);
