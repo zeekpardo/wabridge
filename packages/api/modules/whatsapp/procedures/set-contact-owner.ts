@@ -1,4 +1,9 @@
-import { getConversation, listOrganizationMembers, setConversationOwner } from "@repo/database";
+import {
+	getConversation,
+	getGhlConnection,
+	listOrganizationMembers,
+	setConversationOwner,
+} from "@repo/database";
 import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
@@ -13,7 +18,7 @@ export const setContactOwner = protectedProcedure
 		tags: ["WhatsApp"],
 		summary: "Assign or clear a contact's owner",
 		description:
-			"Sets the owning org member for a contact. Local-first; when the thread is linked to a GHL contact, the assignment also pushes to GHL's assignedTo (member matched to a GHL location user by email).",
+			"GHL-connected subaccounts assign in GHL terms: ownerId is a GHL user id, written to the contact's assignedTo, with the email-matched agency member cached locally. Standalone subaccounts assign an agency member locally.",
 	})
 	.input(
 		z.object({
@@ -25,47 +30,62 @@ export const setContactOwner = protectedProcedure
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
+		const ghl = await getGhlConnection(subaccount.id);
+
+		// Standalone: the owner is an agency member, stored locally.
+		if (!ghl) {
+			await setConversationOwner({
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				chatId: input.chatId,
+				ownerId: input.ownerId,
+			});
+			return { ok: true };
+		}
+
+		// Connected: ownerId is a GHL user id (the dropdown lists location staff).
 		const conversation = await getConversation(subaccount.id, input.chatId);
+		if (!conversation?.ghlContactId) {
+			logger.warn("Owner set on a thread not linked to a GHL contact; skipped", {
+				ctx: "whatsapp.contactOwner",
+				chatId: input.chatId,
+			});
+			return { ok: true };
+		}
 
-		await setConversationOwner({
-			subaccountId: subaccount.id,
-			organizationId: subaccount.organizationId,
-			chatId: input.chatId,
-			ownerId: input.ownerId,
-		});
+		const client = await createGoHighLevelClient(subaccount.id);
+		if (!client) {
+			return { ok: true };
+		}
 
-		// Push to the linked GHL contact: match the member to a GHL location user
-		// by email and set assignedTo. Best-effort — no email match (or a GHL
-		// hiccup) keeps the local assignment and logs. Clearing the owner stays
-		// local-only: GHL has no documented unassign, and the read-through would
-		// re-adopt GHL's assignment anyway.
-		if (input.ownerId && conversation?.ghlContactId) {
+		await client.updateContact(conversation.ghlContactId, { assignedTo: input.ownerId });
+
+		// Cache the email-matched agency member locally (null when the GHL user
+		// isn't a member) so app-internal surfaces have a member to point at.
+		let memberOwnerId: string | null = null;
+		if (input.ownerId) {
 			try {
-				const client = await createGoHighLevelClient(subaccount.id);
-				if (client) {
-					const members = await listOrganizationMembers(subaccount.organizationId);
-					const member = members.find((m) => m.userId === input.ownerId);
-					const email = member?.user.email?.toLowerCase();
-					const ghlUser = email
-						? (await client.getUsers()).find((u) => u.email?.toLowerCase() === email)
-						: undefined;
-					if (ghlUser) {
-						await client.updateContact(conversation.ghlContactId, { assignedTo: ghlUser.id });
-					} else {
-						logger.warn("No GHL user matches the owner's email; assignedTo not pushed", {
-							ctx: "whatsapp.contactOwner",
-							ownerId: input.ownerId,
-						});
-					}
-				}
+				const [users, members] = await Promise.all([
+					client.getUsers(),
+					listOrganizationMembers(subaccount.organizationId),
+				]);
+				const email = users.find((u) => u.id === input.ownerId)?.email?.toLowerCase();
+				memberOwnerId = email
+					? (members.find((member) => member.user.email.toLowerCase() === email)?.userId ?? null)
+					: null;
 			} catch (error) {
-				logger.warn("GHL owner push failed", {
+				logger.warn("GHL owner member-cache mapping failed", {
 					ctx: "whatsapp.contactOwner",
-					ghlContactId: conversation.ghlContactId,
 					error: error instanceof Error ? error.message : String(error),
 				});
 			}
 		}
+		await setConversationOwner({
+			subaccountId: subaccount.id,
+			organizationId: subaccount.organizationId,
+			chatId: input.chatId,
+			ownerId: memberOwnerId,
+		});
 
 		return { ok: true };
 	});

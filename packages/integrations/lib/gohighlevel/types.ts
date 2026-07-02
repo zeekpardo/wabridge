@@ -87,8 +87,8 @@ export interface GHLContactUpdateInput {
 	phone?: string;
 	tags?: string[];
 	customFields?: GHLCustomFieldValue[];
-	/** GHL user id to assign as the contact's owner. */
-	assignedTo?: string;
+	/** GHL user id to assign as the contact's owner (null clears the assignment). */
+	assignedTo?: string | null;
 }
 
 export interface GHLApiResponse<T> {

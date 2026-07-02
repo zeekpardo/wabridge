@@ -198,14 +198,15 @@ export const getContactProfile = protectedProcedure
 			});
 		}
 
-		// Owner: the GHL assignment wins when it maps to a member; otherwise keep
-		// the local owner (if still a current member). Cache the mapped owner so
-		// other surfaces agree.
+		// Owner: connected subaccounts assign in GHL terms — the dropdown lists
+		// GHL staff, so the selected value is the GHL assignee id. Standalone
+		// subaccounts use the local member owner. The email-matched member (when
+		// one exists) is still cached on the thread for app-internal use.
 		const localOwnerId =
 			conversation?.ownerId && members.some((member) => member.userId === conversation.ownerId)
 				? conversation.ownerId
 				: null;
-		const ownerId = ghlOwnerId ?? localOwnerId;
+		const ownerId = ghl ? (ghlContact?.assignedTo ?? null) : localOwnerId;
 		if (ghlOwnerId && ghlOwnerId !== conversation?.ownerId) {
 			await setConversationOwner({
 				subaccountId: subaccount.id,
