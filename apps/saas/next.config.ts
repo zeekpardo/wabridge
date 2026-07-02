@@ -6,6 +6,9 @@ import nextIntlPlugin from "next-intl/plugin";
 const withNextIntl = nextIntlPlugin("./modules/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+	// Emit a self-contained server bundle (apps/saas/.next/standalone/...) so the
+	// Docker runtime image ships only what it needs. Required by the Railway deploy.
+	output: "standalone",
 	transpilePackages: ["@repo/api", "@repo/auth", "@repo/database", "@repo/ui"],
 	// Let dev asset requests (fonts, HMR) through when the app is reached via a
 	// tunnel host instead of localhost (GHL local testing). Dev-only; ignored in prod.
