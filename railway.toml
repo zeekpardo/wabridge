@@ -1,0 +1,16 @@
+# Railway config for the WABridge SaaS app (apps/saas).
+# Docs: https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+# Migrations are applied OUT OF BAND, not via a preDeployCommand. The runtime
+# image ships only Next.js's standalone output (no pnpm / Prisma CLI / migrations
+# folder), so `prisma migrate deploy` cannot run inside it. Run migrations against
+# the Railway Postgres (public proxy URL) before deploying:
+#   DATABASE_URL=<public-url> pnpm --filter @repo/database migrate:deploy
+[deploy]
+startCommand = "node apps/saas/.next/standalone/apps/saas/server.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
