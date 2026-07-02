@@ -89,9 +89,12 @@ export function WhatsAppInbox({
 				body: string | null;
 				type: string;
 				timestamp: Date | string;
+				status?: string | null;
+				sessionId?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 			}
 		>();
+		// Our DB rows carry status + the sending/receiving session (which number).
 		for (const m of threadQuery.data?.messages ?? []) {
 			byKey.set(m.waMessageId ?? m.id, {
 				id: m.id,
@@ -99,18 +102,29 @@ export function WhatsAppInbox({
 				body: m.body,
 				type: m.type,
 				timestamp: m.timestamp,
+				status: m.status,
+				sessionId: m.sessionId,
 				media: null,
 			});
 		}
+		// OpenWA history carries media thumbnails — merge it in without dropping
+		// the DB row's status/sessionId; history-only rows keep those undefined.
 		for (const m of historyQuery.data ?? []) {
-			byKey.set(m.waMessageId ?? m.id, {
-				id: m.id,
-				direction: m.direction,
-				body: m.body,
-				type: m.type,
-				timestamp: m.timestamp,
-				media: m.media,
-			});
+			const key = m.waMessageId ?? m.id;
+			const existing = byKey.get(key);
+			if (existing) {
+				existing.media = m.media;
+			} else {
+				byKey.set(key, {
+					id: m.id,
+					direction: m.direction,
+					body: m.body,
+					type: m.type,
+					timestamp: m.timestamp,
+					status: m.status,
+					media: m.media,
+				});
+			}
 		}
 		return [...byKey.values()].sort(
 			(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
@@ -241,6 +255,12 @@ export function WhatsAppInbox({
 						<MessageThread
 							messages={threadMessages}
 							isLoading={threadQuery.isLoading || historyQuery.isLoading}
+							contact={{
+								name: contactName,
+								phone: selectedChat?.phone ?? (selectedChatId ? prettyPhone(selectedChatId) : null),
+							}}
+							numbers={numbers}
+							fallbackNumberId={activeNumberId || null}
 						/>
 
 						<Composer
