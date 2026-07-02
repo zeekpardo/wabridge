@@ -92,7 +92,7 @@ export function SubaccountWorkspace({
 				</Button>
 				<div>
 					<h2 className="font-bold text-2xl">{sub.name}</h2>
-					<p className="text-xs text-foreground/50">{sub.id}</p>
+					<p className="text-xs text-foreground/65">{sub.id}</p>
 				</div>
 			</div>
 
@@ -104,11 +104,11 @@ export function SubaccountWorkspace({
 						{sub.ghl.connected ? (
 							<CircleCheckIcon className="size-5 text-emerald-500" />
 						) : (
-							<CircleXIcon className="size-5 text-foreground/40" />
+							<CircleXIcon className="size-5 text-foreground/55" />
 						)}
 					</div>
 					<div className="min-w-0 flex-1">
-						<p className="text-xs text-foreground/60">CRM connection</p>
+						<p className="text-xs text-foreground/75">CRM connection</p>
 						<p className="font-bold text-lg">{sub.ghl.connected ? "Connected" : "Not connected"}</p>
 					</div>
 					<div className="gap-2 flex shrink-0 items-center">
@@ -153,7 +153,7 @@ export function SubaccountWorkspace({
 						<MessageSquareIcon className="size-5 text-primary" />
 					</div>
 					<div className="min-w-0 flex-1">
-						<p className="text-xs text-foreground/60">Provisioning</p>
+						<p className="text-xs text-foreground/75">Provisioning</p>
 						<p className="font-bold text-lg capitalize">
 							{sub.provisioningSource === "ghl" ? "GHL-linked" : "Manual"}
 						</p>

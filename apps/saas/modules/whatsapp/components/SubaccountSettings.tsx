@@ -64,7 +64,7 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 			<Card className="gap-4 p-5 flex flex-col">
 				<div>
 					<h3 className="font-medium">Global spintax variables</h3>
-					<p className="text-sm text-foreground/60">
+					<p className="text-sm text-foreground/75">
 						Reusable variations for this subaccount. Reference them in messages as{" "}
 						<code className="rounded px-1 text-xs bg-muted">${"{SPINTAX_1}"}</code>.
 						Comma-separated.

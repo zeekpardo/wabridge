@@ -155,25 +155,25 @@ export function WhatsAppInbox({
 		>
 			<div
 				className={cn(
-					"md:w-1/4 md:min-w-56 w-full shrink-0 flex-col border-r",
-					selectedChatId ? "md:flex hidden" : "flex",
+					"md:w-1/4 md:min-w-56 w-full shrink-0 border-r",
+					selectedChatId ? "md:block hidden" : "block",
 				)}
 			>
-				<ConversationFilters
-					subaccountId={subaccountId}
-					ownerFilter={ownerFilter}
-					onOwnerChange={setOwnerFilter}
-					tagFilter={tagFilter}
-					onTagChange={setTagFilter}
+				<ConversationList
+					conversations={conversations}
+					isLoading={conversationsQuery.isLoading}
+					selectedChatId={selectedChatId}
+					onSelect={setSelectedChatId}
+					filters={
+						<ConversationFilters
+							subaccountId={subaccountId}
+							ownerFilter={ownerFilter}
+							onOwnerChange={setOwnerFilter}
+							tagFilter={tagFilter}
+							onTagChange={setTagFilter}
+						/>
+					}
 				/>
-				<div className="min-h-0 flex-1">
-					<ConversationList
-						conversations={conversations}
-						isLoading={conversationsQuery.isLoading}
-						selectedChatId={selectedChatId}
-						onSelect={setSelectedChatId}
-					/>
-				</div>
 			</div>
 
 			<div className={cn("flex-1 flex-col", selectedChatId ? "flex" : "md:flex hidden")}>
@@ -183,7 +183,7 @@ export function WhatsAppInbox({
 							<MessageSquareIcon className="size-6 text-primary" />
 						</div>
 						<p className="font-medium">Select a conversation</p>
-						<p className="text-sm text-foreground/60">
+						<p className="text-sm text-foreground/75">
 							Pick a chat on the left, or start a new one.
 						</p>
 					</div>
@@ -203,12 +203,12 @@ export function WhatsAppInbox({
 								<div className="min-w-0">
 									<p className="font-medium text-sm truncate">{contactName}</p>
 									{selectedChat?.phone && selectedChat.phone !== contactName ? (
-										<p className="text-xs truncate text-foreground/50">{selectedChat.phone}</p>
+										<p className="text-xs truncate text-foreground/65">{selectedChat.phone}</p>
 									) : null}
 								</div>
 							</div>
 							<div className="gap-2 flex items-center">
-								<span className="text-xs sm:inline hidden text-foreground/60">Send from</span>
+								<span className="text-xs sm:inline hidden text-foreground/75">Send from</span>
 								<Select
 									value={activeNumberId}
 									disabled={numbers.length === 0 || setNumber.isPending}

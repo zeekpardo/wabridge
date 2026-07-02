@@ -148,7 +148,7 @@ export function CommandTester({
 
 					{preview.data && (
 						<div className="gap-2 p-3 flex flex-col rounded-lg border bg-muted/40">
-							<p className="text-xs font-medium tracking-wide text-foreground/60 uppercase">
+							<p className="text-xs font-medium tracking-wide text-foreground/75 uppercase">
 								Resolves to {preview.data.actions.length} action
 								{preview.data.actions.length === 1 ? "" : "s"}
 								{preview.data.meta.spintaxApplied ? " · spintax applied" : ""}
@@ -159,14 +159,14 @@ export function CommandTester({
 								</p>
 							)}
 							{preview.data.actions.length === 0 ? (
-								<p className="text-sm text-foreground/60">Nothing to send.</p>
+								<p className="text-sm text-foreground/75">Nothing to send.</p>
 							) : (
 								preview.data.actions.map((action, i) => (
 									<div key={i} className="gap-2 text-sm flex items-start">
 										<Badge status="info">{action.kind}</Badge>
 										<div className="min-w-0 flex-1">
 											{action.url && (
-												<p className="text-xs truncate text-foreground/60">{action.url}</p>
+												<p className="text-xs truncate text-foreground/75">{action.url}</p>
 											)}
 											{action.text && <p className="whitespace-pre-wrap">{action.text}</p>}
 											{action.delayMs ? (

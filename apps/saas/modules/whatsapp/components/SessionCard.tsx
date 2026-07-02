@@ -57,7 +57,7 @@ export function SessionCard({
 				</div>
 				<div>
 					<p className="font-medium">{session.label || session.phone || "Unnamed number"}</p>
-					<p className="text-sm text-foreground/60">
+					<p className="text-sm text-foreground/75">
 						{session.phone ? session.phone : session.openwaName}
 					</p>
 				</div>

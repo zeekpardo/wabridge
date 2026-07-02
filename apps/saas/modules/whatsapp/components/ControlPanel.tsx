@@ -79,7 +79,7 @@ export function ControlPanel({ organizationSlug }: { organizationSlug: string })
 				<Card className="gap-1 p-5 flex flex-col">
 					<span className="font-semibold text-indigo-500 text-xs tracking-wide uppercase">New</span>
 					<p className="font-medium text-sm">Provision from GoHighLevel</p>
-					<p className="text-xs leading-snug text-foreground/60">
+					<p className="text-xs leading-snug text-foreground/75">
 						Once your marketplace app is live, pull subaccounts straight from your GHL locations.
 						Manual subaccounts work today.
 					</p>
@@ -89,7 +89,7 @@ export function ControlPanel({ organizationSlug }: { organizationSlug: string })
 			<div className="gap-3 flex flex-col">
 				<div className="flex items-center justify-between">
 					<h3 className="font-bold text-xl">Subaccounts</h3>
-					<span className="text-xs text-foreground/50">
+					<span className="text-xs text-foreground/65">
 						Showing {subaccounts.length} of {limits?.subaccountsUsed ?? subaccounts.length}
 					</span>
 				</div>
@@ -127,10 +127,10 @@ function StatCard({
 		<Card className="gap-3 p-5 flex flex-col">
 			<div className="flex items-center justify-between">
 				<div>
-					<p className="text-sm text-foreground/60">{label}</p>
+					<p className="text-sm text-foreground/75">{label}</p>
 					<p className="font-bold text-3xl">
 						{value}
-						{sub ? <span className="text-lg text-foreground/50"> {sub}</span> : null}
+						{sub ? <span className="text-lg text-foreground/65"> {sub}</span> : null}
 					</p>
 				</div>
 				<div className="size-11 flex items-center justify-center rounded-xl bg-primary/10">
@@ -167,7 +167,7 @@ function SubaccountCard({
 			<div className="gap-2 flex items-start justify-between">
 				<div className="min-w-0">
 					<h4 className="font-semibold text-base truncate">{subaccount.name}</h4>
-					<p className="text-xs truncate text-foreground/50">{subaccount.id}</p>
+					<p className="text-xs truncate text-foreground/65">{subaccount.id}</p>
 				</div>
 			</div>
 
@@ -190,7 +190,7 @@ function SubaccountCard({
 					{subaccount.connectionsOffline}
 				</span>
 				<div className="h-4 w-px bg-border" />
-				<span className="gap-1.5 flex flex-1 items-center justify-center text-foreground/60">
+				<span className="gap-1.5 flex flex-1 items-center justify-center text-foreground/75">
 					{subaccount.connectionsTotal} total
 				</span>
 			</div>
@@ -238,7 +238,7 @@ function AddSubaccountCard() {
 					<div className="size-12 flex items-center justify-center rounded-xl bg-primary/10">
 						<PlusIcon className="size-6 text-primary" />
 					</div>
-					<p className="font-medium text-sm text-foreground/60">Add new subaccount</p>
+					<p className="font-medium text-sm text-foreground/75">Add new subaccount</p>
 				</button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-md">

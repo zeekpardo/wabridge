@@ -53,20 +53,26 @@ export function ConversationFilters({
 		: null;
 
 	return (
-		<div className="gap-1.5 px-2 py-1.5 flex flex-wrap items-center border-b">
+		<>
 			<Popover open={open} onOpenChange={setOpen}>
 				<PopoverTrigger asChild>
-					<Button variant="outline" size="sm" className="gap-1.5 h-7">
-						<ListFilterIcon className="size-3.5" />
-						Filter
+					<Button
+						variant="outline"
+						size="icon"
+						className="size-9 relative shrink-0"
+						aria-label="Filter conversations"
+					>
+						<ListFilterIcon className="size-4" />
 						{activeCount > 0 ? (
-							<Badge className="size-4 p-0 justify-center text-[10px]">{activeCount}</Badge>
+							<Badge className="-right-1 -top-1 size-4 p-0 absolute justify-center text-[10px]">
+								{activeCount}
+							</Badge>
 						) : null}
 					</Button>
 				</PopoverTrigger>
 				<PopoverContent align="start" className="p-1.5 w-64">
 					{/* Owner */}
-					<p className="px-1.5 pb-1 text-[11px] text-foreground/50">Owner</p>
+					<p className="px-1.5 pb-1 text-[11px] text-foreground/65">Owner</p>
 					<div className="max-h-40 overflow-y-auto">
 						<FilterRow
 							selected={!ownerFilter}
@@ -82,7 +88,7 @@ export function ConversationFilters({
 							/>
 						))}
 						{ownersQuery.isLoading ? (
-							<p className="px-2 py-1.5 text-xs text-foreground/40">Loading…</p>
+							<p className="px-2 py-1.5 text-xs text-foreground/55">Loading…</p>
 						) : null}
 					</div>
 
@@ -90,11 +96,11 @@ export function ConversationFilters({
 
 					{/* Tag + has/not */}
 					<div className="px-1.5 pb-1 flex items-center justify-between">
-						<span className="text-[11px] text-foreground/50">Tag</span>
+						<span className="text-[11px] text-foreground/65">Tag</span>
 						{tagFilter ? (
 							<button
 								type="button"
-								className="gap-1 rounded px-1 flex items-center text-[11px] text-foreground/60 hover:bg-foreground/5"
+								className="gap-1 rounded px-1 flex items-center text-[11px] text-foreground/75 hover:bg-foreground/5"
 								onClick={() =>
 									onTagChange({
 										tag: tagFilter.tag,
@@ -121,10 +127,10 @@ export function ConversationFilters({
 							);
 						})}
 						{tagsQuery.isLoading ? (
-							<p className="px-2 py-1.5 text-xs text-foreground/40">Loading…</p>
+							<p className="px-2 py-1.5 text-xs text-foreground/55">Loading…</p>
 						) : null}
 						{!tagsQuery.isLoading && tags.length === 0 ? (
-							<p className="px-2 py-1.5 text-xs text-foreground/40">No tags</p>
+							<p className="px-2 py-1.5 text-xs text-foreground/55">No tags</p>
 						) : null}
 					</div>
 
@@ -133,7 +139,7 @@ export function ConversationFilters({
 							<div className="my-1 border-t" />
 							<button
 								type="button"
-								className="px-2 py-1.5 text-sm rounded w-full text-left text-foreground/70 hover:bg-foreground/5"
+								className="px-2 py-1.5 text-sm rounded w-full text-left text-foreground/80 hover:bg-foreground/5"
 								onClick={() => {
 									onOwnerChange(null);
 									onTagChange(null);
@@ -153,7 +159,7 @@ export function ConversationFilters({
 					onClear={() => onTagChange(null)}
 				/>
 			) : null}
-		</div>
+		</>
 	);
 }
 

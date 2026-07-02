@@ -148,7 +148,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 				<Button
 					variant="ghost"
 					size="icon"
-					className="size-7 text-foreground/60"
+					className="size-7 text-foreground/75"
 					aria-label="Close contact details"
 					onClick={onClose}
 				>
@@ -173,7 +173,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						<div className="min-w-0 flex-1">
 							<p className="font-semibold text-sm truncate">{profile.name}</p>
 							{profile.phone ? (
-								<p className="text-xs truncate text-foreground/50">{profile.phone}</p>
+								<p className="text-xs truncate text-foreground/65">{profile.phone}</p>
 							) : null}
 						</div>
 						{profile.ghl.contactUrl ? (
@@ -182,7 +182,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								target="_blank"
 								rel="noopener noreferrer"
 								aria-label="Open in GoHighLevel"
-								className="text-foreground/50 hover:text-foreground"
+								className="text-foreground/65 hover:text-foreground"
 							>
 								<ExternalLinkIcon className="size-4" />
 							</a>
@@ -191,7 +191,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 
 					{/* Owner */}
 					<div className="gap-1.5 flex flex-col">
-						<span className="font-medium text-xs text-foreground/60">Owner</span>
+						<span className="font-medium text-xs text-foreground/75">Owner</span>
 						<Select
 							value={profile.ownerId ?? UNASSIGNED}
 							disabled={setOwner.isPending}
@@ -205,7 +205,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						>
 							<SelectTrigger className="h-9">
 								<div className="gap-2 flex items-center">
-									<UserIcon className="size-3.5 text-foreground/50" />
+									<UserIcon className="size-3.5 text-foreground/65" />
 									<SelectValue placeholder="Unassigned" />
 								</div>
 							</SelectTrigger>
@@ -219,9 +219,9 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 							</SelectContent>
 						</Select>
 						{!profile.ownerId && profile.ghl.assignee && !profile.ghl.assignee.memberId ? (
-							<p className="leading-snug text-[11px] text-foreground/50">
+							<p className="leading-snug text-[11px] text-foreground/65">
 								Assigned in GoHighLevel to{" "}
-								<span className="text-foreground/70">
+								<span className="text-foreground/80">
 									{profile.ghl.assignee.name || profile.ghl.assignee.email || "a GHL user"}
 								</span>{" "}
 								— invite them as an agency member to sync ownership.
@@ -231,7 +231,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 
 					{/* Tags */}
 					<div className="gap-1.5 flex flex-col">
-						<span className="font-medium text-xs text-foreground/60">
+						<span className="font-medium text-xs text-foreground/75">
 							Tags ({profile.tags.length})
 						</span>
 						<div className="gap-1.5 flex flex-wrap items-center">
@@ -270,13 +270,13 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								</PopoverTrigger>
 								<PopoverContent align="start" className="p-1.5 w-64">
 									<div className="gap-1.5 px-1.5 pb-1.5 flex items-center border-b">
-										<SearchIcon className="size-3.5 shrink-0 text-foreground/40" />
+										<SearchIcon className="size-3.5 shrink-0 text-foreground/55" />
 										<input
 											// oxlint-disable-next-line no-autofocus
 											autoFocus
 											value={tagInput}
 											placeholder="Search tags"
-											className="h-7 text-sm w-full bg-transparent outline-none placeholder:text-foreground/40"
+											className="h-7 text-sm w-full bg-transparent outline-none placeholder:text-foreground/55"
 											onChange={(event) => setTagInput(event.target.value)}
 										/>
 									</div>
@@ -337,7 +337,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 															</button>
 														) : null}
 														{options.length === 0 && !query ? (
-															<p className="px-2 py-3 text-xs text-foreground/50">
+															<p className="px-2 py-3 text-xs text-foreground/65">
 																No tags yet — type to create one.
 															</p>
 														) : null}
@@ -353,10 +353,10 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 
 					{/* Fields */}
 					<div className="gap-2 p-3 flex flex-col rounded-lg border bg-background">
-						<span className="font-medium text-xs text-foreground/60">Contact</span>
+						<span className="font-medium text-xs text-foreground/75">Contact</span>
 						{profile.fields.map((field) => (
 							<div key={field.key} className="gap-0.5 flex flex-col">
-								<span className="text-[11px] text-foreground/50">{field.label}</span>
+								<span className="text-[11px] text-foreground/65">{field.label}</span>
 								{editingField?.key === field.key ? (
 									<Input
 										// oxlint-disable-next-line no-autofocus
@@ -383,7 +383,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 										title={`Edit ${field.label.toLowerCase()}`}
 										onClick={() => setEditingField({ key: field.key, value: field.value ?? "" })}
 									>
-										{field.value || <span className="text-foreground/40">—</span>}
+										{field.value || <span className="text-foreground/55">—</span>}
 									</button>
 								) : (
 									<span className="text-sm">{field.value || "—"}</span>
@@ -396,14 +396,14 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 					{(customFieldsQuery.data?.folders.length ?? 0) > 0 ? (
 						<div className="gap-2 flex flex-col">
 							<div className="flex items-center justify-between">
-								<span className="font-medium text-xs text-foreground/60">Custom Fields</span>
+								<span className="font-medium text-xs text-foreground/75">Custom Fields</span>
 								<Popover open={folderSettingsOpen} onOpenChange={setFolderSettingsOpen}>
 									<PopoverTrigger asChild>
 										<Button
 											type="button"
 											variant="ghost"
 											size="icon"
-											className="size-6 text-foreground/50"
+											className="size-6 text-foreground/65"
 											aria-label="Choose which folders to show"
 										>
 											<SlidersHorizontalIcon className="size-3.5" />
@@ -423,7 +423,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 											<span className="truncate">Hide empty fields</span>
 										</button>
 										<div className="my-1 border-t" />
-										<p className="px-1.5 pb-1 text-[11px] text-foreground/50">Folders to display</p>
+										<p className="px-1.5 pb-1 text-[11px] text-foreground/65">Folders to display</p>
 										<div className="max-h-64 overflow-y-auto">
 											{(customFieldsQuery.data?.folders ?? []).map((folder) => {
 												const visible = !hiddenFolders.has(folder.id);
@@ -469,13 +469,13 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 											>
 												<span className="gap-1.5 font-medium flex items-center">
 													{collapsed ? (
-														<ChevronRightIcon className="size-3.5 text-foreground/50" />
+														<ChevronRightIcon className="size-3.5 text-foreground/65" />
 													) : (
-														<ChevronDownIcon className="size-3.5 text-foreground/50" />
+														<ChevronDownIcon className="size-3.5 text-foreground/65" />
 													)}
 													{folder.name}
 												</span>
-												<span className="text-[11px] text-foreground/40">
+												<span className="text-[11px] text-foreground/55">
 													{setCount}/{folder.fields.length}
 												</span>
 											</button>
@@ -483,9 +483,9 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 												<div className="gap-2 px-3 pt-0 pb-3 flex flex-col">
 													{shownFields.map((field) => (
 														<div key={field.id} className="gap-0.5 flex flex-col">
-															<span className="text-[11px] text-foreground/50">{field.name}</span>
+															<span className="text-[11px] text-foreground/65">{field.name}</span>
 															<span className="text-sm">
-																{field.value || <span className="text-foreground/40">—</span>}
+																{field.value || <span className="text-foreground/55">—</span>}
 															</span>
 														</div>
 													))}
@@ -500,7 +500,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 					{/* GHL status — only surfaced when there's something actionable. */}
 					{profile.ghl.connected ? null : (
 						<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
-							<p className="text-foreground/60">
+							<p className="text-foreground/75">
 								<span className="font-medium text-foreground">GoHighLevel not connected.</span>{" "}
 								Owner and tags are saved here and will sync to the contact once you connect GHL.
 							</p>

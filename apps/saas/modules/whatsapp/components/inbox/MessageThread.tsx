@@ -45,7 +45,7 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
 	if (messages.length === 0) {
 		return (
 			<div className="px-4 flex flex-1 items-center justify-center bg-muted/20 text-center">
-				<p className="text-sm text-foreground/50">No messages in this conversation yet.</p>
+				<p className="text-sm text-foreground/65">No messages in this conversation yet.</p>
 			</div>
 		);
 	}
@@ -119,7 +119,7 @@ function MessageBubble({ message }: { message: ThreadMessage }) {
 
 				{emptyText ? <span className="italic opacity-60">[{message.type}]</span> : null}
 			</div>
-			<span className="mt-0.5 px-1 text-[10px] text-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
+			<span className="mt-0.5 px-1 text-[10px] text-foreground/55 opacity-0 transition-opacity group-hover:opacity-100">
 				{messageTime(message.timestamp)}
 			</span>
 		</div>

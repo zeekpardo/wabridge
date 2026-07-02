@@ -7,7 +7,7 @@ import { Input } from "@repo/ui/components/input";
 import { Spinner } from "@repo/ui/components/spinner";
 import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
 import { InboxIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { prettyPhone, relativeTime, toChatId } from "./helpers";
 
@@ -18,6 +18,8 @@ interface ConversationListProps {
 	isLoading: boolean;
 	selectedChatId: string | null;
 	onSelect: (chatId: string) => void;
+	/** Filter control (button + active-filter chips), shown beside the search box. */
+	filters?: ReactNode;
 }
 
 function displayName(chat: Chat): string {
@@ -43,6 +45,7 @@ export function ConversationList({
 	isLoading,
 	selectedChatId,
 	onSelect,
+	filters,
 }: ConversationListProps) {
 	const [showNewChat, setShowNewChat] = useState(false);
 	const [phone, setPhone] = useState("");
@@ -85,9 +88,9 @@ export function ConversationList({
 				</Button>
 			</div>
 
-			<div className="p-2 border-b">
-				<div className="relative">
-					<SearchIcon className="left-2.5 size-4 absolute top-1/2 -translate-y-1/2 text-foreground/40" />
+			<div className="gap-2 p-2 flex flex-wrap items-center border-b">
+				<div className="min-w-40 relative flex-1">
+					<SearchIcon className="left-2.5 size-4 absolute top-1/2 -translate-y-1/2 text-foreground/75" />
 					<Input
 						className="h-9 pl-8"
 						placeholder="Search name or number…"
@@ -95,6 +98,7 @@ export function ConversationList({
 						onChange={(e) => setSearch(e.target.value)}
 					/>
 				</div>
+				{filters}
 			</div>
 
 			{showNewChat && (
@@ -129,7 +133,7 @@ export function ConversationList({
 							<InboxIcon className="size-5 text-primary" />
 						</div>
 						<p className="font-medium text-sm">{search ? "No matches" : "No conversations yet"}</p>
-						<p className="text-xs text-foreground/60">
+						<p className="text-xs text-foreground/75">
 							{search
 								? "Try a different name or number."
 								: "Incoming messages appear here, or start a new chat."}
@@ -180,7 +184,7 @@ function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
 					<span className={cn("text-sm truncate", hasUnread ? "font-semibold" : "font-medium")}>
 						{name}
 					</span>
-					<span className="shrink-0 text-[11px] text-foreground/40">
+					<span className="shrink-0 text-[11px] text-foreground/55">
 						{relativeTime(chat.lastMessageAt)}
 					</span>
 				</div>
@@ -200,7 +204,7 @@ function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
 					)}
 				</div>
 				{numberLabel && (
-					<span className="mt-0.5 block truncate text-[10px] text-foreground/40">
+					<span className="mt-0.5 block truncate text-[10px] text-foreground/55">
 						via {numberLabel}
 					</span>
 				)}

@@ -27,13 +27,13 @@ export function LinkPreview({ url }: { url: string }) {
 			) : null}
 			<div className="gap-0.5 p-2 flex flex-col">
 				{data.siteName ? (
-					<span className="tracking-wide truncate text-[10px] text-foreground/40 uppercase">
+					<span className="tracking-wide truncate text-[10px] text-foreground/55 uppercase">
 						{data.siteName}
 					</span>
 				) : null}
 				{data.title ? <span className="font-medium text-xs line-clamp-2">{data.title}</span> : null}
 				{data.description ? (
-					<span className="line-clamp-2 text-[11px] text-foreground/60">{data.description}</span>
+					<span className="line-clamp-2 text-[11px] text-foreground/75">{data.description}</span>
 				) : null}
 			</div>
 		</a>
