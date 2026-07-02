@@ -19,6 +19,13 @@ import { createOpenWaClient } from "@repo/whatsapp";
 
 import type { CanonicalMessage, FanOutDeps } from "./fan-out";
 
+/** Hard cap on the in-request pre-send delay so a delivery-URL post can't hang. */
+const MAX_SEND_DELAY_MS = 15_000;
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * The contact's phone in E.164-ish form for CRM matching. Trust order:
  * 1. `senderPhone` (OpenWA's `@lid` → phone resolution) — the only valid source
@@ -152,6 +159,11 @@ export function createFanOutDeps(): FanOutDeps {
 					subaccountId: message.subaccountId,
 				});
 				return { waMessageId: null };
+			}
+			// Human-like delay from a `!/DELAY/x/y/!` directive. Capped so a synchronous
+			// delivery-URL request can't hang (mirrors MAX_DELAY_MS in @repo/whatsapp send).
+			if (message.sendDelayMs && message.sendDelayMs > 0) {
+				await sleep(Math.min(message.sendDelayMs, MAX_SEND_DELAY_MS));
 			}
 			const openwa = createOpenWaClient();
 			const result = await openwa.sendText(session.openwaSessionId, {

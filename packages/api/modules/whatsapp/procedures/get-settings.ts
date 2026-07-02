@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
+import { parseMessageTemplates } from "../types";
 
 export const getSettings = protectedProcedure
 	.route({
@@ -11,7 +12,8 @@ export const getSettings = protectedProcedure
 		path: "/whatsapp/settings",
 		tags: ["WhatsApp"],
 		summary: "Get WhatsApp settings",
-		description: "Global spintax variables for the resolved subaccount.",
+		description:
+			"Global spintax variables and saved bulk-message templates for the resolved subaccount.",
 	})
 	.input(z.object({ subaccountId: z.string().optional() }))
 	.handler(async ({ input, context: { user, session } }) => {
@@ -19,6 +21,7 @@ export const getSettings = protectedProcedure
 
 		const settings = await getWhatsAppSettings(subaccount.id);
 		const globalSpintax = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
+		const messageTemplates = parseMessageTemplates(settings?.messageTemplates);
 
-		return { globalSpintax };
+		return { globalSpintax, messageTemplates };
 	});

@@ -151,6 +151,16 @@ export class GoHighLevelClient {
 		return res.contact as GHLContact;
 	}
 
+	/** A page of the location's contacts (newest first), for sample/preview use. */
+	async listContacts(limit = 20): Promise<GHLContact[]> {
+		const params = new URLSearchParams({
+			locationId: this.locationId,
+			limit: String(limit),
+		});
+		const res = await this.request<GHLApiResponse<GHLContact>>(`/contacts/?${params.toString()}`);
+		return res.contacts ?? [];
+	}
+
 	async searchContactsByEmail(email: string): Promise<GHLContact[]> {
 		const params = new URLSearchParams({
 			locationId: this.locationId,

@@ -7,6 +7,7 @@ import {
 	getOrganizationById,
 	getSubaccount,
 	getSubaccountByLocationId,
+	getWhatsAppSettings,
 	setConversationContactName,
 	setConversationTags,
 	updateSubaccount,
@@ -23,7 +24,7 @@ import {
 } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { getBaseUrl } from "@repo/utils";
-import { toChatId } from "@repo/whatsapp";
+import { type GlobalSpintax, toChatId } from "@repo/whatsapp";
 
 import {
 	EMBEDDED_COOKIE,
@@ -34,6 +35,7 @@ import {
 import { createFanOutDeps } from "../messaging/deps";
 import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
+import { resolveOutboundCommand } from "./resolve-command";
 
 function saasBaseUrl(): string {
 	return getBaseUrl(process.env.NEXT_PUBLIC_SAAS_URL, 3000);
@@ -192,6 +194,20 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	}
 	const session = await getDefaultSession(subaccount.id);
 
+	// Resolve commands (spintax + delay) against this subaccount's global spintax
+	// BEFORE fan-out, so the persisted/mirrored body is the real per-recipient
+	// variation — a bulk send POSTs the same raw template for every recipient.
+	const settings = await getWhatsAppSettings(subaccount.id);
+	const globals = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
+	const resolved = resolveOutboundCommand(body, globals);
+	if (resolved.unresolved.length > 0) {
+		logger.warn("Provider outbound had undefined spintax", {
+			ctx: "ghl.provider.outbound",
+			locationId,
+			unresolved: resolved.unresolved,
+		});
+	}
+
 	try {
 		const result = await fanOutMessage(
 			{
@@ -201,7 +217,8 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 				chatId: toChatId(phone),
 				direction: "outbound",
 				origin: "ghl",
-				body,
+				body: resolved.text,
+				sendDelayMs: resolved.delayMs,
 				type: "text",
 				attachments,
 				ghlMessageId: ghlMessageId ?? null,
