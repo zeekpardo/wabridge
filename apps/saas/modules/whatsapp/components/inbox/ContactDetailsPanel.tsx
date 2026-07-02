@@ -335,19 +335,15 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						))}
 					</div>
 
-					{/* GHL status */}
-					<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
-						{profile.ghl.connected ? (
-							<p className="text-foreground/60">
-								Synced with GoHighLevel. Owner and tag changes will propagate to the contact.
-							</p>
-						) : (
+					{/* GHL status — only surfaced when there's something actionable. */}
+					{profile.ghl.connected ? null : (
+						<div className="p-3 text-xs mt-auto rounded-lg border border-dashed">
 							<p className="text-foreground/60">
 								<span className="font-medium text-foreground">GoHighLevel not connected.</span>{" "}
 								Owner and tags are saved here and will sync to the contact once you connect GHL.
 							</p>
-						)}
-					</div>
+						</div>
+					)}
 				</div>
 			)}
 		</div>
