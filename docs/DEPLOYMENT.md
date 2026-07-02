@@ -145,14 +145,16 @@ SSRF_ALLOWED_HOSTS=${{saas.RAILWAY_PRIVATE_DOMAIN}},localhost
 ## Phase 3 — Post-deploy wiring
 
 1. **Run migrations** (Phase 0) against the Postgres **public** URL.
-2. **Reconcile cron** — schedule a POST every 1–2 min so sessions dropped by an
-   OpenWA restart are re-started (reconnecting without QR because the Volume
-   kept the creds):
+2. **Session self-heal** — the saas app runs a built-in reconcile loop (Next
+   `instrumentation.ts` → `startReconcileLoop`) that re-starts any sessions
+   OpenWA dropped on restart, reconnecting without a QR because the Volume kept
+   the creds. Runs every `RECONCILE_INTERVAL_MS` ms (default 120000; set `0` to
+   disable). No external scheduler required. The embedded inbox also reconciles
+   on load. As a manual/backup trigger the cron route accepts GET or POST:
    ```
    curl -X POST https://app.<domain>/api/cron/whatsapp-reconcile \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
-   Use a small Railway cron service or an external scheduler.
 3. **Smoke test** — sign in, connect a number (QR), send a test message, confirm
    inbound webhooks land (OpenWA → saas private).
 

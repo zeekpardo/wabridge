@@ -2,6 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/components/tabs";
 
+import { ConnectionBanner } from "./inbox/ConnectionBanner";
 import { WhatsAppInbox } from "./inbox/WhatsAppInbox";
 import { SubaccountSettings } from "./SubaccountSettings";
 import { WhatsAppNumbers } from "./WhatsAppNumbers";
@@ -18,6 +19,7 @@ export function WhatsAppTabs({
 	if (embedded) {
 		return (
 			<Tabs defaultValue="inbox" className="gap-0 flex h-full flex-col">
+				<ConnectionBanner subaccountId={subaccountId} />
 				<TabsList className="px-2 shrink-0 justify-start rounded-none border-b bg-card">
 					<TabsTrigger value="inbox">Inbox</TabsTrigger>
 					<TabsTrigger value="numbers">Connections</TabsTrigger>
