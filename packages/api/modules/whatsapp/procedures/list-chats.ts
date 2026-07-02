@@ -108,7 +108,16 @@ export const listChats = protectedProcedure
 		description:
 			"All chats pulled from the subaccount's connected number(s) via OpenWA, merged and overlaid with tracked conversation state (unread, active number).",
 	})
-	.input(z.object({ subaccountId: z.string().optional() }))
+	.input(
+		z.object({
+			subaccountId: z.string().optional(),
+			/** Restrict to threads whose cached owner id matches. */
+			ownerId: z.string().optional(),
+			/** Restrict by a tag the thread has ("has") or lacks ("not"). */
+			tag: z.string().optional(),
+			tagMode: z.enum(["has", "not"]).optional(),
+		}),
+	)
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
@@ -174,7 +183,31 @@ export const listChats = protectedProcedure
 			}
 		}
 
-		const deduped = dedupeByContact(items);
+		let deduped = dedupeByContact(items);
+
+		// Owner / tag filters operate on the cached conversation row (owner id and
+		// tags synced from GHL). Threads with no conversation row — or not yet
+		// synced — carry no owner/tags, so they fall out of an active filter.
+		const tagFilter = input.tag?.trim().toLowerCase();
+		if (input.ownerId || tagFilter) {
+			deduped = deduped.filter((item) => {
+				const convo = convoByChat.get(item.chatId);
+				if (input.ownerId && convo?.ownerId !== input.ownerId) {
+					return false;
+				}
+				if (tagFilter) {
+					const tags = Array.isArray(convo?.tags)
+						? (convo.tags as unknown[]).filter((t): t is string => typeof t === "string")
+						: [];
+					const has = tags.some((t) => t.toLowerCase() === tagFilter);
+					if (input.tagMode === "not" ? has : !has) {
+						return false;
+					}
+				}
+				return true;
+			});
+		}
+
 		deduped.sort((a, b) => (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0));
 
 		return deduped;

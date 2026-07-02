@@ -1,9 +1,4 @@
-import {
-	getConversation,
-	getGhlConnection,
-	listOrganizationMembers,
-	setConversationOwner,
-} from "@repo/database";
+import { getConversation, getGhlConnection, setConversationOwner } from "@repo/database";
 import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
@@ -60,31 +55,13 @@ export const setContactOwner = protectedProcedure
 
 		await client.updateContact(conversation.ghlContactId, { assignedTo: input.ownerId });
 
-		// Cache the email-matched agency member locally (null when the GHL user
-		// isn't a member) so app-internal surfaces have a member to point at.
-		let memberOwnerId: string | null = null;
-		if (input.ownerId) {
-			try {
-				const [users, members] = await Promise.all([
-					client.getUsers(),
-					listOrganizationMembers(subaccount.organizationId),
-				]);
-				const email = users.find((u) => u.id === input.ownerId)?.email?.toLowerCase();
-				memberOwnerId = email
-					? (members.find((member) => member.user.email.toLowerCase() === email)?.userId ?? null)
-					: null;
-			} catch (error) {
-				logger.warn("GHL owner member-cache mapping failed", {
-					ctx: "whatsapp.contactOwner",
-					error: error instanceof Error ? error.message : String(error),
-				});
-			}
-		}
+		// Cache the GHL user id as the thread's display owner so the panel and the
+		// conversation-list owner filter agree (same identity as the dropdown).
 		await setConversationOwner({
 			subaccountId: subaccount.id,
 			organizationId: subaccount.organizationId,
 			chatId: input.chatId,
-			ownerId: memberOwnerId,
+			ownerId: input.ownerId,
 		});
 
 		return { ok: true };

@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 
 import { Composer } from "./Composer";
 import { ContactDetailsPanel } from "./ContactDetailsPanel";
+import { ConversationFilters } from "./ConversationFilters";
 import { ConversationList } from "./ConversationList";
 import { prettyPhone } from "./helpers";
 import { MessageThread } from "./MessageThread";
@@ -36,10 +37,20 @@ export function WhatsAppInbox({
 		() => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
 	);
 
+	// Conversation-list filters (owner / tag). Cleared = no filter.
+	const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+	const [tagFilter, setTagFilter] = useState<{ tag: string; mode: "has" | "not" } | null>(null);
+
 	// Full chat list pulled from OpenWA (all contacts), overlaid with our tracked
 	// conversation state. Heavier than the DB-only list, so polled less often.
 	const conversationsQuery = useQuery({
-		...orpc.whatsapp.listChats.queryOptions({ input: { subaccountId } }),
+		...orpc.whatsapp.listChats.queryOptions({
+			input: {
+				subaccountId,
+				...(ownerFilter ? { ownerId: ownerFilter } : {}),
+				...(tagFilter ? { tag: tagFilter.tag, tagMode: tagFilter.mode } : {}),
+			},
+		}),
 		refetchInterval: 15000,
 	});
 
@@ -144,16 +155,25 @@ export function WhatsAppInbox({
 		>
 			<div
 				className={cn(
-					"md:w-1/4 md:min-w-56 w-full shrink-0 border-r",
-					selectedChatId ? "md:block hidden" : "block",
+					"md:w-1/4 md:min-w-56 w-full shrink-0 flex-col border-r",
+					selectedChatId ? "md:flex hidden" : "flex",
 				)}
 			>
-				<ConversationList
-					conversations={conversations}
-					isLoading={conversationsQuery.isLoading}
-					selectedChatId={selectedChatId}
-					onSelect={setSelectedChatId}
+				<ConversationFilters
+					subaccountId={subaccountId}
+					ownerFilter={ownerFilter}
+					onOwnerChange={setOwnerFilter}
+					tagFilter={tagFilter}
+					onTagChange={setTagFilter}
 				/>
+				<div className="min-h-0 flex-1">
+					<ConversationList
+						conversations={conversations}
+						isLoading={conversationsQuery.isLoading}
+						selectedChatId={selectedChatId}
+						onSelect={setSelectedChatId}
+					/>
+				</div>
 			</div>
 
 			<div className={cn("flex-1 flex-col", selectedChatId ? "flex" : "md:flex hidden")}>

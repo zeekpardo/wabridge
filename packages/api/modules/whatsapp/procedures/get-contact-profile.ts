@@ -182,19 +182,22 @@ export const getContactProfile = protectedProcedure
 
 		// Owner: connected subaccounts assign in GHL terms — the dropdown lists
 		// GHL staff, so the selected value is the GHL assignee id. Standalone
-		// subaccounts use the local member owner. The email-matched member (when
-		// one exists) is still cached on the thread for app-internal use.
+		// subaccounts use the local member owner. `ghlOwnerId` (email-matched
+		// member) still drives the "assignee isn't a member" hint.
 		const localOwnerId =
 			conversation?.ownerId && members.some((member) => member.userId === conversation.ownerId)
 				? conversation.ownerId
 				: null;
 		const ownerId = ghl ? (ghlContact?.assignedTo ?? null) : localOwnerId;
-		if (ghlOwnerId && ghlOwnerId !== conversation?.ownerId) {
+		// Cache the DISPLAY owner id on the thread (GHL user id when connected,
+		// member id standalone) so the conversation list can filter by owner
+		// without a per-row GHL call — and so the panel and list agree.
+		if (ghl && ownerId !== (conversation?.ownerId ?? null)) {
 			await setConversationOwner({
 				subaccountId: subaccount.id,
 				organizationId: subaccount.organizationId,
 				chatId: input.chatId,
-				ownerId: ghlOwnerId,
+				ownerId,
 			});
 		}
 
