@@ -14,3 +14,19 @@ export function getBaseUrl(envValue?: string, defaultPort = 3000): string {
 	}
 	return `http://localhost:${process.env.PORT ?? defaultPort}`;
 }
+
+/**
+ * All origins the app is served from: the canonical base URL plus any extra
+ * domains listed in ADDITIONAL_TRUSTED_ORIGINS (comma-separated). Lets the app
+ * run on a custom domain AND the Railway-provided one simultaneously — auth
+ * (better-auth trustedOrigins) and API CORS both accept every listed origin,
+ * while emails/OAuth redirects keep using the canonical base URL.
+ */
+export function getTrustedOrigins(envValue?: string, defaultPort = 3000): string[] {
+	const canonical = getBaseUrl(envValue, defaultPort);
+	const extra = (process.env.ADDITIONAL_TRUSTED_ORIGINS ?? "")
+		.split(",")
+		.map((origin) => origin.trim().replace(/\/+$/, ""))
+		.filter(Boolean);
+	return [...new Set([canonical, ...extra])];
+}
