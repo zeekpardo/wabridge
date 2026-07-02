@@ -3,6 +3,7 @@ import {
 	getGhlConnection,
 	listOrganizationMembers,
 	setConversationContactName,
+	setConversationTags,
 } from "@repo/database";
 import {
 	createGoHighLevelClient,
@@ -117,9 +118,23 @@ export const getContactProfile = protectedProcedure
 			});
 		}
 
-		const tags = Array.isArray(conversation?.tags)
+		const localTags = Array.isArray(conversation?.tags)
 			? (conversation.tags as unknown[]).filter((tag): tag is string => typeof tag === "string")
 			: [];
+		// GHL's tags win when linked; cache them locally so standalone views and
+		// the next panel load agree even if GHL is briefly unreachable.
+		const tags = ghlContact?.tags ?? localTags;
+		if (
+			ghlContact?.tags &&
+			JSON.stringify([...ghlContact.tags].sort()) !== JSON.stringify([...localTags].sort())
+		) {
+			await setConversationTags({
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				chatId: input.chatId,
+				tags: ghlContact.tags,
+			});
+		}
 
 		// Keep the owner id only if it still maps to a current member.
 		const ownerId =
