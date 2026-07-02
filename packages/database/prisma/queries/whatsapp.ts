@@ -226,6 +226,11 @@ export async function setConversationGhlLink(data: {
 	});
 }
 
+/** The thread linked to a GHL contact, if any (webhook → conversation routing). */
+export async function getConversationByGhlContactId(subaccountId: string, ghlContactId: string) {
+	return db.whatsAppConversation.findFirst({ where: { subaccountId, ghlContactId } });
+}
+
 /** Cache a contact's display name on the thread (feeds the conversation list). */
 export async function setConversationContactName(data: {
 	subaccountId: string;

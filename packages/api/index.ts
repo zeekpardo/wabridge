@@ -8,6 +8,7 @@ import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 
 import {
+	ghlAppWebhookHandler,
 	ghlAuthorizeHandler,
 	ghlCallbackHandler,
 	ghlProviderOutboundHandler,
@@ -46,6 +47,8 @@ export const app = new Hono()
 	.post("/ghl-sso/decrypt", (c) => ghlSsoDecryptHandler(c.req.raw))
 	// Conversation-provider Delivery URL (SMS takeover — GHL → WhatsApp)
 	.post("/providers/sms/outbound", (c) => ghlProviderOutboundHandler(c.req.raw))
+	// Marketplace app webhooks (contact lifecycle → local cache refresh)
+	.post("/webhooks/gohighlevel", (c) => ghlAppWebhookHandler(c.req.raw))
 	// Health check
 	.get("/health", (c) => c.text("OK"))
 	// oRPC handlers (for RPC and OpenAPI)

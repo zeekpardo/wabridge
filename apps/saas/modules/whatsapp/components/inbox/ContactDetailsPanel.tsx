@@ -30,9 +30,12 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	const [tagInput, setTagInput] = useState("");
 	const [addingTag, setAddingTag] = useState(false);
 
-	const profileQuery = useQuery(
-		orpc.whatsapp.getContactProfile.queryOptions({ input: { chatId, subaccountId } }),
-	);
+	const profileQuery = useQuery({
+		...orpc.whatsapp.getContactProfile.queryOptions({ input: { chatId, subaccountId } }),
+		// Keep an open panel tracking CRM-side edits (the procedure reads through
+		// to the live GHL contact).
+		refetchInterval: 8000,
+	});
 	const ownersQuery = useQuery(
 		orpc.whatsapp.listContactOwners.queryOptions({ input: { subaccountId } }),
 	);
@@ -47,6 +50,22 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	const setTags = useMutation(
 		orpc.whatsapp.setContactTags.mutationOptions({ onSuccess: invalidateProfile }),
 	);
+	const setFields = useMutation(
+		orpc.whatsapp.setContactFields.mutationOptions({ onSuccess: invalidateProfile }),
+	);
+
+	const [editingField, setEditingField] = useState<{ key: string; value: string } | null>(null);
+
+	function saveField() {
+		if (!editingField) {
+			return;
+		}
+		const { key, value } = editingField;
+		setEditingField(null);
+		if (key === "firstName" || key === "lastName" || key === "email") {
+			setFields.mutate({ chatId, subaccountId, [key]: value.trim() });
+		}
+	}
 
 	const profile = profileQuery.data;
 	const owners = ownersQuery.data ?? [];
@@ -207,7 +226,37 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						{profile.fields.map((field) => (
 							<div key={field.key} className="gap-0.5 flex flex-col">
 								<span className="text-[11px] text-foreground/50">{field.label}</span>
-								<span className="text-sm">{field.value || "—"}</span>
+								{editingField?.key === field.key ? (
+									<Input
+										// oxlint-disable-next-line no-autofocus
+										autoFocus
+										value={editingField.value}
+										className="h-7 text-sm"
+										onChange={(event) =>
+											setEditingField({ key: field.key, value: event.target.value })
+										}
+										onBlur={saveField}
+										onKeyDown={(event) => {
+											if (event.key === "Enter") {
+												event.preventDefault();
+												saveField();
+											} else if (event.key === "Escape") {
+												setEditingField(null);
+											}
+										}}
+									/>
+								) : field.editable ? (
+									<button
+										type="button"
+										className="text-sm -mx-1 rounded px-1 text-left hover:bg-foreground/5"
+										title={`Edit ${field.label.toLowerCase()}`}
+										onClick={() => setEditingField({ key: field.key, value: field.value ?? "" })}
+									>
+										{field.value || <span className="text-foreground/40">—</span>}
+									</button>
+								) : (
+									<span className="text-sm">{field.value || "—"}</span>
+								)}
 							</div>
 						))}
 					</div>

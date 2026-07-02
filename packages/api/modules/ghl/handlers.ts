@@ -1,11 +1,14 @@
 import { auth } from "@repo/auth";
 import {
 	createSubaccount,
+	getConversationByGhlContactId,
 	getDefaultSession,
 	getGhlConnectionByLocationId,
 	getOrganizationById,
 	getSubaccount,
 	getSubaccountByLocationId,
+	setConversationContactName,
+	setConversationTags,
 	updateSubaccount,
 	upsertGhlConnection,
 } from "@repo/database";
@@ -15,6 +18,7 @@ import {
 	encrypt,
 	exchangeGhlCode,
 	getGhlAuthUrl,
+	ghlContactDisplayName,
 	verifyGhlWebhookSignature,
 } from "@repo/integrations";
 import { logger } from "@repo/logs";
@@ -314,4 +318,112 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 		`${EMBEDDED_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${60 * 60 * 12}`,
 	);
 	return response;
+}
+
+// ─── Marketplace app webhooks (GHL → us) ─────────────────────────────────────
+
+/**
+ * Short-TTL webhook dedupe: absorbs GHL's burst/retry duplicates without
+ * suppressing legitimate follow-up updates to the same contact. In-memory is
+ * fine — a missed dedupe just refreshes the same caches twice.
+ */
+const WEBHOOK_DEDUP_TTL_MS = 30_000;
+const recentGhlEvents = new Map<string, number>();
+
+function isDuplicateGhlEvent(type: string, contactId: string, locationId: string): boolean {
+	const now = Date.now();
+	if (recentGhlEvents.size > 500) {
+		for (const [key, expiresAt] of recentGhlEvents) {
+			if (expiresAt < now) {
+				recentGhlEvents.delete(key);
+			}
+		}
+	}
+	const key = `${type}:${contactId}:${locationId}`;
+	const expiresAt = recentGhlEvents.get(key);
+	if (expiresAt && expiresAt > now) {
+		return true;
+	}
+	recentGhlEvents.set(key, now + WEBHOOK_DEDUP_TTL_MS);
+	return false;
+}
+
+/**
+ * POST /api/webhooks/gohighlevel — the marketplace app's webhook URL. GHL posts
+ * contact lifecycle events here; for threads linked to the contact we refresh
+ * the local caches (display name, tags) from the live contact, so edits made
+ * on the GHL profile appear in the app without waiting for a panel load.
+ *
+ * All responses are 200 so GHL doesn't retry-storm; unknown locations/contacts
+ * are acknowledged quietly. Effects are benign cache refreshes scoped to a
+ * known location, read back from GHL's API rather than trusting the payload.
+ * TODO(prod): verify X-WH-Signature once the app's webhook public key is wired.
+ */
+export async function ghlAppWebhookHandler(req: Request): Promise<Response> {
+	let payload: Record<string, unknown>;
+	try {
+		payload = (await req.json()) as Record<string, unknown>;
+	} catch {
+		return new Response("Invalid body.", { status: 400 });
+	}
+
+	const type = str(payload.type);
+	const locationId = str(payload.locationId);
+	const contactId = str(payload.id) ?? str(payload.contactId);
+	if (!type || !locationId || !contactId || !type.startsWith("Contact")) {
+		return new Response("Ignored.", { status: 200 });
+	}
+	if (isDuplicateGhlEvent(type, contactId, locationId)) {
+		return new Response("Duplicate.", { status: 200 });
+	}
+
+	const subaccount = await getSubaccountByLocationId(locationId);
+	if (!subaccount) {
+		return new Response("Unknown location.", { status: 200 });
+	}
+	const conversation = await getConversationByGhlContactId(subaccount.id, contactId);
+	if (!conversation) {
+		return new Response("No linked thread.", { status: 200 });
+	}
+
+	if (type === "ContactDelete") {
+		// The GHL contact is gone; a future message re-links (or re-creates) it.
+		logger.info("GHL contact deleted; thread keeps local data", {
+			ctx: "ghl.webhook",
+			chatId: conversation.chatId,
+		});
+		return new Response("OK", { status: 200 });
+	}
+
+	try {
+		const client = await createGoHighLevelClient(subaccount.id);
+		if (!client) {
+			return new Response("OK", { status: 200 });
+		}
+		const contact = await client.getContact(contactId);
+		const name = ghlContactDisplayName(contact);
+		if (name && name !== conversation.contactName) {
+			await setConversationContactName({
+				subaccountId: subaccount.id,
+				chatId: conversation.chatId,
+				contactName: name,
+			});
+		}
+		if (contact.tags) {
+			await setConversationTags({
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				chatId: conversation.chatId,
+				tags: contact.tags,
+			});
+		}
+	} catch (error) {
+		logger.warn("GHL webhook contact refresh failed", {
+			ctx: "ghl.webhook",
+			contactId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+
+	return new Response("OK", { status: 200 });
 }

@@ -23,6 +23,7 @@ import { reconcileSessions } from "./procedures/reconcile-sessions";
 import { requestPairingCode } from "./procedures/request-pairing-code";
 import { sendMessage } from "./procedures/send-message";
 import { sendTestMessage } from "./procedures/send-test-message";
+import { setContactFields } from "./procedures/set-contact-fields";
 import { setContactOwner } from "./procedures/set-contact-owner";
 import { setContactTags } from "./procedures/set-contact-tags";
 import { setConversationNumber } from "./procedures/set-conversation-number";
@@ -61,4 +62,5 @@ export const whatsappRouter = {
 	listContactOwners,
 	setContactOwner,
 	setContactTags,
+	setContactFields,
 };
