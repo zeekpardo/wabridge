@@ -1,7 +1,7 @@
 import { auth } from "@repo/auth";
 import { logger } from "@repo/logs";
 import { webhookHandler as paymentsWebhookHandler } from "@repo/payments";
-import { getBaseUrl } from "@repo/utils";
+import { getTrustedOrigins } from "@repo/utils";
 import { webhookHandler as openwaWebhookHandler } from "@repo/whatsapp";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -26,7 +26,8 @@ export const app = new Hono()
 	// Cors middleware
 	.use(
 		cors({
-			origin: getBaseUrl(process.env.NEXT_PUBLIC_SAAS_URL, 3000),
+			// Canonical domain + ADDITIONAL_TRUSTED_ORIGINS (custom + Railway domains).
+			origin: getTrustedOrigins(process.env.NEXT_PUBLIC_SAAS_URL, 3000),
 			allowHeaders: ["Content-Type", "Authorization"],
 			allowMethods: ["POST", "GET", "OPTIONS"],
 			exposeHeaders: ["Content-Length"],

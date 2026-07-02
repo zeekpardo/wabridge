@@ -12,7 +12,7 @@ import { logger } from "@repo/logs";
 import { sendEmail } from "@repo/mail";
 import { createWelcomeNotification } from "@repo/notifications";
 import { cancelSubscription } from "@repo/payments";
-import { getBaseUrl } from "@repo/utils";
+import { getBaseUrl, getTrustedOrigins } from "@repo/utils";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
@@ -31,8 +31,11 @@ const getLocaleFromRequest = (request?: Request) => {
 const appUrl = getBaseUrl(process.env.NEXT_PUBLIC_SAAS_URL, 3000);
 
 export const auth = betterAuth({
+	// Canonical URL: drives email links (magic link, invites) and OAuth redirects.
 	baseURL: appUrl,
-	trustedOrigins: [appUrl],
+	// Every origin the app is served from (canonical + ADDITIONAL_TRUSTED_ORIGINS),
+	// so auth works from both the custom domain and the Railway-provided one.
+	trustedOrigins: getTrustedOrigins(process.env.NEXT_PUBLIC_SAAS_URL, 3000),
 	database: prismaAdapter(db, {
 		provider: "postgresql",
 	}),
@@ -221,7 +224,11 @@ export const auth = betterAuth({
 		admin(),
 		passkey(),
 		magicLink({
-			disableSignUp: false,
+			// Invite-only: a magic link must never CREATE an account (that would
+			// bypass invitationOnlyPlugin, which only guards /sign-up/email).
+			// Existing users still sign in via magic link; invited users create
+			// their account through the invitation signup flow first.
+			disableSignUp: true,
 			sendMagicLink: async ({ email, url }, ctx) => {
 				const request = ctx?.request as Request;
 
