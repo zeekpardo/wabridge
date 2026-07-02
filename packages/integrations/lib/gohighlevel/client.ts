@@ -13,6 +13,7 @@ import type {
 	GHLOutboundMessageInput,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
+	GHLUser,
 } from "./types";
 
 const GHL_API_BASE = "https://services.leadconnectorhq.com";
@@ -204,6 +205,18 @@ export class GoHighLevelClient {
 	async getLocation(): Promise<GHLLocation> {
 		const res = await this.request<{ location: GHLLocation }>(`/locations/${this.locationId}`);
 		return res.location;
+	}
+
+	// ─── Users ────────────────────────────────────────────────────────────────
+
+	/**
+	 * The location's staff users — used to map GHL `assignedTo` ids to app
+	 * members by email. Requires the users.readonly scope.
+	 * GET /users/?locationId=
+	 */
+	async getUsers(): Promise<GHLUser[]> {
+		const res = await this.request<{ users: GHLUser[] }>(`/users/?locationId=${this.locationId}`);
+		return res.users ?? [];
 	}
 
 	// ─── Conversations / Messages ────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
 	getGhlConnection,
 	listOrganizationMembers,
 	setConversationContactName,
+	setConversationOwner,
 	setConversationTags,
 } from "@repo/database";
 import {
@@ -88,17 +89,57 @@ export const getContactProfile = protectedProcedure
 		]);
 
 		// Read-through to the live GHL contact when linked — GHL is the source of
-		// truth for name/email/phone then. Best-effort: a GHL hiccup falls back to
-		// the local snapshot.
+		// truth for name/email/phone/tags/owner then. Best-effort: a GHL hiccup
+		// falls back to the local snapshot.
 		let ghlContact: GHLContact | null = null;
+		let client: Awaited<ReturnType<typeof createGoHighLevelClient>> = null;
 		if (ghl && conversation?.ghlContactId) {
 			try {
-				const client = await createGoHighLevelClient(subaccount.id);
+				client = await createGoHighLevelClient(subaccount.id);
 				ghlContact = client ? await client.getContact(conversation.ghlContactId) : null;
 			} catch (error) {
 				logger.warn("GHL contact read-through failed", {
 					ctx: "whatsapp.contactProfile",
 					ghlContactId: conversation.ghlContactId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		// GHL assignedTo → app member, matched by email via the location's users
+		// (users.readonly). Unmappable assignments fall back to the local owner.
+		let ghlOwnerId: string | null = null;
+		if (client && ghlContact?.assignedTo) {
+			try {
+				const users = await client.getUsers();
+				const assignee = users.find((u) => u.id === ghlContact.assignedTo);
+				const email = assignee?.email?.toLowerCase();
+				ghlOwnerId = email
+					? (members.find((member) => member.user.email.toLowerCase() === email)?.userId ?? null)
+					: null;
+			} catch (error) {
+				logger.warn("GHL owner mapping failed", {
+					ctx: "whatsapp.contactProfile",
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		// Custom field values with their definition names (display-only).
+		let customFields: ContactField[] = [];
+		if (client && ghlContact?.customFields?.length) {
+			try {
+				const definitions = await client.getCustomFields();
+				const nameById = new Map(definitions.map((def) => [def.id, def.name]));
+				customFields = ghlContact.customFields.map((field) => ({
+					key: `custom:${field.id}`,
+					label: nameById.get(field.id) ?? "Custom field",
+					value: Array.isArray(field.value) ? field.value.join(", ") : (field.value ?? null),
+					editable: false,
+				}));
+			} catch (error) {
+				logger.warn("GHL custom fields fetch failed", {
+					ctx: "whatsapp.contactProfile",
 					error: error instanceof Error ? error.message : String(error),
 				});
 			}
@@ -136,11 +177,22 @@ export const getContactProfile = protectedProcedure
 			});
 		}
 
-		// Keep the owner id only if it still maps to a current member.
-		const ownerId =
+		// Owner: the GHL assignment wins when it maps to a member; otherwise keep
+		// the local owner (if still a current member). Cache the mapped owner so
+		// other surfaces agree.
+		const localOwnerId =
 			conversation?.ownerId && members.some((member) => member.userId === conversation.ownerId)
 				? conversation.ownerId
 				: null;
+		const ownerId = ghlOwnerId ?? localOwnerId;
+		if (ghlOwnerId && ghlOwnerId !== conversation?.ownerId) {
+			await setConversationOwner({
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				chatId: input.chatId,
+				ownerId: ghlOwnerId,
+			});
+		}
 
 		const nameParts = name.split(/\s+/);
 		const splitFirst = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : name;
@@ -161,6 +213,7 @@ export const getContactProfile = protectedProcedure
 			},
 			{ key: "phone", label: "Phone", value: phone, editable: false },
 			{ key: "email", label: "Email", value: ghlContact?.email?.trim() || null, editable: true },
+			...customFields,
 		];
 
 		const contactUrl =

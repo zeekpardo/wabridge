@@ -22,9 +22,22 @@ export interface GHLContact {
 	gender?: string | null;
 	source?: string | null;
 	attributionSource?: GHLAttributionSource | null;
+	/** GHL user id of the assigned owner, when set. */
+	assignedTo?: string | null;
 	createdBy?: string | null;
 	createdAt?: string;
 	updatedAt?: string;
+}
+
+/** A GHL location user (Settings → My Staff). Requires the users.readonly scope. */
+export interface GHLUser {
+	id: string;
+	name?: string;
+	firstName?: string;
+	lastName?: string;
+	email?: string;
+	phone?: string;
+	roles?: { type?: string; role?: string; locationIds?: string[] };
 }
 
 /**
@@ -74,6 +87,8 @@ export interface GHLContactUpdateInput {
 	phone?: string;
 	tags?: string[];
 	customFields?: GHLCustomFieldValue[];
+	/** GHL user id to assign as the contact's owner. */
+	assignedTo?: string;
 }
 
 export interface GHLApiResponse<T> {

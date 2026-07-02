@@ -32,6 +32,7 @@ export type {
 	GHLOutboundMessageInput,
 	GHLTokenResponse,
 	GHLUpdateMessageStatusInput,
+	GHLUser,
 } from "./lib/gohighlevel/types";
 
 export { createGoHighLevelClient } from "./lib/client-factories";
