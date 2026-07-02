@@ -36,6 +36,7 @@ import { createFanOutDeps } from "../messaging/deps";
 import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
 import { resolveOutboundCommand } from "./resolve-command";
+import { syncSubaccountNameFromGhl } from "./sync-subaccount-name";
 
 function saasBaseUrl(): string {
 	return getBaseUrl(process.env.NEXT_PUBLIC_SAAS_URL, 3000);
@@ -134,6 +135,10 @@ export async function ghlCallbackHandler(req: Request): Promise<Response> {
 			// bookkeeping only; Option B API calls don't send a provider id.
 			smsProviderId: process.env.GOHIGHLEVEL_SMS_PROVIDER_ID ?? null,
 		});
+
+		// Adopt the GHL location name (replaces the `GHL <locationId>` placeholder for
+		// freshly provisioned accounts; refreshes it for linked ones). Best-effort.
+		await syncSubaccountNameFromGhl(subaccountId);
 
 		const org = await getOrganizationById(state.organizationId);
 		const slug = org?.slug ?? "";

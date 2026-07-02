@@ -8,6 +8,7 @@ import { getChatHistory } from "./procedures/get-chat-history";
 import { getContactProfile } from "./procedures/get-contact-profile";
 import { getCustomFieldGroups } from "./procedures/get-custom-field-groups";
 import { getGhlOAuthUrl } from "./procedures/get-ghl-oauth-url";
+import { getGhlProvisionUrl } from "./procedures/get-ghl-provision-url";
 import { getQr } from "./procedures/get-qr";
 import { getSampleContact } from "./procedures/get-sample-contact";
 import { getSession } from "./procedures/get-session";
@@ -63,6 +64,7 @@ export const whatsappRouter = {
 	listNumbers,
 	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect
 	getGhlOAuthUrl,
+	getGhlProvisionUrl,
 	connectGoHighLevel,
 	disconnectGoHighLevel,
 	// Contact / CRM panel (prewired for GoHighLevel)

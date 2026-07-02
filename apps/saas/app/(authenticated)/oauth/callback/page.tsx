@@ -1,5 +1,9 @@
 "use client";
 
+import {
+	GHL_PROVISION_INTENT_KEY,
+	GHL_PROVISION_STATE,
+} from "@repo/api/modules/whatsapp/ghl-constants";
 import { Button } from "@repo/ui/components/button";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -38,7 +42,7 @@ export default function GhlCallbackPage() {
 		window.opener?.postMessage({ type: "OAUTH_CALLBACK_COMPLETE", success, error }, "*");
 	}
 
-	function runConnect(subaccountId: string) {
+	function runConnect(subaccountId?: string) {
 		if (!code) {
 			return;
 		}
@@ -83,9 +87,25 @@ export default function GhlCallbackPage() {
 			return;
 		}
 
+		// Provision intent: the sentinel state, or the localStorage flag the opener
+		// set (survives GHL dropping `state` on already-installed second locations).
+		const provisionIntent =
+			typeof window !== "undefined" && window.localStorage.getItem(GHL_PROVISION_INTENT_KEY);
+		if (provisionIntent) {
+			window.localStorage.removeItem(GHL_PROVISION_INTENT_KEY);
+		}
+
+		if (stateSubaccountId === GHL_PROVISION_STATE || provisionIntent) {
+			// Control Panel "Connect GoHighLevel" add flow: provision a new subaccount
+			// from the chosen location (no subaccount id to link).
+			runConnect(undefined);
+			return;
+		}
+
 		if (!stateSubaccountId) {
 			// GHL dropped `state` (already-installed reinstall / marketplace link):
-			// let the user pick which subaccount this location connects to.
+			// let the user pick which subaccount this location connects to, or create
+			// a fresh one from it.
 			setStatus("pick");
 			return;
 		}
@@ -109,32 +129,34 @@ export default function GhlCallbackPage() {
 					<LinkIcon className="size-12 text-primary" />
 					<h2 className="font-semibold text-xl">Almost there</h2>
 					<p className="max-w-md text-foreground/60">
-						Which subaccount should this GoHighLevel location connect to?
+						Create a new subaccount from this location, or connect it to an existing one.
 					</p>
-					{subaccountsQuery.isLoading ? (
-						<div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-					) : subaccounts.length === 0 ? (
-						<p className="text-sm text-foreground/50">
-							No subaccounts found — create one in the Control Panel first.
-						</p>
-					) : (
-						<div className="gap-2 max-w-sm flex w-full flex-col">
-							{subaccounts.map((sub) => (
-								<Button
-									key={sub.id}
-									variant="outline"
-									className="justify-between"
-									disabled={connect.isPending}
-									onClick={() => runConnect(sub.id)}
-								>
-									<span className="truncate">{sub.name}</span>
-									{sub.ghlConnected ? (
-										<span className="text-xs text-foreground/50">already connected</span>
-									) : null}
-								</Button>
-							))}
-						</div>
-					)}
+					<div className="gap-2 max-w-sm flex w-full flex-col">
+						<Button disabled={connect.isPending} onClick={() => runConnect(undefined)}>
+							Create a new subaccount from this location
+						</Button>
+						{subaccountsQuery.isLoading ? (
+							<div className="mt-2 size-6 animate-spin mx-auto rounded-full border-2 border-primary border-t-transparent" />
+						) : subaccounts.length > 0 ? (
+							<>
+								<p className="mt-1 text-xs text-foreground/45">or connect to an existing one</p>
+								{subaccounts.map((sub) => (
+									<Button
+										key={sub.id}
+										variant="outline"
+										className="justify-between"
+										disabled={connect.isPending || sub.ghlConnected}
+										onClick={() => runConnect(sub.id)}
+									>
+										<span className="truncate">{sub.name}</span>
+										{sub.ghlConnected ? (
+											<span className="text-xs text-foreground/50">already connected</span>
+										) : null}
+									</Button>
+								))}
+							</>
+						) : null}
+					</div>
 				</>
 			)}
 			{status === "success" && (
