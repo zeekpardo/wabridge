@@ -40,8 +40,11 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
     NEXT_PUBLIC_DOCS_URL=${NEXT_PUBLIC_DOCS_URL} \
     pnpm --filter saas build
 
-# Fold static assets into the standalone tree so the runtime serves them.
-RUN cp -r /app/apps/saas/.next/static /app/apps/saas/.next/standalone/apps/saas/.next/static 2>/dev/null || true
+# Fold static assets + the public dir into the standalone tree so the runtime
+# serves them (Next standalone copies neither automatically). public/ holds the
+# nav Logo (/logo.png).
+RUN cp -r /app/apps/saas/.next/static /app/apps/saas/.next/standalone/apps/saas/.next/static 2>/dev/null || true && \
+    cp -r /app/apps/saas/public /app/apps/saas/.next/standalone/apps/saas/public 2>/dev/null || true
 
 # ---- Stage 2: Runtime ----
 FROM node:22-bookworm-slim AS runner
