@@ -263,6 +263,10 @@ model WhatsAppMessage {
   timestamp      DateTime
   createdAt      DateTime        @default(now())
 
+  // One row per WhatsApp message per session: the API-send write and the
+  // message.sent webhook echo race, and check-then-insert can't close that
+  // window. NULLs are distinct in Postgres, so id-less rows are unaffected.
+  @@unique([sessionId, waMessageId])
   @@index([sessionId, timestamp])
   @@index([organizationId, chatId, timestamp])
   @@index([subaccountId, chatId, timestamp])

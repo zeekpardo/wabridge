@@ -271,17 +271,23 @@ export class GoHighLevelClient {
 	 * Record an outbound message that this provider sent on GHL's behalf, so the
 	 * conversation timeline shows the sent message. This is distinct from the
 	 * standard "send message" flow (which asks GHL to deliver); here the provider
-	 * delivered the message itself and is only writing the record back. Keyed on
-	 * `conversationId`, same as the inbound record.
-	 * POST /conversations/messages/outbound
+	 * delivered the message itself and is only writing the record back.
+	 *
+	 * Counter-intuitively this goes through the INBOUND endpoint with
+	 * `direction: "outbound"` — GHL's `/conversations/messages/outbound` is for
+	 * external CALL logs only (its `type` enum rejects "SMS" with a 422).
+	 * Verified live against the API. `conversationProviderId` is required here
+	 * even for the SMS-replace provider.
+	 * POST /conversations/messages/inbound  (direction: "outbound")
 	 */
 	async postOutboundMessageRecord(input: GHLOutboundMessageInput): Promise<GHLMessageResponse> {
-		return this.request<GHLMessageResponse>("/conversations/messages/outbound", {
+		return this.request<GHLMessageResponse>("/conversations/messages/inbound", {
 			method: "POST",
 			body: JSON.stringify({
 				type: input.type,
 				conversationId: input.conversationId,
 				message: input.message,
+				direction: "outbound",
 				...(input.conversationProviderId
 					? { conversationProviderId: input.conversationProviderId }
 					: {}),

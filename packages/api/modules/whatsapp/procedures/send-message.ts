@@ -12,6 +12,7 @@ import { type GlobalSpintax, processMessage, sendProcessedMessage, toChatId } fr
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
 
 const attachmentSchema = z.object({
@@ -117,6 +118,18 @@ export const sendMessage = protectedProcedure
 			sessionId: sender.id,
 			preview,
 		});
+
+		// Mirror the sent messages into the connected CRM's conversation timeline
+		// (no-op when disconnected; never fails the send).
+		await mirrorAppSendToCrm(
+			{
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				sessionId: sender.id,
+				chatId,
+			},
+			result.messages,
+		);
 
 		return { ...result, processed, fromSessionId: sender.id };
 	});

@@ -149,7 +149,7 @@ export function createFanOutDeps(): FanOutDeps {
 				chatId: message.chatId,
 				text: message.body ?? "",
 			});
-			return { waMessageId: result?.id ?? null };
+			return { waMessageId: result?.messageId ?? result?.id ?? null };
 		},
 
 		// Both GHL projections are best-effort: a GHL outage or bad token must never
@@ -202,6 +202,11 @@ export function createFanOutDeps(): FanOutDeps {
 					attachments: message.attachments,
 					type: "SMS",
 					date: message.timestamp.toISOString(),
+					// Unlike the inbound API, GHL's outbound-record endpoint REQUIRES the
+					// provider id even for the SMS-replace provider
+					// (CONVERSATIONS_MSG_PROVIDER_ID_REQUIRED).
+					conversationProviderId:
+						connection.smsProviderId ?? connection.conversationProviderId ?? undefined,
 				});
 				return { ghlMessageId: res.messageId ?? res.message?.id ?? null };
 			} catch (error) {

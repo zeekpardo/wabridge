@@ -388,37 +388,75 @@ export async function createWhatsAppMessage(data: {
 		}
 	}
 
-	// Also dedup on the WhatsApp message id within a session: an outbound message
+	// Dedup on the WhatsApp message id within a session: an outbound message
 	// stored at API-send time and its later `message.sent` webhook echo share a
-	// waMessageId and must collapse to a single row.
-	if (data.waMessageId) {
+	// waMessageId and must collapse to a single row. Either write can win the
+	// race, so on a hit we MERGE the richer identity into the surviving row: the
+	// webhook echo carries no origin/ghlMessageId, and losing them silently
+	// breaks CRM provenance and the delivery-status relay. The check-then-insert
+	// below is racy by nature; the @@unique([sessionId, waMessageId]) constraint
+	// backstops it, and the P2002 catch converges both writers onto one row.
+	async function mergeIntoExisting() {
 		const existing = await db.whatsAppMessage.findFirst({
 			where: { sessionId: data.sessionId, waMessageId: data.waMessageId },
 		});
+		if (!existing) {
+			return null;
+		}
+		const patch: { ghlMessageId?: string; origin?: string } = {
+			...(data.ghlMessageId && !existing.ghlMessageId ? { ghlMessageId: data.ghlMessageId } : {}),
+			...(data.origin && data.origin !== "contact" && existing.origin === "contact"
+				? { origin: data.origin }
+				: {}),
+		};
+		if (Object.keys(patch).length > 0) {
+			return db.whatsAppMessage.update({ where: { id: existing.id }, data: patch });
+		}
+		return existing;
+	}
 
-		if (existing) {
-			return existing;
+	if (data.waMessageId) {
+		const merged = await mergeIntoExisting();
+		if (merged) {
+			return merged;
 		}
 	}
 
-	return db.whatsAppMessage.create({
-		data: {
-			subaccountId: data.subaccountId,
-			organizationId: data.organizationId,
-			sessionId: data.sessionId,
-			direction: data.direction,
-			chatId: data.chatId,
-			fromMe: data.fromMe,
-			type: data.type,
-			timestamp: data.timestamp,
-			waMessageId: data.waMessageId,
-			body: data.body,
-			status: data.status,
-			idempotencyKey: data.idempotencyKey,
-			origin: data.origin ?? "contact",
-			ghlMessageId: data.ghlMessageId ?? null,
-		},
-	});
+	try {
+		return await db.whatsAppMessage.create({
+			data: {
+				subaccountId: data.subaccountId,
+				organizationId: data.organizationId,
+				sessionId: data.sessionId,
+				direction: data.direction,
+				chatId: data.chatId,
+				fromMe: data.fromMe,
+				type: data.type,
+				timestamp: data.timestamp,
+				waMessageId: data.waMessageId,
+				body: data.body,
+				status: data.status,
+				idempotencyKey: data.idempotencyKey,
+				origin: data.origin ?? "contact",
+				ghlMessageId: data.ghlMessageId ?? null,
+			},
+		});
+	} catch (error) {
+		// Unique violation on (sessionId, waMessageId): the other writer won the
+		// race between our check and insert — merge into their row instead.
+		if (
+			data.waMessageId &&
+			error instanceof Error &&
+			"code" in error &&
+			(error as { code?: string }).code === "P2002"
+		) {
+			const merged = await mergeIntoExisting();
+			if (merged) {
+				return merged;
+			}
+		}
+		throw error;
+	}
 }
 
 /** Look up a stored message by the GHL message id (echo de-dupe + status). */
