@@ -1,6 +1,17 @@
 "use client";
 
 import { GHL_PROVISION_INTENT_KEY } from "@repo/api/modules/whatsapp/ghl-constants";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@repo/ui/components/alert-dialog";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Card } from "@repo/ui/components/card";
@@ -16,7 +27,7 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Spinner } from "@repo/ui/components/spinner";
-import { toastError } from "@repo/ui/components/toast";
+import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,6 +36,7 @@ import {
 	PencilLineIcon,
 	PlusIcon,
 	ServerIcon,
+	Trash2Icon,
 	UsersIcon,
 	WifiIcon,
 	WifiOffIcon,
@@ -167,6 +179,17 @@ function SubaccountCard({
 	href: string;
 	embeddedHref: string;
 }) {
+	const queryClient = useQueryClient();
+	const remove = useMutation(
+		orpc.subaccounts.delete.mutationOptions({
+			onSuccess: () => {
+				toastSuccess("Subaccount deleted");
+				void queryClient.invalidateQueries({ queryKey: orpc.subaccounts.list.key() });
+			},
+			onError: (error) => toastError(error.message ?? "Could not delete subaccount"),
+		}),
+	);
+
 	return (
 		<Card className="gap-3 p-5 hover:-translate-y-0.5 hover:shadow-lg flex flex-col transition-all hover:border-primary/50">
 			<div className="gap-2 flex items-start justify-between">
@@ -218,6 +241,36 @@ function SubaccountCard({
 						<ArrowUpRightIcon className="size-4" />
 					</Link>
 				</Button>
+				<AlertDialog>
+					<AlertDialogTrigger asChild>
+						<Button
+							size="sm"
+							variant="outline"
+							className="text-red-600 hover:text-red-600"
+							aria-label="Delete subaccount"
+						>
+							<Trash2Icon className="size-4" />
+						</Button>
+					</AlertDialogTrigger>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Delete "{subaccount.name}"?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This permanently removes the subaccount and all of its WhatsApp conversations,
+								messages, and GoHighLevel link. Disconnect its numbers first. This can't be undone.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								className="bg-red-600 text-white hover:bg-red-600/90"
+								onClick={() => remove.mutate({ id: subaccount.id })}
+							>
+								Delete subaccount
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
 		</Card>
 	);
