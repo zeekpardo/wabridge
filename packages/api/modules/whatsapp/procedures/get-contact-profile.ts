@@ -117,6 +117,15 @@ export const getContactProfile = protectedProcedure
 				ghlOwnerId = email
 					? (members.find((member) => member.user.email.toLowerCase() === email)?.userId ?? null)
 					: null;
+				if (!ghlOwnerId) {
+					// Mapped by email — a GHL assignee who isn't an agency member (or a
+					// stale user id) can't surface as the owner here.
+					logger.info("GHL assignee has no matching agency member", {
+						ctx: "whatsapp.contactProfile",
+						assignedTo: ghlContact.assignedTo,
+						assigneeEmail: email ?? null,
+					});
+				}
 			} catch (error) {
 				logger.warn("GHL owner mapping failed", {
 					ctx: "whatsapp.contactProfile",
