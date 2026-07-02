@@ -63,9 +63,19 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	// a curated layout sticks across contacts and sessions (display-only, so
 	// localStorage is enough).
 	const hiddenKey = `wabridge:cf-hidden:${subaccountId ?? "default"}`;
+	const hideEmptyKey = `wabridge:cf-hide-empty:${subaccountId ?? "default"}`;
 	const [hiddenFolders, setHiddenFolders] = useState<Set<string>>(() => readIdSet(hiddenKey));
 	const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+	const [hideEmptyFields, setHideEmptyFields] = useState<boolean>(() => readFlag(hideEmptyKey));
 	const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
+
+	function toggleHideEmpty() {
+		setHideEmptyFields((prev) => {
+			const next = !prev;
+			writeFlag(hideEmptyKey, next);
+			return next;
+		});
+	}
 
 	function toggleHiddenFolder(id: string) {
 		setHiddenFolders((prev) => {
@@ -400,6 +410,19 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 										</Button>
 									</PopoverTrigger>
 									<PopoverContent align="end" className="p-1.5 w-60">
+										<button
+											type="button"
+											className="gap-2 px-2 py-1.5 text-sm rounded flex w-full items-center text-left hover:bg-foreground/5"
+											onClick={toggleHideEmpty}
+										>
+											<span
+												className={`size-3.5 flex shrink-0 items-center justify-center rounded-sm border ${hideEmptyFields ? "border-primary bg-primary text-primary-foreground" : "border-foreground/30"}`}
+											>
+												{hideEmptyFields ? <CheckIcon className="size-3" /> : null}
+											</span>
+											<span className="truncate">Hide empty fields</span>
+										</button>
+										<div className="my-1 border-t" />
 										<p className="px-1.5 pb-1 text-[11px] text-foreground/50">Folders to display</p>
 										<div className="max-h-64 overflow-y-auto">
 											{(customFieldsQuery.data?.folders ?? []).map((folder) => {
@@ -430,6 +453,13 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 								.map((folder) => {
 									const collapsed = collapsedFolders.has(folder.id);
 									const setCount = folder.fields.filter((f) => f.value).length;
+									const shownFields = hideEmptyFields
+										? folder.fields.filter((f) => f.value)
+										: folder.fields;
+									// With "hide empty" on, a folder whose fields are all empty drops out.
+									if (shownFields.length === 0) {
+										return null;
+									}
 									return (
 										<div key={folder.id} className="rounded-lg border bg-background">
 											<button
@@ -451,7 +481,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 											</button>
 											{collapsed ? null : (
 												<div className="gap-2 px-3 pt-0 pb-3 flex flex-col">
-													{folder.fields.map((field) => (
+													{shownFields.map((field) => (
 														<div key={field.id} className="gap-0.5 flex flex-col">
 															<span className="text-[11px] text-foreground/50">{field.name}</span>
 															<span className="text-sm">
@@ -506,5 +536,28 @@ function writeIdSet(key: string, value: Set<string>): void {
 		window.localStorage.setItem(key, JSON.stringify([...value]));
 	} catch {
 		// Storage unavailable (private mode / quota) — visibility just won't persist.
+	}
+}
+
+/** Read a persisted boolean flag. SSR-safe; defaults false. */
+function readFlag(key: string): boolean {
+	if (typeof window === "undefined") {
+		return false;
+	}
+	try {
+		return window.localStorage.getItem(key) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function writeFlag(key: string, value: boolean): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.localStorage.setItem(key, value ? "1" : "0");
+	} catch {
+		// Storage unavailable — the flag just won't persist.
 	}
 }
