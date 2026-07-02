@@ -8,11 +8,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@repo/ui/components/pop
 import { toastError } from "@repo/ui/components/toast";
 import { buildCommandString, type MessageSegment } from "@repo/whatsapp/commands";
 import { orpc } from "@shared/lib/orpc-query-utils";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	ArrowUpIcon,
 	ClockIcon,
 	FileIcon,
+	FileTextIcon,
 	MicIcon,
 	PaperclipIcon,
 	ShuffleIcon,
@@ -79,6 +80,13 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 	const [delayOpen, setDelayOpen] = useState(false);
 	const [delayMin, setDelayMin] = useState("1");
 	const [delayMax, setDelayMax] = useState("4");
+	const [templatesOpen, setTemplatesOpen] = useState(false);
+
+	// Saved builder templates for this subaccount (loaded into the composer on pick).
+	const settingsQuery = useQuery(
+		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
+	);
+	const templates = settingsQuery.data?.messageTemplates ?? [];
 
 	const preview = useMutation(orpc.whatsapp.previewCommand.mutationOptions());
 
@@ -231,6 +239,15 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 		}
 		setSpintaxInput("");
 		setSpintaxOpen(false);
+	}
+
+	function loadTemplate(templateText: string) {
+		// A saved template is a raw command string; load it as text — it sends and
+		// resolves server-side exactly as the builder produced it.
+		editorRef.current?.clear();
+		editorRef.current?.insertText(templateText);
+		editorRef.current?.focus();
+		setTemplatesOpen(false);
 	}
 
 	function addDelay() {
@@ -475,6 +492,43 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 										Add delay
 									</Button>
 								</div>
+							</PopoverContent>
+						</Popover>
+
+						<Popover open={templatesOpen} onOpenChange={setTemplatesOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-8 gap-1 px-2 text-xs text-foreground/75"
+								>
+									<FileTextIcon className="size-3.5" />
+									Templates
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-64 p-0">
+								{templates.length > 0 ? (
+									<div className="max-h-72 overflow-y-auto p-1">
+										{templates.map((template) => (
+											<button
+												key={template.id}
+												type="button"
+												className="gap-0.5 px-2 py-1.5 flex w-full flex-col rounded-md text-left hover:bg-muted"
+												onClick={() => loadTemplate(template.text)}
+											>
+												<span className="truncate text-sm font-medium">{template.name}</span>
+												<span className="truncate text-[11px] text-foreground/55 font-mono">
+													{template.text}
+												</span>
+											</button>
+										))}
+									</div>
+								) : (
+									<p className="p-3 text-xs text-foreground/60">
+										No saved templates yet. Create them in the Builder tab.
+									</p>
+								)}
 							</PopoverContent>
 						</Popover>
 					</div>
