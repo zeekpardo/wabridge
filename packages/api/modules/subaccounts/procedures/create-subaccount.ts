@@ -4,8 +4,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { requireAgencyId } from "../lib/agency";
-
-const MAX_SUBACCOUNTS = 25;
+import { getSubaccountLimit } from "../lib/plan-limits";
 
 export const createSubaccount = protectedProcedure
 	.route({
@@ -27,10 +26,15 @@ export const createSubaccount = protectedProcedure
 	.handler(async ({ input, context: { user, session } }) => {
 		const organizationId = await requireAgencyId(session.activeOrganizationId, user.id);
 
-		const used = await countSubaccounts(organizationId);
-		if (used >= MAX_SUBACCOUNTS) {
+		const [used, limit] = await Promise.all([
+			countSubaccounts(organizationId),
+			getSubaccountLimit(organizationId),
+		]);
+		if (used >= limit) {
 			throw new ORPCError("FORBIDDEN", {
-				message: `Subaccount limit reached (${MAX_SUBACCOUNTS}).`,
+				message: Number.isFinite(limit)
+					? `Sub-account limit reached (${limit}). Upgrade your plan to add more.`
+					: "Sub-account limit reached.",
 			});
 		}
 

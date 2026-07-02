@@ -28,9 +28,7 @@ import {
 import { NotificationCenter } from "@shared/components/NotificationCenter";
 import { UserMenu } from "@shared/components/UserMenu";
 import {
-	BotMessageSquareIcon,
 	ChevronRightIcon,
-	HomeIcon,
 	MenuIcon,
 	MessageCircleIcon,
 	PanelLeftCloseIcon,
@@ -260,8 +258,6 @@ export function NavBar() {
 	const isCollapsedEffective = isCollapsed && !isMobile;
 
 	const basePath = activeOrganization ? `/${activeOrganization.slug}` : "";
-	/** Home for the current context: org dashboard or `/` when no org is selected. */
-	const startHref = basePath || "/";
 
 	const menuItems: NavMenuItem[] = useMemo(() => {
 		const accountSubItems: NavSubItem[] = [
@@ -311,18 +307,6 @@ export function NavBar() {
 				: undefined;
 
 		return [
-			{
-				label: t("app.menu.start"),
-				href: startHref,
-				icon: HomeIcon,
-				isActive: pathname === "/" || pathname === basePath,
-			},
-			{
-				label: t("app.menu.aiChatbot"),
-				href: "/chatbot",
-				icon: BotMessageSquareIcon,
-				isActive: pathname.startsWith("/chatbot"),
-			},
 			...(activeOrganization
 				? [
 						{
@@ -362,7 +346,7 @@ export function NavBar() {
 					]
 				: []),
 		];
-	}, [activeOrganization, basePath, isOrganizationAdmin, pathname, startHref, t, user?.role]);
+	}, [activeOrganization, basePath, isOrganizationAdmin, pathname, t, user?.role]);
 
 	return (
 		<nav

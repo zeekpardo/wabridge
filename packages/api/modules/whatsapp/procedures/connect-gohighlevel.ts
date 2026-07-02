@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import {
+	countSubaccounts,
 	createSubaccount,
 	getSubaccountByLocationId,
 	getSubaccountById,
@@ -13,6 +14,7 @@ import { protectedProcedure } from "../../../orpc/procedures";
 import { syncSubaccountNameFromGhl } from "../../ghl/sync-subaccount-name";
 import { verifyOrganizationMembership } from "../../organizations/lib/membership";
 import { requireAgencyId } from "../../subaccounts/lib/agency";
+import { getSubaccountLimit } from "../../subaccounts/lib/plan-limits";
 
 /**
  * Exchange the GoHighLevel OAuth code (from the install callback page) and store
@@ -64,6 +66,19 @@ export const connectGoHighLevel = protectedProcedure
 			if (linked && linked.organizationId === organizationId) {
 				subaccountId = linked.id;
 			} else {
+				// Provisioning a NEW subaccount counts against the plan's quota, same as
+				// a manual create — otherwise GHL connects would bypass the limit.
+				const [used, limit] = await Promise.all([
+					countSubaccounts(organizationId),
+					getSubaccountLimit(organizationId),
+				]);
+				if (used >= limit) {
+					throw new ORPCError("FORBIDDEN", {
+						message: Number.isFinite(limit)
+							? `Sub-account limit reached (${limit}). Upgrade your plan to connect more.`
+							: "Sub-account limit reached.",
+					});
+				}
 				const created = await createSubaccount({
 					organizationId,
 					// Placeholder — the name sync below adopts the real GHL location name.

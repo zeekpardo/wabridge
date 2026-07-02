@@ -1,7 +1,9 @@
 import type { AuthConfig } from "./types";
 
 export const config = {
-	enableSignup: true,
+	// Invite-only: no self-service signup. Accounts are created only by accepting
+	// an organization invitation (enforced server-side by invitationOnlyPlugin).
+	enableSignup: false,
 	enableMagicLink: true,
 	enableSocialLogin: false,
 	enablePasskeys: false,
@@ -14,8 +16,10 @@ export const config = {
 	organizations: {
 		enable: true,
 		hideOrganization: false,
-		enableUsersToCreateOrganizations: true,
-		requireOrganization: false,
+		// Org-only: every user works inside an organization (no personal account),
+		// and end users can't spin up new orgs (provisioned by an admin/invite).
+		enableUsersToCreateOrganizations: false,
+		requireOrganization: true,
 		forbiddenOrganizationSlugs: [
 			"new-organization",
 			"admin",
