@@ -32,4 +32,26 @@ describe("resolveOutboundCommand", () => {
 		const result = resolveOutboundCommand("Hello ${SPINTAX_9}", {}, () => 0);
 		expect(result.unresolved).toContain("SPINTAX_9");
 	});
+
+	it("returns no numberOverride for a plain message", () => {
+		expect(resolveOutboundCommand("just a normal reply").numberOverride).toBeUndefined();
+	});
+
+	it("resolves #switch|N to a session-scoped number override (control-only, no text)", () => {
+		const result = resolveOutboundCommand("#switch|2");
+		expect(result.numberOverride).toEqual({ priority: 2, scope: "session" });
+		// A bare #switch changes the active number and sends nothing.
+		expect(result.text).toBe("");
+	});
+
+	it("resolves #switch_unique to a once-scoped override and keeps the inner message", () => {
+		const result = resolveOutboundCommand("#switch_unique|3|On my way", {}, () => 0);
+		expect(result.numberOverride).toEqual({ priority: 3, scope: "once" });
+		expect(result.text).toBe("On my way");
+	});
+
+	it("distinguishes session (#switch) from unique (#switch_unique) scope", () => {
+		expect(resolveOutboundCommand("#switch|1").numberOverride?.scope).toBe("session");
+		expect(resolveOutboundCommand("#switch_unique|1|hi").numberOverride?.scope).toBe("once");
+	});
 });

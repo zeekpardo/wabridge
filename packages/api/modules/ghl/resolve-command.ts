@@ -1,4 +1,11 @@
-import { type GlobalSpintax, processMessage, type Rng } from "@repo/whatsapp/commands";
+import {
+	type GlobalSpintax,
+	type NumberOverride,
+	processMessage,
+	type Rng,
+} from "@repo/whatsapp/commands";
+
+export type { NumberOverride };
 
 export interface ResolvedOutboundCommand {
 	/** The concrete text to deliver over WhatsApp (spintax expanded, delay stripped). */
@@ -7,6 +14,8 @@ export interface ResolvedOutboundCommand {
 	delayMs?: number;
 	/** SPINTAX_ tokens that were undefined and stripped (surface as a warning). */
 	unresolved: string[];
+	/** Sender-number override from `#switch|N` (session) or `#switch_unique` (once), if any. */
+	numberOverride?: NumberOverride;
 }
 
 /**
@@ -35,5 +44,6 @@ export function resolveOutboundCommand(
 		text,
 		delayMs: processed.meta.delayMs,
 		unresolved: processed.meta.unresolvedSpintax ?? [],
+		numberOverride: processed.numberOverride,
 	};
 }

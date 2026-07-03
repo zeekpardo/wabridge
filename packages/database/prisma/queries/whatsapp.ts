@@ -162,7 +162,11 @@ export async function listConversations(subaccountId: string) {
 	});
 }
 
-/** Inbound arrival: upsert the thread and reply-lock it to the receiving number. */
+/**
+ * Inbound arrival: upsert the thread. The active/sending number is set once — on
+ * create, or later via setConversationActiveSession — so subsequent inbound
+ * messages never re-lock the reply number.
+ */
 export async function upsertConversationInbound(data: {
 	subaccountId: string;
 	organizationId: string;
@@ -185,7 +189,6 @@ export async function upsertConversationInbound(data: {
 			unreadCount: 1,
 		},
 		update: {
-			activeSessionId: data.sessionId,
 			...(data.contactName ? { contactName: data.contactName } : {}),
 			lastMessageAt: new Date(),
 			lastMessagePreview: data.preview,
@@ -195,7 +198,11 @@ export async function upsertConversationInbound(data: {
 	});
 }
 
-/** Outbound send: refresh the thread and persist the sending number as active. */
+/**
+ * Outbound send: refresh the thread. The active/sending number is set once — on
+ * create, or later via setConversationActiveSession — so an outbound send never
+ * overwrites an already-chosen active number.
+ */
 export async function touchConversationOutbound(data: {
 	subaccountId: string;
 	organizationId: string;
@@ -216,7 +223,6 @@ export async function touchConversationOutbound(data: {
 			unreadCount: 0,
 		},
 		update: {
-			activeSessionId: data.sessionId,
 			lastMessageAt: new Date(),
 			lastMessagePreview: data.preview,
 			lastDirection: "outbound",
@@ -352,6 +358,7 @@ export async function listOrganizationMembers(organizationId: string) {
 		where: { organizationId },
 		orderBy: { createdAt: "asc" },
 		select: {
+			id: true,
 			userId: true,
 			role: true,
 			user: { select: { id: true, name: true, email: true, image: true } },
@@ -559,5 +566,51 @@ export async function listWhatsAppMessagesBySession(
 		where: { sessionId, subaccountId },
 		orderBy: { timestamp: "desc" },
 		take: limit,
+	});
+}
+
+// ─── Member default numbers (per member, per subaccount) ──────────────────────
+
+/** The member's preferred sending number in a subaccount, if one is set. */
+export async function getMemberDefaultNumber(subaccountId: string, memberId: string) {
+	return db.memberDefaultNumber.findUnique({
+		where: { subaccountId_memberId: { subaccountId, memberId } },
+	});
+}
+
+/** Set (or change) a member's default sending number for a subaccount. */
+export async function setMemberDefaultNumber(data: {
+	subaccountId: string;
+	memberId: string;
+	sessionId: string;
+}) {
+	return db.memberDefaultNumber.upsert({
+		where: {
+			subaccountId_memberId: { subaccountId: data.subaccountId, memberId: data.memberId },
+		},
+		create: {
+			subaccountId: data.subaccountId,
+			memberId: data.memberId,
+			sessionId: data.sessionId,
+		},
+		update: { sessionId: data.sessionId },
+	});
+}
+
+/** Clear a member's default sending number for a subaccount (no-op if unset). */
+export async function clearMemberDefaultNumber(subaccountId: string, memberId: string) {
+	return db.memberDefaultNumber.deleteMany({
+		where: { subaccountId, memberId },
+	});
+}
+
+/** All member→number defaults for a subaccount, with the target number (settings UI). */
+export async function listMemberDefaultNumbers(subaccountId: string) {
+	return db.memberDefaultNumber.findMany({
+		where: { subaccountId },
+		orderBy: { createdAt: "asc" },
+		include: {
+			session: { select: { id: true, label: true, phone: true } },
+		},
 	});
 }

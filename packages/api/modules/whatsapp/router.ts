@@ -21,6 +21,7 @@ import { listContactOwners } from "./procedures/list-contact-owners";
 import { listContactTags } from "./procedures/list-contact-tags";
 import { listContactVariables } from "./procedures/list-contact-variables";
 import { listConversationsProcedure } from "./procedures/list-conversations";
+import { listMemberNumbers } from "./procedures/list-member-numbers";
 import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
 import { listSessions } from "./procedures/list-sessions";
@@ -35,6 +36,7 @@ import { setContactFields } from "./procedures/set-contact-fields";
 import { setContactOwner } from "./procedures/set-contact-owner";
 import { setContactTags } from "./procedures/set-contact-tags";
 import { setConversationNumber } from "./procedures/set-conversation-number";
+import { setMemberNumber } from "./procedures/set-member-number";
 import { updateNumber } from "./procedures/update-number";
 import { updateSettings } from "./procedures/update-settings";
 
@@ -66,6 +68,8 @@ export const whatsappRouter = {
 	linkContactByPhone,
 	setConversationNumber,
 	listNumbers,
+	listMemberNumbers,
+	setMemberNumber,
 	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect
 	getGhlOAuthUrl,
 	getGhlProvisionUrl,

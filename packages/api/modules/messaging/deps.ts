@@ -17,6 +17,7 @@ import {
 import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 
+import { syncPrimaryNumberTag } from "../ghl/sync-primary-number-tag";
 import type { CanonicalMessage, FanOutDeps } from "./fan-out";
 
 /** Hard cap on the in-request pre-send delay so a delivery-URL post can't hang. */
@@ -92,6 +93,11 @@ async function resolveGhlThread(
 		// contact — adopt its name locally (GHL wins when linked).
 		ghlName = ghlContactDisplayName(contact);
 	}
+
+	// Mark this contact's primary WhatsApp number on its GHL contact via the
+	// `wa:<digits>` tag. Best-effort (never fails the projection); runs for both
+	// the inbound and outbound-record paths since both resolve the thread here.
+	await syncPrimaryNumberTag(client, contactId, phone);
 
 	const conversation = await client.getOrCreateConversation({ locationId, contactId });
 

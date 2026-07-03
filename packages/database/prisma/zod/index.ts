@@ -88,6 +88,12 @@ export const WhatsAppSettingsScalarFieldEnumSchema = z.enum(['id', 'subaccountId
 
 export type WhatsAppSettingsScalarFieldEnum = z.infer<typeof WhatsAppSettingsScalarFieldEnumSchema>;
 
+// File: MemberDefaultNumberScalarFieldEnum.schema.ts
+
+export const MemberDefaultNumberScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'memberId', 'sessionId', 'createdAt', 'updatedAt'])
+
+export type MemberDefaultNumberScalarFieldEnum = z.infer<typeof MemberDefaultNumberScalarFieldEnumSchema>;
+
 // File: MemberScalarFieldEnum.schema.ts
 
 export const MemberScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'userId', 'role', 'createdAt'])
@@ -424,6 +430,20 @@ export const WhatsAppSettingsSchema = z.object({
 });
 
 export type WhatsAppSettingsType = z.infer<typeof WhatsAppSettingsSchema>;
+
+
+// File: MemberDefaultNumber.schema.ts
+
+export const MemberDefaultNumberSchema = z.object({
+  id: z.string(),
+  subaccountId: z.string(),
+  memberId: z.string(),
+  sessionId: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type MemberDefaultNumberType = z.infer<typeof MemberDefaultNumberSchema>;
 
 
 // File: Member.schema.ts

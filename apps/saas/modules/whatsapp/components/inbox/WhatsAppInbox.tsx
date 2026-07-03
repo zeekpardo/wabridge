@@ -222,7 +222,12 @@ export function WhatsAppInbox({
 								</div>
 							</div>
 							<div className="gap-2 flex items-center">
-								<span className="text-xs sm:inline hidden text-foreground/75">Send from</span>
+								<span
+									className="text-xs sm:inline hidden text-foreground/75"
+									title="Sets this contact's primary number — future messages send from it."
+								>
+									Send from
+								</span>
 								<Select
 									value={activeNumberId}
 									disabled={numbers.length === 0 || setNumber.isPending}
@@ -230,7 +235,11 @@ export function WhatsAppInbox({
 										setNumber.mutate({ chatId: selectedChatId, sessionId, subaccountId })
 									}
 								>
-									<SelectTrigger className="w-36 sm:w-44">
+									<SelectTrigger
+										className="w-36 sm:w-44"
+										aria-label="Contact's primary number"
+										title="Sets this contact's primary number — future messages send from it."
+									>
 										<SelectValue placeholder="No numbers" />
 									</SelectTrigger>
 									<SelectContent>

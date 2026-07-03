@@ -2,16 +2,21 @@ import { ORPCError } from "@orpc/server";
 import {
 	getConversation,
 	getDefaultSession,
+	getGhlConnection,
+	getMemberDefaultNumber,
+	getOrganizationMembership,
 	getSessionByPriority,
 	getWhatsAppSession,
 	getWhatsAppSettings,
 	setConversationActiveSession,
 	touchConversationOutbound,
 } from "@repo/database";
+import { createGoHighLevelClient } from "@repo/integrations";
 import { type GlobalSpintax, processMessage, sendProcessedMessage, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { syncPrimaryNumberTag } from "../../ghl/sync-primary-number-tag";
 import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
 
@@ -76,6 +81,20 @@ export const sendMessage = protectedProcedure
 					chatId,
 					sessionId: sender.id,
 				});
+
+				// Mark this number as the contact's primary via a `wa:` tag on the
+				// linked GHL contact (mirrors the manual setConversationNumber path).
+				// Best-effort — a GHL hiccup never fails the send.
+				const ghl = await getGhlConnection(subaccount.id);
+				if (ghl && sender.phone) {
+					const conversation = await getConversation(subaccount.id, chatId);
+					if (conversation?.ghlContactId) {
+						const client = await createGoHighLevelClient(subaccount.id);
+						if (client) {
+							await syncPrimaryNumberTag(client, conversation.ghlContactId, sender.phone);
+						}
+					}
+				}
 			}
 		} else if (input.fromSessionId) {
 			sender = await getWhatsAppSession(subaccount.id, input.fromSessionId);
@@ -83,6 +102,18 @@ export const sendMessage = protectedProcedure
 			const conversation = await getConversation(subaccount.id, chatId);
 			if (conversation?.activeSessionId) {
 				sender = await getWhatsAppSession(subaccount.id, conversation.activeSessionId);
+			}
+			// No number is pinned to this thread yet: fall back to the sending user's
+			// per-subaccount default number (Phase 2 stickiness), then the org default.
+			// The activeSessionId set-once above locks this choice for the thread.
+			if (!sender) {
+				const membership = await getOrganizationMembership(subaccount.organizationId, user.id);
+				if (membership) {
+					const memberDefault = await getMemberDefaultNumber(subaccount.id, membership.id);
+					if (memberDefault) {
+						sender = await getWhatsAppSession(subaccount.id, memberDefault.sessionId);
+					}
+				}
 			}
 			if (!sender) {
 				sender = await getDefaultSession(subaccount.id);
