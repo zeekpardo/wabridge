@@ -62,6 +62,16 @@ describe("planProjections (the coexistence contract)", () => {
 			notifyApp: true,
 		});
 	});
+
+	it("device → record outbound in GHL, never re-sends (already delivered from the phone)", () => {
+		expect(planProjections("device")).toEqual({
+			sendOverWhatsApp: false,
+			pushGhlInbound: false,
+			recordGhlOutbound: true,
+			linkGhlThread: false,
+			notifyApp: true,
+		});
+	});
 });
 
 describe("fanOutMessage", () => {
@@ -98,6 +108,30 @@ describe("fanOutMessage", () => {
 		expect(deps.sendOverWhatsApp).toHaveBeenCalledOnce();
 		expect(deps.recordGhlOutbound).toHaveBeenCalledOnce();
 		expect(deps.markSynced).toHaveBeenCalledWith("row1", "ghl_out");
+	});
+
+	it("device (phone-sent echo): records the outbound in GHL and does NOT re-send", async () => {
+		const deps = mockDeps();
+		await fanOutMessage(
+			baseMessage({ origin: "device", direction: "outbound", waMessageId: "wa_phone" }),
+			deps,
+		);
+
+		expect(deps.sendOverWhatsApp).not.toHaveBeenCalled();
+		expect(deps.recordGhlOutbound).toHaveBeenCalledOnce();
+		expect(deps.markSynced).toHaveBeenCalledWith("row1", "ghl_out");
+	});
+
+	it("device: the echo of a message we already sent de-dupes (no double-record)", async () => {
+		const deps = mockDeps({ findByWaMessageId: vi.fn().mockResolvedValue({ id: "existing" }) });
+		const result = await fanOutMessage(
+			baseMessage({ origin: "device", direction: "outbound", waMessageId: "wa_app" }),
+			deps,
+		);
+
+		expect(result).toEqual({ deduped: true, messageId: "existing" });
+		expect(deps.recordGhlOutbound).not.toHaveBeenCalled();
+		expect(deps.sendOverWhatsApp).not.toHaveBeenCalled();
 	});
 
 	it("de-dupes on waMessageId (WhatsApp echo) without persisting or projecting", async () => {

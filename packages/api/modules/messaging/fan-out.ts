@@ -13,7 +13,7 @@
  * / ghlMessageId de-dupe below (mirroring the store's existing idempotency).
  */
 
-export type MessageOrigin = "contact" | "ghl" | "app";
+export type MessageOrigin = "contact" | "ghl" | "app" | "device";
 
 export interface CanonicalMessage {
 	subaccountId: string;
@@ -99,6 +99,20 @@ export function planProjections(origin: MessageOrigin): ProjectionPlan {
 			// resolves the thread link, so no separate link step.
 			return {
 				sendOverWhatsApp: true,
+				pushGhlInbound: false,
+				recordGhlOutbound: true,
+				linkGhlThread: false,
+				notifyApp: true,
+			};
+		case "device":
+			// An outbound message the rep sent from the linked phone's own WhatsApp
+			// (arrives via the `message.sent` echo). It's ALREADY delivered — never
+			// re-send — but record it in GHL so replies from the phone still appear on
+			// the CRM timeline. The waMessageId de-dupe collapses the echo of a message
+			// we sent from our messenger (already recorded), so only genuine
+			// phone-originated sends are mirrored here.
+			return {
+				sendOverWhatsApp: false,
 				pushGhlInbound: false,
 				recordGhlOutbound: true,
 				linkGhlThread: false,

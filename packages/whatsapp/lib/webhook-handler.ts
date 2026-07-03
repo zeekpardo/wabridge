@@ -41,6 +41,23 @@ export interface OpenWaInboundMessage {
 	authorPhone?: string | null;
 }
 
+/**
+ * An outbound (us → contact) WhatsApp message, from the `message.sent` echo.
+ * Covers BOTH messages our app sent (already recorded) and ones the rep sent
+ * from the linked phone's own WhatsApp. The hub de-dupes on waMessageId so only
+ * genuine phone-originated sends are mirrored to the CRM.
+ */
+export interface OpenWaOutboundMessage {
+	subaccountId: string;
+	organizationId: string;
+	sessionId: string;
+	chatId: string;
+	body: string | null;
+	type: string;
+	waMessageId: string | null;
+	timestamp: Date;
+}
+
 /** A delivery/read receipt for a message we sent. */
 export interface OpenWaMessageAck {
 	subaccountId: string;
@@ -87,6 +104,13 @@ export interface OpenWaWebhookHooks {
 	 * this (the hub persists with the same waMessageId de-dupe).
 	 */
 	onInboundMessage?(event: OpenWaInboundMessage): Promise<void>;
+	/**
+	 * Handles an outbound message END-TO-END (persistence included) from the
+	 * `message.sent` echo — when provided, the handler skips its own insert. The
+	 * hub de-dupes on waMessageId, so a message our app already sent+recorded is a
+	 * no-op and only phone-originated sends get persisted + mirrored to the CRM.
+	 */
+	onOutboundMessage?(event: OpenWaOutboundMessage): Promise<void>;
 	/** Fired after the local status update; must not throw. */
 	onMessageAck?(event: OpenWaMessageAck): Promise<void>;
 	/** Fired for an inbound reaction (add or un-react); must not throw. */
@@ -234,6 +258,23 @@ async function processEvent(
 					senderPhone: typeof data.senderPhone === "string" ? data.senderPhone : null,
 					authorName,
 					authorPhone,
+				});
+				break;
+			}
+
+			// Outbound (message.sent echo) also routes through the hub so a send from
+			// the linked phone's own WhatsApp still records to the CRM. De-duped on
+			// waMessageId, so the echo of a message our app already sent is a no-op.
+			if (outbound && hooks?.onOutboundMessage && chatId) {
+				await hooks.onOutboundMessage({
+					subaccountId,
+					organizationId,
+					sessionId,
+					chatId,
+					body,
+					type,
+					waMessageId: typeof data.id === "string" ? data.id : null,
+					timestamp,
 				});
 				break;
 			}

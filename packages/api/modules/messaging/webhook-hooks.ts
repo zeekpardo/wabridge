@@ -62,6 +62,29 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 			);
 		},
 
+		// Outbound `message.sent` echo. Routed as origin "device": already delivered
+		// (never re-sent), but recorded to the CRM so a reply the rep sent from the
+		// linked phone's own WhatsApp still lands on the GHL timeline. The
+		// waMessageId de-dupe makes the echo of a message our app already sent+
+		// recorded a no-op, so only phone-originated sends are mirrored.
+		async onOutboundMessage(event) {
+			await fanOutMessage(
+				{
+					subaccountId: event.subaccountId,
+					organizationId: event.organizationId,
+					sessionId: event.sessionId,
+					chatId: event.chatId,
+					direction: "outbound",
+					origin: "device",
+					body: event.body,
+					type: event.type,
+					waMessageId: event.waMessageId,
+					timestamp: event.timestamp,
+				},
+				createFanOutDeps(),
+			);
+		},
+
 		// Best-effort by contract: a GHL hiccup must never fail the webhook (the
 		// local status update already happened).
 		async onMessageAck(event) {
