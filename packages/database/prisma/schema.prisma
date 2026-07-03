@@ -254,6 +254,13 @@ model WhatsAppMessage {
   body           String?         @db.Text
   type           String
   status         String?
+  // The waMessageId this message quotes/replies to, if any.
+  quotedMessageId String?
+  // Per-message reactions: array of { emoji, senderId, fromMe }. One reaction
+  // per sender (a sender's new reaction replaces their prior one).
+  reactions      Json?
+  // Set when the message was revoked/deleted (inbound revoke or our delete).
+  deleted        Boolean         @default(false)
   // Provenance for the hub: where this message entered our store.
   // "contact" = inbound from WhatsApp, "ghl" = GHL-originated outbound (SMS
   // takeover / workflow / bulk), "app" = sent from our embedded messenger.

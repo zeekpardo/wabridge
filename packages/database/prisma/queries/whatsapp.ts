@@ -1,4 +1,5 @@
 import { db } from "../client";
+import type { Prisma } from "../generated/client";
 
 // ─── WhatsApp Session ─────────────────────────────────────────────────────────
 
@@ -373,6 +374,18 @@ export async function markConversationRead(subaccountId: string, chatId: string)
 	});
 }
 
+/** Toggle a conversation's unread state (unreadCount 1 when unread, else 0). */
+export async function setConversationUnread(data: {
+	subaccountId: string;
+	chatId: string;
+	unread: boolean;
+}) {
+	return db.whatsAppConversation.updateMany({
+		where: { subaccountId: data.subaccountId, chatId: data.chatId },
+		data: { unreadCount: data.unread ? 1 : 0 },
+	});
+}
+
 /** Thread messages for a contact (oldest first), capped to the last `limit`. */
 export async function listThreadMessages(subaccountId: string, chatId: string, limit = 50) {
 	const rows = await db.whatsAppMessage.findMany({
@@ -436,6 +449,8 @@ export async function createWhatsAppMessage(data: {
 	body?: string | null;
 	status?: string | null;
 	idempotencyKey?: string | null;
+	/** The waMessageId this message quotes/replies to, if any. */
+	quotedMessageId?: string | null;
 	/** Where this message entered the hub: "contact" | "ghl" | "app". */
 	origin?: string;
 	/** The acting staff user who sent an outbound message (app or embedded SSO). */
@@ -506,6 +521,7 @@ export async function createWhatsAppMessage(data: {
 				body: data.body,
 				status: data.status,
 				idempotencyKey: data.idempotencyKey,
+				quotedMessageId: data.quotedMessageId ?? null,
 				origin: data.origin ?? "contact",
 				sentByUserId: data.sentByUserId ?? null,
 				sentByName: data.sentByName ?? null,
@@ -560,6 +576,61 @@ export async function updateWhatsAppMessageStatus(
 	return db.whatsAppMessage.updateMany({
 		where: { sessionId, waMessageId },
 		data: { status },
+	});
+}
+
+/** A single reaction on a message: one row per sender. */
+interface MessageReaction {
+	emoji: string;
+	senderId: string;
+	fromMe: boolean;
+}
+
+/**
+ * Apply an inbound/outbound reaction to a stored message, matched by
+ * (subaccountId, waMessageId). Reactions are a read-modify-write JSON array with
+ * one reaction per sender: adding replaces that sender's prior reaction, then
+ * pushes the new one unless `remove` is set or `emoji` is empty (WhatsApp signals
+ * an un-react with an empty emoji). Idempotent — re-applying the same reaction
+ * leaves the array unchanged. No-op if the message isn't found.
+ */
+export async function applyMessageReaction(data: {
+	subaccountId: string;
+	waMessageId: string;
+	emoji: string;
+	senderId: string;
+	fromMe: boolean;
+	remove?: boolean;
+}) {
+	const message = await db.whatsAppMessage.findFirst({
+		where: { subaccountId: data.subaccountId, waMessageId: data.waMessageId },
+	});
+	if (!message) {
+		return null;
+	}
+
+	const current = (message.reactions as MessageReaction[] | null) ?? [];
+	// Drop this sender's existing reaction (one reaction per sender).
+	const withoutSender = current.filter((reaction) => reaction.senderId !== data.senderId);
+	const next =
+		data.remove || !data.emoji
+			? withoutSender
+			: [...withoutSender, { emoji: data.emoji, senderId: data.senderId, fromMe: data.fromMe }];
+
+	return db.whatsAppMessage.update({
+		where: { id: message.id },
+		data: { reactions: next as unknown as Prisma.InputJsonValue },
+	});
+}
+
+/**
+ * Mark a stored message as deleted/revoked, matched by (subaccountId,
+ * waMessageId). No-op if the message isn't tracked in this subaccount.
+ */
+export async function markMessageDeleted(subaccountId: string, waMessageId: string) {
+	return db.whatsAppMessage.updateMany({
+		where: { subaccountId, waMessageId },
+		data: { deleted: true },
 	});
 }
 

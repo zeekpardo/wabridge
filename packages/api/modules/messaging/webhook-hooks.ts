@@ -1,4 +1,4 @@
-import { getMessageByWaMessageId } from "@repo/database";
+import { applyMessageReaction, getMessageByWaMessageId, markMessageDeleted } from "@repo/database";
 import { createGoHighLevelClient, type GHLMessageStatus } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import type { OpenWaWebhookHooks } from "@repo/whatsapp";
@@ -80,6 +80,40 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 					ctx: "messaging.ackToGhl",
 					waMessageId: event.waMessageId,
 					status: event.status,
+				});
+			}
+		},
+
+		// Best-effort by contract: apply the inbound reaction to the stored message's
+		// reactions map (no-op if the reacted-to message isn't tracked). Contact
+		// reactions are never fromMe.
+		async onReaction(event) {
+			try {
+				await applyMessageReaction({
+					subaccountId: event.subaccountId,
+					waMessageId: event.waMessageId,
+					emoji: event.emoji,
+					senderId: event.senderId,
+					fromMe: false,
+					remove: event.remove,
+				});
+			} catch (error) {
+				logger.error(error, {
+					ctx: "messaging.reaction",
+					waMessageId: event.waMessageId,
+				});
+			}
+		},
+
+		// Best-effort by contract: flag the revoked message as deleted (no-op if the
+		// message isn't tracked in this subaccount).
+		async onRevoke(event) {
+			try {
+				await markMessageDeleted(event.subaccountId, event.waMessageId);
+			} catch (error) {
+				logger.error(error, {
+					ctx: "messaging.revoke",
+					waMessageId: event.waMessageId,
 				});
 			}
 		},

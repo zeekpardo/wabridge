@@ -107,6 +107,34 @@ async function resolveAndLinkLidThread(
 	}
 }
 
+/**
+ * Best-effort fetch of a contact's WhatsApp profile picture. Resolves the
+ * owning session (pinned active number, else the subaccount default) and asks
+ * OpenWA for the avatar url. Any error yields null — this never fails the panel.
+ */
+async function resolveAvatarUrl(
+	subaccountId: string,
+	chatId: string,
+	activeSessionId: string | null,
+): Promise<string | null> {
+	try {
+		const session = activeSessionId
+			? await getWhatsAppSession(subaccountId, activeSessionId)
+			: await getDefaultSession(subaccountId);
+		if (!session) {
+			return null;
+		}
+		return await createOpenWaClient().getProfilePicture(session.openwaSessionId, chatId);
+	} catch (error) {
+		logger.warn("profile picture fetch failed", {
+			ctx: "whatsapp.contactProfile.avatar",
+			chatId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+}
+
 function initialsFrom(name: string): string {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
 	if (parts.length === 0) {
@@ -153,6 +181,15 @@ export const getContactProfile = protectedProcedure
 				conversation.ghlContactId = linkedId;
 			}
 		}
+
+		// Kick off the WhatsApp avatar fetch alongside the GHL read-through so it
+		// doesn't add its own round-trip to the happy path. Best-effort — resolves
+		// to null on any error.
+		const avatarUrlPromise = resolveAvatarUrl(
+			subaccount.id,
+			input.chatId,
+			conversation?.activeSessionId ?? null,
+		);
 
 		// Read-through to the live GHL contact when linked — GHL is the source of
 		// truth for name/email/phone/tags/owner then. Best-effort: a GHL hiccup
@@ -282,6 +319,8 @@ export const getContactProfile = protectedProcedure
 			{ key: "email", label: "Email", value: ghlContact?.email?.trim() || null, editable: true },
 		];
 
+		const avatarUrl = await avatarUrlPromise;
+
 		const contactUrl =
 			ghl && conversation?.ghlContactId
 				? `https://app.gohighlevel.com/v2/location/${ghl.locationId}/contacts/detail/${conversation.ghlContactId}`
@@ -291,7 +330,7 @@ export const getContactProfile = protectedProcedure
 			chatId: input.chatId,
 			name,
 			phone,
-			avatarUrl: null,
+			avatarUrl,
 			initials: initialsFrom(name),
 			ownerId,
 			tags,
