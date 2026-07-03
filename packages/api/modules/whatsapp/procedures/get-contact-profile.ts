@@ -1,6 +1,8 @@
 import {
 	getConversation,
+	getDefaultSession,
 	getGhlConnection,
+	getWhatsAppSession,
 	listOrganizationMembers,
 	setConversationContactName,
 	setConversationOwner,
@@ -12,10 +14,12 @@ import {
 	type GHLContact,
 } from "@repo/integrations";
 import { logger } from "@repo/logs";
+import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
+import { linkThreadToGhlByPhone } from "../lib/link-ghl-contact";
 
 export interface ContactField {
 	key: string;
@@ -47,6 +51,12 @@ export interface ContactProfile {
 		/** Deep link into the GHL contact record, when resolvable. */
 		contactUrl: string | null;
 		/**
+		 * True when the thread is a WhatsApp-privacy (`@lid`) chat that GHL is
+		 * connected for but that couldn't be auto-linked (the LID never resolved
+		 * to a phone). The panel offers a manual "link by phone" affordance.
+		 */
+		linkableByPhone: boolean;
+		/**
 		 * GHL's assigned user for this contact, when set. `memberId` is the
 		 * email-matched agency member (null when the assignee isn't a member —
 		 * the panel then shows the assignment instead of "Unassigned").
@@ -62,6 +72,39 @@ function phoneFromChatId(chatId: string): string | null {
 		return null;
 	}
 	return `+${digits}`;
+}
+
+/**
+ * Ask OpenWA to resolve a thread's `@lid` sender to a phone (best-effort — the
+ * account's lid↔phone map may still not know it), then link the matching GHL
+ * contact to the thread. Returns the linked GHL contact id, or null.
+ */
+async function resolveAndLinkLidThread(
+	subaccountId: string,
+	organizationId: string,
+	chatId: string,
+	activeSessionId: string | null,
+): Promise<string | null> {
+	try {
+		const session = activeSessionId
+			? await getWhatsAppSession(subaccountId, activeSessionId)
+			: await getDefaultSession(subaccountId);
+		if (!session) {
+			return null;
+		}
+		const phone = await createOpenWaClient().resolveContactPhone(session.openwaSessionId, chatId);
+		if (!phone) {
+			return null;
+		}
+		return await linkThreadToGhlByPhone({ subaccountId, organizationId, chatId, phone });
+	} catch (error) {
+		logger.warn("LID self-heal link failed", {
+			ctx: "whatsapp.contactProfile.lidSelfHeal",
+			chatId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
 }
 
 function initialsFrom(name: string): string {
@@ -93,6 +136,23 @@ export const getContactProfile = protectedProcedure
 			getGhlConnection(subaccount.id),
 			listOrganizationMembers(subaccount.organizationId),
 		]);
+
+		// Self-heal @lid threads: a WhatsApp-privacy (`@lid`) chat whose LID never
+		// resolved to a phone at message time carries no ghlContactId, so the
+		// read-through below can't find the CRM contact. Try resolving the LID now
+		// (the account's lid↔phone map often fills in after interaction) and link
+		// the thread. Best-effort — falls back to the manual link affordance.
+		if (ghl && conversation && !conversation.ghlContactId && input.chatId.endsWith("@lid")) {
+			const linkedId = await resolveAndLinkLidThread(
+				subaccount.id,
+				subaccount.organizationId,
+				input.chatId,
+				conversation.activeSessionId,
+			);
+			if (linkedId) {
+				conversation.ghlContactId = linkedId;
+			}
+		}
 
 		// Read-through to the live GHL contact when linked — GHL is the source of
 		// truth for name/email/phone/tags/owner then. Best-effort: a GHL hiccup
@@ -241,6 +301,8 @@ export const getContactProfile = protectedProcedure
 				contactId: conversation?.ghlContactId ?? null,
 				contactUrl,
 				assignee: ghlAssignee,
+				linkableByPhone:
+					Boolean(ghl) && !conversation?.ghlContactId && input.chatId.endsWith("@lid"),
 			},
 		};
 	});

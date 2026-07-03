@@ -14,6 +14,7 @@ import { getSampleContact } from "./procedures/get-sample-contact";
 import { getSession } from "./procedures/get-session";
 import { getSettings } from "./procedures/get-settings";
 import { getThread } from "./procedures/get-thread";
+import { linkContactByPhone } from "./procedures/link-contact-by-phone";
 import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
 import { listContactOwners } from "./procedures/list-contact-owners";
@@ -62,6 +63,7 @@ export const whatsappRouter = {
 	getThread,
 	getChatHistory,
 	linkPreview,
+	linkContactByPhone,
 	setConversationNumber,
 	listNumbers,
 	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect

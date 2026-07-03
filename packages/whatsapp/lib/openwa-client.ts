@@ -80,6 +80,11 @@ export interface OpenWaClient {
 	getQr(id: string): Promise<OpenWaQrResponse>;
 	requestPairingCode(id: string, phoneNumber: string): Promise<OpenWaPairingCodeResponse>;
 	getChats(id: string): Promise<OpenWaChat[]>;
+	/**
+	 * Resolve a contact id (e.g. an `@lid` privacy id) to a phone number (MSISDN
+	 * digits, no `+`), best-effort. Null when the engine can't map it.
+	 */
+	resolveContactPhone(id: string, contactId: string): Promise<string | null>;
 	getChatHistory(
 		id: string,
 		chatId: string,
@@ -184,6 +189,15 @@ class OpenWaHttpClient implements OpenWaClient {
 
 	getChats(id: string): Promise<OpenWaChat[]> {
 		return this.request<OpenWaChat[]>("GET", `/sessions/${id}/chats`);
+	}
+
+	async resolveContactPhone(id: string, contactId: string): Promise<string | null> {
+		const res = await this.request<{ contactId: string; phone: string | null }>(
+			"GET",
+			`/sessions/${id}/contacts/${encodeURIComponent(contactId)}/phone`,
+		);
+		const digits = res?.phone?.replace(/\D/g, "");
+		return digits && digits.length >= 6 ? digits : null;
 	}
 
 	getChatHistory(

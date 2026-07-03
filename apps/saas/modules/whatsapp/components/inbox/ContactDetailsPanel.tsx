@@ -116,6 +116,10 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 	const setFields = useMutation(
 		orpc.whatsapp.setContactFields.mutationOptions({ onSuccess: invalidateProfile }),
 	);
+	const linkByPhone = useMutation(
+		orpc.whatsapp.linkContactByPhone.mutationOptions({ onSuccess: invalidateProfile }),
+	);
+	const [linkPhone, setLinkPhone] = useState("");
 
 	const [editingField, setEditingField] = useState<{ key: string; value: string } | null>(null);
 
@@ -188,6 +192,48 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 							</a>
 						) : null}
 					</div>
+
+					{/* Manual CRM link — for @lid (WhatsApp privacy) threads whose number
+					    couldn't be auto-resolved to match a GoHighLevel contact. */}
+					{profile.ghl.connected && profile.ghl.linkableByPhone ? (
+						<div className="gap-1.5 p-3 flex flex-col rounded-lg border border-dashed">
+							<span className="font-medium text-xs text-foreground/75">Link to GoHighLevel</span>
+							<p className="leading-snug text-[11px] text-foreground/65">
+								This chat hides its number (WhatsApp privacy), so it isn’t matched to a CRM contact
+								yet. Enter the contact’s phone to link it.
+							</p>
+							<div className="gap-1.5 flex items-center">
+								<Input
+									value={linkPhone}
+									placeholder="+1 555 123 4567"
+									inputMode="tel"
+									className="h-8 text-sm"
+									onChange={(event) => setLinkPhone(event.target.value)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter" && linkPhone.trim().replace(/\D/g, "").length >= 6) {
+											event.preventDefault();
+											linkByPhone.mutate({ chatId, phone: linkPhone.trim(), subaccountId });
+										}
+									}}
+								/>
+								<Button
+									size="sm"
+									className="h-8"
+									disabled={linkByPhone.isPending || linkPhone.trim().replace(/\D/g, "").length < 6}
+									onClick={() =>
+										linkByPhone.mutate({ chatId, phone: linkPhone.trim(), subaccountId })
+									}
+								>
+									{linkByPhone.isPending ? <Spinner className="size-4" /> : "Link"}
+								</Button>
+							</div>
+							{linkByPhone.data && !linkByPhone.data.linked ? (
+								<p className="text-[11px] text-destructive">
+									Couldn’t link — check the number and that GoHighLevel is reachable.
+								</p>
+							) : null}
+						</div>
+					) : null}
 
 					{/* Owner */}
 					<div className="gap-1.5 flex flex-col">
