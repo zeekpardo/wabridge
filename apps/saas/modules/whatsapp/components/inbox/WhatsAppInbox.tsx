@@ -12,7 +12,13 @@ import {
 } from "@repo/ui/components/select";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeftIcon, MessageSquareIcon, PanelRightIcon, StarIcon } from "lucide-react";
+import {
+	ChevronLeftIcon,
+	MessageSquareIcon,
+	PanelRightIcon,
+	StarIcon,
+	UsersIcon,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { Composer } from "./Composer";
@@ -57,9 +63,12 @@ function normalizeReactions(
 export function WhatsAppInbox({
 	embedded = false,
 	subaccountId,
+	onManageGroup,
 }: {
 	embedded?: boolean;
 	subaccountId?: string;
+	/** Called with the group chatId when the user opens group management from a group thread. */
+	onManageGroup?: (chatId: string) => void;
 }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -136,6 +145,7 @@ export function WhatsAppInbox({
 				status?: string | null;
 				sessionId?: string | null;
 				sentByName?: string | null;
+				authorName?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 				waMessageId?: string | null;
 				quotedMessageId?: string | null;
@@ -152,6 +162,7 @@ export function WhatsAppInbox({
 				quotedMessageId?: string | null;
 				reactions?: unknown;
 				deleted?: boolean | null;
+				authorName?: string | null;
 			};
 			byKey.set(m.waMessageId ?? m.id, {
 				id: m.id,
@@ -162,6 +173,7 @@ export function WhatsAppInbox({
 				status: m.status,
 				sessionId: m.sessionId,
 				sentByName: m.sentByName,
+				authorName: row.authorName ?? null,
 				media: null,
 				waMessageId: m.waMessageId,
 				quotedMessageId: row.quotedMessageId ?? null,
@@ -276,6 +288,21 @@ export function WhatsAppInbox({
 		selectedChat?.phone ||
 		(selectedChatId ? prettyPhone(selectedChatId) : "");
 
+	// A group thread is either flagged by the chat list or detectable from the id.
+	const isGroupChat =
+		Boolean(selectedChat?.isGroup) || (selectedChatId?.endsWith("@g.us") ?? false);
+
+	// Best-effort member count for the group header, resolved via the group's
+	// member session (the active number). Stays null until it loads or if it fails.
+	const groupInfoQuery = useQuery({
+		...orpc.whatsapp.getGroup.queryOptions({
+			input: { sessionId: activeNumberId, groupId: selectedChatId ?? "", subaccountId },
+		}),
+		enabled: isGroupChat && !!selectedChatId && !!activeNumberId,
+		staleTime: 60_000,
+	});
+	const memberCount = groupInfoQuery.data?.participants?.length ?? null;
+
 	return (
 		<Card
 			className={cn(
@@ -335,7 +362,13 @@ export function WhatsAppInbox({
 								</Button>
 								<div className="min-w-0">
 									<p className="font-medium text-sm truncate">{contactName}</p>
-									{selectedChat?.phone && selectedChat.phone !== contactName ? (
+									{isGroupChat ? (
+										memberCount !== null ? (
+											<p className="text-xs truncate text-foreground/65">
+												{memberCount} {memberCount === 1 ? "member" : "members"}
+											</p>
+										) : null
+									) : selectedChat?.phone && selectedChat.phone !== contactName ? (
 										<p className="text-xs truncate text-foreground/65">{selectedChat.phone}</p>
 									) : null}
 								</div>
@@ -377,6 +410,18 @@ export function WhatsAppInbox({
 										))}
 									</SelectContent>
 								</Select>
+								{isGroupChat && onManageGroup ? (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="gap-1.5"
+										aria-label="Manage group"
+										onClick={() => onManageGroup(selectedChatId)}
+									>
+										<UsersIcon className="size-4" />
+										<span className="sm:inline hidden">Manage</span>
+									</Button>
+								) : null}
 								<Button
 									variant={detailsOpen ? "secondary" : "ghost"}
 									size="icon"
@@ -395,6 +440,8 @@ export function WhatsAppInbox({
 								name: contactName,
 								phone: selectedChat?.phone ?? (selectedChatId ? prettyPhone(selectedChatId) : null),
 								avatarUrl: contactProfileQuery.data?.avatarUrl ?? undefined,
+								isGroup: isGroupChat,
+								memberCount,
 							}}
 							numbers={numbers}
 							fallbackNumberId={activeNumberId || null}

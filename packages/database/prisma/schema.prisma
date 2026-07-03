@@ -271,6 +271,11 @@ model WhatsAppMessage {
   // and for GHL-native/automation sends (no acting app user).
   sentByUserId   String?
   sentByName     String?
+  // The group member who sent an inbound message — their display name and
+  // phone (`<digits>@c.us` → digits). Set only for inbound group messages so
+  // the thread can label who spoke; null for 1:1 chats and outbound.
+  authorName     String?
+  authorPhone    String?
   // GHL's message id once mirrored, for status updates + echo de-duplication.
   ghlMessageId   String?
   ghlSynced      Boolean         @default(false)

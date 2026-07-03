@@ -52,6 +52,10 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 					type: event.type,
 					waMessageId: event.waMessageId,
 					senderPhone: event.senderPhone ?? null,
+					// Group author (inbound group messages only) — persisted so the inbox
+					// can label each bubble with who sent it.
+					authorName: event.authorName ?? null,
+					authorPhone: event.authorPhone ?? null,
 					timestamp: event.timestamp,
 				},
 				createFanOutDeps(),

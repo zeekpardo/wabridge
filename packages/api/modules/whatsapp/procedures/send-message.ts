@@ -67,7 +67,22 @@ export const sendMessage = protectedProcedure
 		// Resolve which number sends.
 		let sender: Awaited<ReturnType<typeof getWhatsAppSession>> | null = null;
 
-		if (processed.numberOverride) {
+		// Group routing is authoritative: a group is tied to the ONE of our numbers
+		// that is a member of it, pinned as the conversation's active number by the
+		// inbound group message. We must send from that number — never the
+		// owner/org default (a non-member number can't post to the group). This
+		// overrides #switch and explicit fromSessionId, which have no meaning here.
+		if (chatId.endsWith("@g.us")) {
+			const conversation = await getConversation(subaccount.id, chatId);
+			if (conversation?.activeSessionId) {
+				sender = await getWhatsAppSession(subaccount.id, conversation.activeSessionId);
+			}
+			if (!sender) {
+				throw new ORPCError("NOT_FOUND", {
+					message: "No number is a member of this group.",
+				});
+			}
+		} else if (processed.numberOverride) {
 			sender = await getSessionByPriority(subaccount.id, processed.numberOverride.priority);
 			if (!sender) {
 				throw new ORPCError("NOT_FOUND", {
