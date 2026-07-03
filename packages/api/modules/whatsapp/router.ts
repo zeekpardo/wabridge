@@ -34,6 +34,7 @@ import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
 import { listContactOwners } from "./procedures/list-contact-owners";
 import { listContactTags } from "./procedures/list-contact-tags";
+import { listCrmConnections } from "./procedures/list-crm-connections";
 import { listContactVariables } from "./procedures/list-contact-variables";
 import { listConversationsProcedure } from "./procedures/list-conversations";
 import { listMessages } from "./procedures/list-messages";
@@ -124,6 +125,7 @@ export const whatsappRouter = {
 	// Contact / CRM panel (prewired for GoHighLevel)
 	getContactProfile,
 	listContactOwners,
+	listCrmConnections,
 	setContactOwner,
 	setContactTags,
 	setContactFields,
