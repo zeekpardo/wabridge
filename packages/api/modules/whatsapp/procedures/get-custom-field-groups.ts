@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getConversation, getGhlConnection } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
 
@@ -9,7 +9,6 @@ import { resolveSubaccount } from "../lib/active-organization";
 export interface CustomFieldValue {
 	id: string;
 	name: string;
-	dataType: string;
 	value: string | null;
 }
 
@@ -50,58 +49,12 @@ export const getCustomFieldGroups = protectedProcedure
 			}
 
 			try {
-				const client = await createGoHighLevelClient(subaccount.id);
-				if (!client) {
+				const provider = await resolveCrmProvider(subaccount.id);
+				if (!provider) {
 					return { folders: [] };
 				}
 
-				const [definitions, folders, contact] = await Promise.all([
-					client.getCustomFields(),
-					client.getCustomFieldFolders(),
-					client.getContact(conversation.ghlContactId),
-				]);
-
-				// The contact's set values, keyed by field id.
-				const valueById = new Map<string, string>();
-				for (const field of contact.customFields ?? []) {
-					const value = Array.isArray(field.value) ? field.value.join(", ") : field.value;
-					if (value != null && value !== "") {
-						valueById.set(field.id, String(value));
-					}
-				}
-
-				// Fields keyed by their folder, ordered by position within each.
-				const byFolder = new Map<string, typeof definitions>();
-				for (const def of definitions) {
-					if (def.documentType && def.documentType !== "field") {
-						continue;
-					}
-					const key = def.parentId ?? "__ungrouped__";
-					const list = byFolder.get(key) ?? [];
-					list.push(def);
-					byFolder.set(key, list);
-				}
-
-				const groups: CustomFieldFolderGroup[] = [];
-				for (const folder of folders) {
-					const defs = (byFolder.get(folder.id) ?? [])
-						.slice()
-						.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-					if (defs.length === 0) {
-						continue;
-					}
-					groups.push({
-						id: folder.id,
-						name: folder.name,
-						fields: defs.map((def) => ({
-							id: def.id,
-							name: def.name,
-							dataType: def.dataType,
-							value: valueById.get(def.id) ?? null,
-						})),
-					});
-				}
-
+				const groups = await provider.customFieldGroups(conversation.ghlContactId);
 				return { folders: groups };
 			} catch (error) {
 				logger.warn("GHL custom field groups fetch failed", {
