@@ -25,6 +25,7 @@ function mockDeps(overrides: Partial<FanOutDeps> = {}): FanOutDeps {
 		sendOverWhatsApp: vi.fn().mockResolvedValue({ waMessageId: "wa_sent" }),
 		pushGhlInbound: vi.fn().mockResolvedValue({ ghlMessageId: "ghl_in" }),
 		recordGhlOutbound: vi.fn().mockResolvedValue({ ghlMessageId: "ghl_out" }),
+		linkGhlThread: vi.fn().mockResolvedValue(undefined),
 		markSynced: vi.fn().mockResolvedValue(undefined),
 		notifyApp: vi.fn(),
 		...overrides,
@@ -37,6 +38,7 @@ describe("planProjections (the coexistence contract)", () => {
 			sendOverWhatsApp: false,
 			pushGhlInbound: true,
 			recordGhlOutbound: false,
+			linkGhlThread: false,
 			notifyApp: true,
 		});
 	});
@@ -46,6 +48,7 @@ describe("planProjections (the coexistence contract)", () => {
 			sendOverWhatsApp: true,
 			pushGhlInbound: false,
 			recordGhlOutbound: false,
+			linkGhlThread: true,
 			notifyApp: true,
 		});
 	});
@@ -55,6 +58,7 @@ describe("planProjections (the coexistence contract)", () => {
 			sendOverWhatsApp: true,
 			pushGhlInbound: false,
 			recordGhlOutbound: true,
+			linkGhlThread: false,
 			notifyApp: true,
 		});
 	});
@@ -82,6 +86,8 @@ describe("fanOutMessage", () => {
 		expect(deps.sendOverWhatsApp).toHaveBeenCalledOnce();
 		expect(deps.pushGhlInbound).not.toHaveBeenCalled();
 		expect(deps.recordGhlOutbound).not.toHaveBeenCalled();
+		// Links the thread to its GHL contact (so the panel reads through) without re-posting.
+		expect(deps.linkGhlThread).toHaveBeenCalledOnce();
 		expect(result.waMessageId).toBe("wa_sent");
 	});
 
