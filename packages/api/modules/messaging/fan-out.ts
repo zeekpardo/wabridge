@@ -36,6 +36,12 @@ export interface CanonicalMessage {
 	 */
 	senderPhone?: string | null;
 	/**
+	 * For inbound GROUP messages: the member who sent it. `authorName` labels the
+	 * bubble in the inbox; both are null for 1:1 chats and outbound.
+	 */
+	authorName?: string | null;
+	authorPhone?: string | null;
+	/**
 	 * Pre-send human delay (ms) from a `!/DELAY/x/y/!` directive, resolved before
 	 * fan-out. Honoured by `sendOverWhatsApp` (capped) so bulk sends look human.
 	 */

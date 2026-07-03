@@ -457,6 +457,10 @@ export async function createWhatsAppMessage(data: {
 	sentByUserId?: string | null;
 	/** Denormalized display name of {@link sentByUserId} for the thread avatar. */
 	sentByName?: string | null;
+	/** Inbound group sender's display name (group messages only). */
+	authorName?: string | null;
+	/** Inbound group sender's phone, digits from `<digits>@c.us` (group only). */
+	authorPhone?: string | null;
 	/** GHL's message id once mirrored (for status updates + echo de-dupe). */
 	ghlMessageId?: string | null;
 }) {
@@ -525,6 +529,8 @@ export async function createWhatsAppMessage(data: {
 				origin: data.origin ?? "contact",
 				sentByUserId: data.sentByUserId ?? null,
 				sentByName: data.sentByName ?? null,
+				authorName: data.authorName ?? null,
+				authorPhone: data.authorPhone ?? null,
 				ghlMessageId: data.ghlMessageId ?? null,
 			},
 		});

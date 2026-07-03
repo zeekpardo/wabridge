@@ -16,6 +16,19 @@ import { getSampleContact } from "./procedures/get-sample-contact";
 import { getSession } from "./procedures/get-session";
 import { getSettings } from "./procedures/get-settings";
 import { getThread } from "./procedures/get-thread";
+import { createGroup } from "./procedures/group-create";
+import { setGroupDescription } from "./procedures/group-description";
+import { getGroup } from "./procedures/group-get";
+import { getGroupInviteCode, revokeGroupInviteCode } from "./procedures/group-invite";
+import { leaveGroup } from "./procedures/group-leave";
+import { listGroups } from "./procedures/group-list";
+import {
+	addGroupParticipants,
+	demoteGroupParticipants,
+	promoteGroupParticipants,
+	removeGroupParticipants,
+} from "./procedures/group-participants";
+import { setGroupSubject } from "./procedures/group-subject";
 import { linkContactByPhone } from "./procedures/link-contact-by-phone";
 import { linkPreview } from "./procedures/link-preview";
 import { listChats } from "./procedures/list-chats";
@@ -90,6 +103,19 @@ export const whatsappRouter = {
 	listNumbers,
 	listOwnerNumbers,
 	setOwnerNumber,
+	// Groups (tied to the member number; all POST under /whatsapp/groups...)
+	listGroups,
+	getGroup,
+	createGroup,
+	addGroupParticipants,
+	removeGroupParticipants,
+	promoteGroupParticipants,
+	demoteGroupParticipants,
+	setGroupSubject,
+	setGroupDescription,
+	getGroupInviteCode,
+	revokeGroupInviteCode,
+	leaveGroup,
 	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect
 	getGhlOAuthUrl,
 	getGhlProvisionUrl,

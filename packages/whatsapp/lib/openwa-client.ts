@@ -114,6 +114,39 @@ export interface SendContactInput {
 /** Presence indicator sent to a chat: 'typing'/'recording' show it, 'paused' clears it. */
 export type OpenWaChatState = "typing" | "recording" | "paused";
 
+export interface Group {
+	id: string;
+	name: string;
+	participantsCount?: number;
+	isAdmin?: boolean;
+	linkedParentJID?: string;
+}
+
+export interface GroupParticipant {
+	id: string;
+	number: string;
+	name: string;
+	isAdmin: boolean;
+	isSuperAdmin: boolean;
+}
+
+export interface GroupInfo {
+	id: string;
+	name: string;
+	description?: string;
+	owner?: string;
+	createdAt?: string;
+	isReadOnly: boolean;
+	isAnnounce: boolean;
+	linkedParentJID?: string;
+	participants: GroupParticipant[];
+}
+
+export interface Invite {
+	inviteCode: string;
+	inviteLink: string;
+}
+
 export interface OpenWaClient {
 	createSession(input: CreateSessionInput): Promise<OpenWaSession>;
 	listSessions(): Promise<OpenWaSession[]>;
@@ -152,6 +185,18 @@ export interface OpenWaClient {
 	markChatUnread(id: string, chatId: string): Promise<void>;
 	sendChatState(id: string, chatId: string, state: OpenWaChatState): Promise<void>;
 	getProfilePicture(id: string, contactId: string): Promise<string | null>;
+	getGroups(id: string, opts?: { limit?: number; offset?: number }): Promise<Group[]>;
+	getGroupInfo(id: string, groupId: string): Promise<GroupInfo>;
+	createGroup(id: string, input: { name: string; participants: string[] }): Promise<Group>;
+	addGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
+	removeGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
+	promoteGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
+	demoteGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
+	setGroupSubject(id: string, groupId: string, subject: string): Promise<void>;
+	setGroupDescription(id: string, groupId: string, description: string): Promise<void>;
+	getGroupInviteCode(id: string, groupId: string): Promise<Invite>;
+	revokeGroupInviteCode(id: string, groupId: string): Promise<Invite>;
+	leaveGroup(id: string, groupId: string): Promise<void>;
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown>;
 }
 
@@ -368,6 +413,110 @@ class OpenWaHttpClient implements OpenWaClient {
 			`/sessions/${id}/contacts/${encodeURIComponent(contactId)}/profile-picture`,
 		);
 		return res?.url ?? null;
+	}
+
+	getGroups(id: string, opts?: { limit?: number; offset?: number }): Promise<Group[]> {
+		const params = new URLSearchParams();
+		if (opts?.limit !== undefined) {
+			params.set("limit", String(opts.limit));
+		}
+		if (opts?.offset !== undefined) {
+			params.set("offset", String(opts.offset));
+		}
+		const query = params.toString();
+		return this.request<Group[]>("GET", `/sessions/${id}/groups${query ? `?${query}` : ""}`);
+	}
+
+	getGroupInfo(id: string, groupId: string): Promise<GroupInfo> {
+		return this.request<GroupInfo>("GET", `/sessions/${id}/groups/${encodeURIComponent(groupId)}`);
+	}
+
+	createGroup(id: string, input: { name: string; participants: string[] }): Promise<Group> {
+		return this.request<Group>("POST", `/sessions/${id}/groups`, {
+			name: input.name,
+			participants: input.participants,
+		});
+	}
+
+	async addGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"POST",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/participants`,
+			{ participants },
+		);
+	}
+
+	async removeGroupParticipants(
+		id: string,
+		groupId: string,
+		participants: string[],
+	): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"DELETE",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/participants`,
+			{ participants },
+		);
+	}
+
+	async promoteGroupParticipants(
+		id: string,
+		groupId: string,
+		participants: string[],
+	): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"POST",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/participants/promote`,
+			{ participants },
+		);
+	}
+
+	async demoteGroupParticipants(
+		id: string,
+		groupId: string,
+		participants: string[],
+	): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"POST",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/participants/demote`,
+			{ participants },
+		);
+	}
+
+	async setGroupSubject(id: string, groupId: string, subject: string): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"PUT",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/subject`,
+			{ subject },
+		);
+	}
+
+	async setGroupDescription(id: string, groupId: string, description: string): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"PUT",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/description`,
+			{ description },
+		);
+	}
+
+	getGroupInviteCode(id: string, groupId: string): Promise<Invite> {
+		return this.request<Invite>(
+			"GET",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/invite-code`,
+		);
+	}
+
+	revokeGroupInviteCode(id: string, groupId: string): Promise<Invite> {
+		return this.request<Invite>(
+			"POST",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/invite-code/revoke`,
+		);
+	}
+
+	async leaveGroup(id: string, groupId: string): Promise<void> {
+		await this.request<{ success: boolean }>(
+			"POST",
+			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/leave`,
+		);
 	}
 
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown> {

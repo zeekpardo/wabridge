@@ -27,6 +27,18 @@ export interface OpenWaInboundMessage {
 	 * consumers must NOT fall back to the `@lid` digits, which are not a phone.
 	 */
 	senderPhone?: string | null;
+	/**
+	 * For GROUP messages (chatId ends `@g.us`), the author (the group member who
+	 * sent this) display name — from `pushName`/`notifyName`. Null/absent for 1:1
+	 * chats, where the sender IS the conversation contact. Never used as the
+	 * conversation's name for a group (that's the GROUP subject, sourced elsewhere).
+	 */
+	authorName?: string | null;
+	/**
+	 * For GROUP messages, the author's phone (MSISDN digits from `<digits>@c.us`).
+	 * Null/absent for 1:1 chats.
+	 */
+	authorPhone?: string | null;
 }
 
 /** A delivery/read receipt for a message we sent. */
@@ -152,6 +164,29 @@ async function processEvent(
 			const body = typeof data.body === "string" ? data.body : null;
 			const type = String(data.type ?? "text");
 			const timestamp = parseTimestamp(payload.timestamp);
+			const isGroup = chatId.endsWith("@g.us");
+
+			// The sender's display name from the gateway. For a 1:1 chat this is the
+			// contact; for a GROUP it's the AUTHOR (a group member), which must NOT
+			// become the conversation name — the conversation name is the group
+			// subject (sourced elsewhere).
+			const senderName =
+				typeof data.pushName === "string"
+					? data.pushName
+					: typeof data.notifyName === "string"
+						? data.notifyName
+						: null;
+			// Group author phone: prefer the gateway's resolved senderPhone, else the
+			// digits of the `<digits>@c.us` author JID. `@lid` author ids are opaque
+			// privacy ids and are NOT a phone, so they're left null.
+			const authorPhone = isGroup
+				? typeof data.senderPhone === "string"
+					? data.senderPhone
+					: typeof data.author === "string" && data.author.endsWith("@c.us")
+						? data.author.replace(/@.*/, "")
+						: null
+				: null;
+			const authorName = isGroup ? senderName : null;
 
 			// Keep the conversation thread fresh BEFORE persisting the message, so
 			// downstream projections (e.g. GHL contact upsert) see the contact name.
@@ -168,19 +203,17 @@ async function processEvent(
 						preview,
 					});
 				} else {
-					const contactName =
-						typeof data.pushName === "string"
-							? data.pushName
-							: typeof data.notifyName === "string"
-								? data.notifyName
-								: null;
+					// For a GROUP thread, do NOT set contactName from the sender — that's
+					// the author (a member), not the conversation name (the group
+					// subject, sourced elsewhere). Only 1:1 chats name the thread from
+					// the sender.
 					await upsertConversationInbound({
 						subaccountId,
 						organizationId,
 						chatId,
 						sessionId,
 						preview,
-						contactName,
+						contactName: isGroup ? null : senderName,
 					});
 				}
 			}
@@ -199,6 +232,8 @@ async function processEvent(
 					waMessageId: typeof data.id === "string" ? data.id : null,
 					timestamp,
 					senderPhone: typeof data.senderPhone === "string" ? data.senderPhone : null,
+					authorName,
+					authorPhone,
 				});
 				break;
 			}
@@ -216,6 +251,9 @@ async function processEvent(
 				waMessageId: typeof data.id === "string" ? data.id : null,
 				idempotencyKey: payload.idempotencyKey,
 				timestamp,
+				// Group author (inbound only); null for 1:1 and for outbound echoes.
+				authorName: outbound ? null : authorName,
+				authorPhone: outbound ? null : authorPhone,
 			});
 			break;
 		}

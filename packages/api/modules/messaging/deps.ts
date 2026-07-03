@@ -151,6 +151,8 @@ export function createFanOutDeps(): FanOutDeps {
 				status: message.direction === "outbound" ? "sent" : null,
 				waMessageId: message.waMessageId ?? null,
 				origin: message.origin,
+				authorName: message.authorName ?? null,
+				authorPhone: message.authorPhone ?? null,
 				ghlMessageId: message.ghlMessageId ?? null,
 				timestamp: message.timestamp,
 			});
