@@ -503,7 +503,7 @@ function MessageActions({
 					</DropdownMenuItem>
 				) : null}
 
-				{onDelete ? (
+				{onDelete && isOutbound ? (
 					<DropdownMenuItem
 						onSelect={() => onDelete(message)}
 						className="text-destructive focus:text-destructive"
