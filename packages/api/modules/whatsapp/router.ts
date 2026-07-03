@@ -34,6 +34,7 @@ import { setContactFields } from "./procedures/set-contact-fields";
 import { setContactOwner } from "./procedures/set-contact-owner";
 import { setContactTags } from "./procedures/set-contact-tags";
 import { setConversationNumber } from "./procedures/set-conversation-number";
+import { updateNumber } from "./procedures/update-number";
 import { updateSettings } from "./procedures/update-settings";
 
 export const whatsappRouter = {
@@ -43,6 +44,7 @@ export const whatsappRouter = {
 	getQr,
 	requestPairingCode,
 	deleteSession,
+	updateNumber,
 	sendTestMessage,
 	sendMessage,
 	previewCommand,
