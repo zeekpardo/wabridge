@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getConversation, setConversationTags } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
 
@@ -55,12 +55,12 @@ export const setContactTags = protectedProcedure
 		// linked, so keep it current with the app-side edit).
 		if (conversation?.ghlContactId) {
 			try {
-				const client = await createGoHighLevelClient(subaccount.id);
-				if (client) {
+				const provider = await resolveCrmProvider(subaccount.id);
+				if (provider) {
 					if (input.action === "add") {
-						await client.addTags(conversation.ghlContactId, [tag]);
+						await provider.addContactTags(conversation.ghlContactId, [tag]);
 					} else {
-						await client.updateContact(conversation.ghlContactId, { tags: next });
+						await provider.setContactTags(conversation.ghlContactId, next);
 					}
 				}
 			} catch (error) {

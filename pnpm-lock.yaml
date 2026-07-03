@@ -691,6 +691,9 @@ importers:
       '@repo/auth':
         specifier: workspace:*
         version: link:../auth
+      '@repo/crm':
+        specifier: workspace:*
+        version: link:../crm
       '@repo/database':
         specifier: workspace:*
         version: link:../database
@@ -786,6 +789,34 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  packages/crm:
+    dependencies:
+      '@repo/database':
+        specifier: workspace:*
+        version: link:../database
+      '@repo/integrations':
+        specifier: workspace:*
+        version: link:../integrations
+      '@repo/logs':
+        specifier: workspace:*
+        version: link:../logs
+      '@repo/whatsapp':
+        specifier: workspace:*
+        version: link:../whatsapp
+    devDependencies:
+      '@repo/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.0.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/coverage-v8@4.1.9)(vite@7.3.1(@types/node@26.0.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/database:
     dependencies:

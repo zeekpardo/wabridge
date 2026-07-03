@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getGhlConnection, listOrganizationMembers } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 
 export interface AssignableOwner {
@@ -32,9 +32,9 @@ export async function listAssignableOwners(subaccount: {
 	const ghl = await getGhlConnection(subaccount.id);
 	if (ghl) {
 		try {
-			const client = await createGoHighLevelClient(subaccount.id);
-			if (client) {
-				const users = await client.getUsers();
+			const provider = await resolveCrmProvider(subaccount.id);
+			if (provider) {
+				const users = await provider.getUsers();
 				return users.map((ghlUser) => ({
 					id: ghlUser.id,
 					name:

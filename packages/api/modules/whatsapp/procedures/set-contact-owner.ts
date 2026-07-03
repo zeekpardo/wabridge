@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getConversation, getGhlConnection, setConversationOwner } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
 
@@ -48,12 +48,12 @@ export const setContactOwner = protectedProcedure
 			return { ok: true };
 		}
 
-		const client = await createGoHighLevelClient(subaccount.id);
-		if (!client) {
+		const provider = await resolveCrmProvider(subaccount.id);
+		if (!provider) {
 			return { ok: true };
 		}
 
-		await client.updateContact(conversation.ghlContactId, { assignedTo: input.ownerId });
+		await provider.setContactOwner(conversation.ghlContactId, input.ownerId);
 
 		// Cache the GHL user id as the thread's display owner so the panel and the
 		// conversation-list owner filter agree (same identity as the dropdown).

@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getConversation, setConversationContactName } from "@repo/database";
-import { createGoHighLevelClient, ghlContactDisplayName } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
 
@@ -41,17 +41,17 @@ export const setContactFields = protectedProcedure
 		const conversation = await getConversation(subaccount.id, input.chatId);
 
 		if (conversation?.ghlContactId) {
-			const client = await createGoHighLevelClient(subaccount.id);
-			if (client) {
-				await client.updateContact(conversation.ghlContactId, {
+			const provider = await resolveCrmProvider(subaccount.id);
+			if (provider) {
+				await provider.setContactFields(conversation.ghlContactId, {
 					...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
 					...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
 					...(input.email !== undefined ? { email: input.email } : {}),
 				});
 				// Re-read for the merged truth and cache the display name locally.
 				try {
-					const contact = await client.getContact(conversation.ghlContactId);
-					const name = ghlContactDisplayName(contact);
+					const contact = await provider.getContact(conversation.ghlContactId);
+					const name = contact?.name ?? null;
 					if (name) {
 						await setConversationContactName({
 							subaccountId: subaccount.id,

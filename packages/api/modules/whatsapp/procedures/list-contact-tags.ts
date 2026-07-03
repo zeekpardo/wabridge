@@ -1,5 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
 import { getGhlConnection, listConversations } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { z } from "zod";
 
@@ -26,10 +26,9 @@ export const listContactTags = protectedProcedure
 		const ghl = await getGhlConnection(subaccount.id);
 		if (ghl) {
 			try {
-				const client = await createGoHighLevelClient(subaccount.id);
-				if (client) {
-					const tags = await client.getTags();
-					return tags.map((tag) => tag.name).sort((a, b) => a.localeCompare(b));
+				const provider = await resolveCrmProvider(subaccount.id);
+				if (provider) {
+					return await provider.listTags();
 				}
 			} catch (error) {
 				logger.warn("GHL tag library fetch failed; falling back to local tags", {

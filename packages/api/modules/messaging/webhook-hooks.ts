@@ -1,5 +1,5 @@
+import { type CrmMessageStatus, resolveCrmProvider } from "@repo/crm";
 import { applyMessageReaction, getMessageByWaMessageId, markMessageDeleted } from "@repo/database";
-import { createGoHighLevelClient, type GHLMessageStatus } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import type { OpenWaWebhookHooks } from "@repo/whatsapp";
 
@@ -11,7 +11,7 @@ import { fanOutMessage } from "./fan-out";
  * (e.g. "sent"/"pending") are skipped — GHL treats the message as pending until
  * we report a terminal-ish state.
  */
-function toGhlStatus(waStatus: string): GHLMessageStatus | null {
+function toGhlStatus(waStatus: string): CrmMessageStatus | null {
 	switch (waStatus) {
 		case "delivered":
 			return "delivered";
@@ -97,11 +97,11 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 				if (!message?.ghlMessageId || message.direction !== "outbound") {
 					return;
 				}
-				const client = await createGoHighLevelClient(event.subaccountId);
-				if (!client) {
+				const provider = await resolveCrmProvider(event.subaccountId);
+				if (!provider) {
 					return;
 				}
-				await client.updateMessageStatus({ messageId: message.ghlMessageId, status });
+				await provider.updateMessageStatus({ crmMessageId: message.ghlMessageId, status });
 			} catch (error) {
 				logger.error(error, {
 					ctx: "messaging.ackToGhl",

@@ -1,3 +1,4 @@
+import { type CrmContact, type CrmProvider, resolveCrmProvider } from "@repo/crm";
 import {
 	getConversation,
 	getDefaultSession,
@@ -8,11 +9,6 @@ import {
 	setConversationOwner,
 	setConversationTags,
 } from "@repo/database";
-import {
-	createGoHighLevelClient,
-	ghlContactDisplayName,
-	type GHLContact,
-} from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
@@ -230,12 +226,12 @@ export const getContactProfile = protectedProcedure
 		// Read-through to the live GHL contact when linked — GHL is the source of
 		// truth for name/email/phone/tags/owner then. Best-effort: a GHL hiccup
 		// falls back to the local snapshot.
-		let ghlContact: GHLContact | null = null;
-		let client: Awaited<ReturnType<typeof createGoHighLevelClient>> = null;
+		let ghlContact: CrmContact | null = null;
+		let provider: CrmProvider | null = null;
 		if (ghl && conversation?.ghlContactId) {
 			try {
-				client = await createGoHighLevelClient(subaccount.id);
-				ghlContact = client ? await client.getContact(conversation.ghlContactId) : null;
+				provider = await resolveCrmProvider(subaccount.id);
+				ghlContact = provider ? await provider.getContact(conversation.ghlContactId) : null;
 			} catch (error) {
 				logger.warn("GHL contact read-through failed", {
 					ctx: "whatsapp.contactProfile",
@@ -249,9 +245,9 @@ export const getContactProfile = protectedProcedure
 		// (users.readonly). Unmappable assignments fall back to the local owner.
 		let ghlOwnerId: string | null = null;
 		let ghlAssignee: ContactProfile["ghl"]["assignee"] = null;
-		if (client && ghlContact?.assignedTo) {
+		if (provider && ghlContact?.assignedTo) {
 			try {
-				const users = await client.getUsers();
+				const users = await provider.getUsers();
 				const assignee = users.find((u) => u.id === ghlContact.assignedTo);
 				const email = assignee?.email?.toLowerCase() ?? null;
 				ghlOwnerId = email
@@ -281,7 +277,7 @@ export const getContactProfile = protectedProcedure
 		// Custom fields are surfaced separately, grouped by folder — see the
 		// getCustomFieldGroups procedure.
 
-		const ghlName = ghlContact ? ghlContactDisplayName(ghlContact) : null;
+		const ghlName = ghlContact?.name ?? null;
 		const phone = ghlContact?.phone ?? phoneFromChatId(input.chatId);
 		const name = ghlName || conversation?.contactName?.trim() || phone || "Unknown contact";
 
@@ -360,7 +356,8 @@ export const getContactProfile = protectedProcedure
 
 		const contactUrl =
 			ghl && conversation?.ghlContactId
-				? `https://app.gohighlevel.com/v2/location/${ghl.locationId}/contacts/detail/${conversation.ghlContactId}`
+				? (provider?.contactUrl(conversation.ghlContactId) ??
+					`https://app.gohighlevel.com/v2/location/${ghl.locationId}/contacts/detail/${conversation.ghlContactId}`)
 				: null;
 
 		return {
