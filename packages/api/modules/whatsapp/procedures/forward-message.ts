@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { createWhatsAppMessage } from "@repo/database";
 import { logger } from "@repo/logs";
-import { createOpenWaClient } from "@repo/whatsapp";
+import { createOpenWaClient, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
@@ -15,22 +15,29 @@ export const forwardMessage = protectedProcedure
 		path: "/whatsapp/forward",
 		tags: ["WhatsApp"],
 		summary: "Forward a message",
-		description: "Forwards a message from one chat to another and records it outbound.",
+		description:
+			"Forwards a message to an existing chat (toChatId) or to a person by phone (toPhone) — a CRM contact or a team member from the owners list — and records it outbound.",
 	})
 	.input(
-		z.object({
-			fromChatId: z.string().optional(),
-			toChatId: z.string(),
-			messageId: z.string(),
-			subaccountId: z.string().optional(),
-		}),
+		z
+			.object({
+				fromChatId: z.string().optional(),
+				toChatId: z.string().optional(),
+				toPhone: z.string().optional(),
+				messageId: z.string(),
+				subaccountId: z.string().optional(),
+			})
+			.refine((value) => Boolean(value.toChatId || value.toPhone), {
+				message: "Either toChatId or toPhone is required.",
+			}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
-		const fromChatId = input.fromChatId ?? input.toChatId;
+		const toChat = input.toChatId ?? toChatId(input.toPhone ?? "");
+		const fromChatId = input.fromChatId ?? toChat;
 
-		const sender = await resolveSendingSession(subaccount.id, input.toChatId);
+		const sender = await resolveSendingSession(subaccount.id, toChat);
 		if (!sender) {
 			throw new ORPCError("NOT_FOUND", { message: "No sendable number available." });
 		}
@@ -40,11 +47,11 @@ export const forwardMessage = protectedProcedure
 		try {
 			result = await openwa.forwardMessage(sender.openwaSessionId, {
 				fromChatId,
-				toChatId: input.toChatId,
+				toChatId: toChat,
 				messageId: input.messageId,
 			});
 		} catch (error) {
-			logger.error(error, { ctx: "whatsapp.forwardMessage", toChatId: input.toChatId });
+			logger.error(error, { ctx: "whatsapp.forwardMessage", toChatId: toChat });
 			throw new ORPCError("INTERNAL_SERVER_ERROR");
 		}
 
@@ -60,7 +67,7 @@ export const forwardMessage = protectedProcedure
 			organizationId: subaccount.organizationId,
 			sessionId: sender.id,
 			direction: "outbound",
-			chatId: input.toChatId,
+			chatId: toChat,
 			fromMe: true,
 			type: "text",
 			body: "[forwarded]",

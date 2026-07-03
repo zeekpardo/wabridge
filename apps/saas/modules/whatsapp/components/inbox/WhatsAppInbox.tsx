@@ -19,6 +19,7 @@ import { Composer } from "./Composer";
 import { ContactDetailsPanel } from "./ContactDetailsPanel";
 import { ConversationFilters } from "./ConversationFilters";
 import { ConversationList } from "./ConversationList";
+import { ForwardDialog, type ForwardTarget } from "./ForwardDialog";
 import { prettyPhone } from "./helpers";
 import { MessageThread } from "./MessageThread";
 
@@ -70,6 +71,8 @@ export function WhatsAppInbox({
 		body: string | null;
 		senderName: string;
 	} | null>(null);
+	// The message being forwarded (opens the target picker). Cleared on pick/close.
+	const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(null);
 	// Contact details default open on desktop; on mobile the aside is a full
 	// overlay, so it stays opt-in there.
 	const [detailsOpen, setDetailsOpen] = useState(
@@ -409,14 +412,8 @@ export function WhatsAppInbox({
 								reactMutation.mutate({ chatId: selectedChatId, messageId, emoji, subaccountId });
 							}}
 							onForward={(message) => {
-								const messageId = message.waMessageId ?? message.id;
-								// Minimal best-effort target: forward back to the same chat. A real
-								// chat-picker lands later; this keeps the wire live and compiling.
-								forwardMutation.mutate({
-									toChatId: selectedChatId,
-									messageId,
-									subaccountId,
-								});
+								// Open the target picker (a contact or a team member).
+								setForwardingMessageId(message.waMessageId ?? message.id);
 							}}
 							onDelete={(message) => {
 								const messageId = message.waMessageId ?? message.id;
@@ -470,6 +467,25 @@ export function WhatsAppInbox({
 					/>
 				</aside>
 			) : null}
+
+			<ForwardDialog
+				open={forwardingMessageId !== null}
+				onOpenChange={(next) => {
+					if (!next) {
+						setForwardingMessageId(null);
+					}
+				}}
+				subaccountId={subaccountId}
+				contacts={conversations}
+				fromChatId={selectedChatId}
+				onSelect={(target: ForwardTarget) => {
+					if (!forwardingMessageId) {
+						return;
+					}
+					forwardMutation.mutate({ messageId: forwardingMessageId, ...target, subaccountId });
+					setForwardingMessageId(null);
+				}}
+			/>
 		</Card>
 	);
 }

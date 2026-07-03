@@ -6,6 +6,8 @@ export interface AssignableOwner {
 	id: string;
 	name: string;
 	email: string;
+	/** The owner's phone (E.164-ish), when known — lets us forward a chat to them. */
+	phone: string | null;
 	image: string | null;
 	role: string;
 	/** Where this option comes from: a GHL location user or an agency member. */
@@ -41,6 +43,7 @@ export async function listAssignableOwners(subaccount: {
 						ghlUser.email ||
 						"GHL user",
 					email: ghlUser.email ?? "",
+					phone: ghlUser.phone?.trim() || null,
 					image: null,
 					role: ghlUser.roles?.role ?? "staff",
 					source: "ghl" as const,
@@ -59,6 +62,7 @@ export async function listAssignableOwners(subaccount: {
 		id: member.userId,
 		name: member.user.name || member.user.email,
 		email: member.user.email,
+		phone: null,
 		image: member.user.image ?? null,
 		role: member.role,
 		source: "local" as const,
