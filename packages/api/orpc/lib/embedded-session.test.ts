@@ -21,16 +21,28 @@ describe("embedded session token", () => {
 			organizationId: "org1",
 			subaccountId: "sub1",
 			ghlUserId: "u1",
+			ghlUserName: "Kobe Bryant",
 		});
 		const principal = await resolveEmbeddedSession(headersWithCookie(token));
-		expect(principal).toEqual({ organizationId: "org1", subaccountId: "sub1", ghlUserId: "u1" });
+		expect(principal).toEqual({
+			organizationId: "org1",
+			subaccountId: "sub1",
+			ghlUserId: "u1",
+			ghlUserName: "Kobe Bryant",
+		});
 	});
 
 	it("resolves from the x-embedded-token header too", async () => {
-		const token = mintEmbeddedToken({ organizationId: "o", subaccountId: "s", ghlUserId: null });
+		const token = mintEmbeddedToken({
+			organizationId: "o",
+			subaccountId: "s",
+			ghlUserId: null,
+			ghlUserName: null,
+		});
 		const principal = await resolveEmbeddedSession(new Headers({ "x-embedded-token": token }));
 		expect(principal?.subaccountId).toBe("s");
 		expect(principal?.ghlUserId).toBeNull();
+		expect(principal?.ghlUserName).toBeNull();
 	});
 
 	it("rejects a tampered token", async () => {
@@ -38,6 +50,7 @@ describe("embedded session token", () => {
 			organizationId: "org1",
 			subaccountId: "sub1",
 			ghlUserId: null,
+			ghlUserName: null,
 		});
 		const tampered = `${token.slice(0, -2)}xy`;
 		expect(await resolveEmbeddedSession(headersWithCookie(tampered))).toBeNull();
@@ -48,6 +61,7 @@ describe("embedded session token", () => {
 			organizationId: "org1",
 			subaccountId: "sub1",
 			ghlUserId: null,
+			ghlUserName: null,
 		});
 		process.env.EMBEDDED_JWT_SECRET = "a-different-secret";
 		const principal = await resolveEmbeddedSession(headersWithCookie(token));
@@ -61,7 +75,7 @@ describe("embedded session token", () => {
 
 	it("rejects an expired token", async () => {
 		const token = mintEmbeddedToken(
-			{ organizationId: "org1", subaccountId: "sub1", ghlUserId: null },
+			{ organizationId: "org1", subaccountId: "sub1", ghlUserId: null, ghlUserName: null },
 			-1,
 		);
 		expect(await resolveEmbeddedSession(headersWithCookie(token))).toBeNull();
@@ -75,7 +89,12 @@ describe("oauth state", () => {
 	});
 
 	it("does not accept an embedded token as oauth state (issuer isolation)", () => {
-		const embedded = mintEmbeddedToken({ organizationId: "o", subaccountId: "s", ghlUserId: null });
+		const embedded = mintEmbeddedToken({
+			organizationId: "o",
+			subaccountId: "s",
+			ghlUserId: null,
+			ghlUserName: null,
+		});
 		expect(verifyOAuthState(embedded)).toBeNull();
 	});
 });

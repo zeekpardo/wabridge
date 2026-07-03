@@ -91,6 +91,7 @@ export function WhatsAppInbox({
 				timestamp: Date | string;
 				status?: string | null;
 				sessionId?: string | null;
+				sentByName?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 			}
 		>();
@@ -104,6 +105,7 @@ export function WhatsAppInbox({
 				timestamp: m.timestamp,
 				status: m.status,
 				sessionId: m.sessionId,
+				sentByName: m.sentByName,
 				media: null,
 			});
 		}

@@ -258,6 +258,12 @@ model WhatsAppMessage {
   // "contact" = inbound from WhatsApp, "ghl" = GHL-originated outbound (SMS
   // takeover / workflow / bulk), "app" = sent from our embedded messenger.
   origin         String          @default("contact")
+  // Who sent an outbound message from our app — the acting staff user (app
+  // login or GHL-embedded SSO user). Denormalized `sentByName` so the thread
+  // renders the sender without a per-message user/CRM lookup. Null for inbound
+  // and for GHL-native/automation sends (no acting app user).
+  sentByUserId   String?
+  sentByName     String?
   // GHL's message id once mirrored, for status updates + echo de-duplication.
   ghlMessageId   String?
   ghlSynced      Boolean         @default(false)

@@ -353,14 +353,23 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 
 	// GHL's decrypted SSO payload names the sub-account `activeLocation` (not
 	// `locationId`); `userId` is the GHL user. Accept `locationId` as a fallback
-	// for any host that uses the alternate name.
-	let payload: { activeLocation?: string; locationId?: string; userId?: string };
+	// for any host that uses the alternate name. `userName`/`email` (best-effort;
+	// field names vary by host) give the acting user's display name for message
+	// provenance.
+	let payload: {
+		activeLocation?: string;
+		locationId?: string;
+		userId?: string;
+		userName?: string;
+		email?: string;
+	};
 	try {
 		payload = decryptGhlSsoPayload(encrypted, ssoKey);
 	} catch (error) {
 		logger.error(error, { ctx: "ghl.sso.decrypt" });
 		return Response.json({ error: "Could not decrypt SSO payload" }, { status: 400 });
 	}
+	const ghlUserName = payload.userName?.trim() || payload.email?.trim() || null;
 
 	const locationId = payload.activeLocation ?? payload.locationId;
 	if (!locationId) {
@@ -378,6 +387,7 @@ export async function ghlSsoDecryptHandler(req: Request): Promise<Response> {
 		organizationId: subaccount.organizationId,
 		subaccountId: subaccount.id,
 		ghlUserId: payload.userId ?? null,
+		ghlUserName,
 	});
 
 	const org = await getOrganizationById(subaccount.organizationId);

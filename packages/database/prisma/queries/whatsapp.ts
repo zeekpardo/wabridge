@@ -438,6 +438,10 @@ export async function createWhatsAppMessage(data: {
 	idempotencyKey?: string | null;
 	/** Where this message entered the hub: "contact" | "ghl" | "app". */
 	origin?: string;
+	/** The acting staff user who sent an outbound message (app or embedded SSO). */
+	sentByUserId?: string | null;
+	/** Denormalized display name of {@link sentByUserId} for the thread avatar. */
+	sentByName?: string | null;
 	/** GHL's message id once mirrored (for status updates + echo de-dupe). */
 	ghlMessageId?: string | null;
 }) {
@@ -503,6 +507,8 @@ export async function createWhatsAppMessage(data: {
 				status: data.status,
 				idempotencyKey: data.idempotencyKey,
 				origin: data.origin ?? "contact",
+				sentByUserId: data.sentByUserId ?? null,
+				sentByName: data.sentByName ?? null,
 				ghlMessageId: data.ghlMessageId ?? null,
 			},
 		});

@@ -72,7 +72,7 @@ export type WhatsAppSessionScalarFieldEnum = z.infer<typeof WhatsAppSessionScala
 
 // File: WhatsAppMessageScalarFieldEnum.schema.ts
 
-export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'origin', 'ghlMessageId', 'ghlSynced', 'idempotencyKey', 'timestamp', 'createdAt'])
+export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'direction', 'waMessageId', 'chatId', 'fromMe', 'body', 'type', 'status', 'origin', 'sentByUserId', 'sentByName', 'ghlMessageId', 'ghlSynced', 'idempotencyKey', 'timestamp', 'createdAt'])
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
 
@@ -384,6 +384,8 @@ export const WhatsAppMessageSchema = z.object({
   type: z.string(),
   status: z.string().nullish(),
   origin: z.string().default("contact"),
+  sentByUserId: z.string().nullish(),
+  sentByName: z.string().nullish(),
   ghlMessageId: z.string().nullish(),
   ghlSynced: z.boolean(),
   idempotencyKey: z.string().nullish(),

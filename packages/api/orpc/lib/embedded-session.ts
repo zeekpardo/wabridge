@@ -17,6 +17,8 @@ export interface EmbeddedPrincipal {
 	organizationId: string;
 	subaccountId: string;
 	ghlUserId: string | null;
+	/** The GHL SSO user's display name, captured at bootstrap (for message provenance). */
+	ghlUserName: string | null;
 }
 
 export interface OAuthState {
@@ -80,6 +82,7 @@ export function mintEmbeddedToken(principal: EmbeddedPrincipal, ttlSeconds = 60 
 			organizationId: principal.organizationId,
 			subaccountId: principal.subaccountId,
 			ghlUserId: principal.ghlUserId,
+			ghlUserName: principal.ghlUserName,
 		},
 		EMBEDDED_ISSUER,
 		ttlSeconds,
@@ -105,6 +108,7 @@ export async function resolveEmbeddedSession(headers: Headers): Promise<Embedded
 		organizationId: payload.organizationId,
 		subaccountId: payload.subaccountId,
 		ghlUserId: typeof payload.ghlUserId === "string" ? payload.ghlUserId : null,
+		ghlUserName: typeof payload.ghlUserName === "string" ? payload.ghlUserName : null,
 	};
 }
 
