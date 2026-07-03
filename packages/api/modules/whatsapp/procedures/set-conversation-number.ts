@@ -1,8 +1,15 @@
 import { ORPCError } from "@orpc/server";
-import { getWhatsAppSession, setConversationActiveSession } from "@repo/database";
+import {
+	getConversation,
+	getGhlConnection,
+	getWhatsAppSession,
+	setConversationActiveSession,
+} from "@repo/database";
+import { createGoHighLevelClient } from "@repo/integrations";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { syncPrimaryNumberTag } from "../../ghl/sync-primary-number-tag";
 import { resolveSubaccount } from "../lib/active-organization";
 
 export const setConversationNumber = protectedProcedure
@@ -28,10 +35,25 @@ export const setConversationNumber = protectedProcedure
 			throw new ORPCError("NOT_FOUND", { message: "Number not found for this subaccount." });
 		}
 
-		return setConversationActiveSession({
+		const result = await setConversationActiveSession({
 			subaccountId: subaccount.id,
 			organizationId: subaccount.organizationId,
 			chatId: input.chatId,
 			sessionId: input.sessionId,
 		});
+
+		// Mark the newly-picked number as the contact's primary via a `wa:` tag on
+		// the linked GHL contact. Best-effort — a GHL hiccup never fails the pick.
+		const ghl = await getGhlConnection(subaccount.id);
+		if (ghl && target.phone) {
+			const conversation = await getConversation(subaccount.id, input.chatId);
+			if (conversation?.ghlContactId) {
+				const client = await createGoHighLevelClient(subaccount.id);
+				if (client) {
+					await syncPrimaryNumberTag(client, conversation.ghlContactId, target.phone);
+				}
+			}
+		}
+
+		return result;
 	});

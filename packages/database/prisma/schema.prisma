@@ -178,6 +178,7 @@ model Subaccount {
   whatsAppMessages      WhatsAppMessage[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppSettings      WhatsAppSettings?
+  memberDefaultNumbers  MemberDefaultNumber[]
 
   @@index([organizationId])
   @@map("subaccount")
@@ -231,6 +232,7 @@ model WhatsAppSession {
   updatedAt       DateTime          @updatedAt
   messages        WhatsAppMessage[]
   activeConversations WhatsAppConversation[] @relation("ConversationActiveSession")
+  memberDefaultNumbers MemberDefaultNumber[]
 
   @@index([organizationId])
   @@index([subaccountId])
@@ -322,6 +324,26 @@ model WhatsAppSettings {
   @@map("whatsapp_settings")
 }
 
+/// An agency member's preferred sending number within a subaccount — the default
+/// WhatsAppSession used when that member starts a new conversation.
+model MemberDefaultNumber {
+  id           String          @id @default(cuid())
+  subaccountId String
+  subaccount   Subaccount      @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
+  memberId     String
+  member       Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([subaccountId, memberId])
+  @@index([subaccountId])
+  @@index([memberId])
+  @@index([sessionId])
+  @@map("member_default_number")
+}
+
 model Member {
   id             String       @id @default(cuid())
   organizationId String
@@ -330,6 +352,8 @@ model Member {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String
   createdAt      DateTime
+
+  memberDefaultNumbers MemberDefaultNumber[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])

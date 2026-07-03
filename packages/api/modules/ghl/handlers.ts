@@ -1,13 +1,16 @@
 import { auth } from "@repo/auth";
 import {
 	createSubaccount,
+	getConversation,
 	getConversationByGhlContactId,
 	getDefaultSession,
 	getGhlConnectionByLocationId,
 	getOrganizationById,
+	getSessionByPriority,
 	getSubaccount,
 	getSubaccountByLocationId,
 	getWhatsAppSettings,
+	setConversationActiveSession,
 	setConversationContactName,
 	setConversationTags,
 	updateSubaccount,
@@ -36,7 +39,8 @@ import { createFanOutDeps } from "../messaging/deps";
 import { fanOutMessage } from "../messaging/fan-out";
 import { verifyOrganizationMembership } from "../organizations/lib/membership";
 import { disconnectSubaccountFromGhl } from "./disconnect-subaccount";
-import { resolveOutboundCommand } from "./resolve-command";
+import { type NumberOverride, resolveOutboundCommand } from "./resolve-command";
+import { syncPrimaryNumberTag } from "./sync-primary-number-tag";
 import { syncSubaccountNameFromGhl } from "./sync-subaccount-name";
 
 function saasBaseUrl(): string {
@@ -198,7 +202,6 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 		});
 		return new Response("Location not linked.", { status: 404 });
 	}
-	const session = await getDefaultSession(subaccount.id);
 
 	// Resolve commands (spintax + delay) against this subaccount's global spintax
 	// BEFORE fan-out, so the persisted/mirrored body is the real per-recipient
@@ -214,13 +217,18 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 		});
 	}
 
+	// Choose the sender number. Precedence: an explicit `#switch` override in the
+	// body → the conversation's sticky active number → the subaccount default.
+	const chatId = toChatId(phone);
+	const session = await resolveOutboundSession(subaccount, chatId, phone, resolved.numberOverride);
+
 	try {
 		const result = await fanOutMessage(
 			{
 				subaccountId: subaccount.id,
 				organizationId: subaccount.organizationId,
 				sessionId: session?.id ?? "",
-				chatId: toChatId(phone),
+				chatId,
 				direction: "outbound",
 				origin: "ghl",
 				body: resolved.text,
@@ -248,6 +256,55 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	}
 
 	return new Response("OK", { status: 200 });
+}
+
+/**
+ * Pick the WhatsApp session an outbound GHL message sends from.
+ *
+ * 1. An explicit `#switch` in the body wins. `#switch|N` (session scope) also
+ *    reassigns the conversation's sticky primary number and re-tags the GHL
+ *    contact, so every later message goes out from the same number; `#switch_unique`
+ *    (once scope) sends from the target number this one time without touching the
+ *    primary. An override that resolves to no ready number falls through.
+ * 2. Otherwise the conversation's persisted active number, if set.
+ * 3. Otherwise the subaccount default (highest-priority ready number).
+ */
+async function resolveOutboundSession(
+	subaccount: { id: string; organizationId: string },
+	chatId: string,
+	phone: string,
+	numberOverride: NumberOverride | undefined,
+) {
+	if (numberOverride) {
+		const target = await getSessionByPriority(subaccount.id, numberOverride.priority);
+		if (target) {
+			if (numberOverride.scope === "session") {
+				await setConversationActiveSession({
+					subaccountId: subaccount.id,
+					organizationId: subaccount.organizationId,
+					chatId,
+					sessionId: target.id,
+				});
+				// Keep the GHL contact's `wa:` primary-number tag in step with the new
+				// sticky number. Best-effort: never blocks the send.
+				const conversation = await getConversation(subaccount.id, chatId);
+				if (conversation?.ghlContactId) {
+					const client = await createGoHighLevelClient(subaccount.id);
+					if (client) {
+						await syncPrimaryNumberTag(client, conversation.ghlContactId, phone);
+					}
+				}
+			}
+			return target;
+		}
+	}
+
+	const conversation = await getConversation(subaccount.id, chatId);
+	if (conversation?.activeSession) {
+		return conversation.activeSession;
+	}
+
+	return getDefaultSession(subaccount.id);
 }
 
 /** Best-effort "failed" status back to GHL for an SMS we couldn't deliver. */
