@@ -22,15 +22,18 @@
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"type-check": "tsc --noEmit",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"generate:openwa-types": "openapi-typescript openapi/openwa-openapi.json -o openapi/openwa-schema.ts"
 	},
 	"dependencies": {
 		"@repo/database": "workspace:*",
-		"@repo/logs": "workspace:*"
+		"@repo/logs": "workspace:*",
+		"openapi-fetch": "^0.17.0"
 	},
 	"devDependencies": {
 		"@repo/tsconfig": "workspace:*",
 		"@types/node": "catalog:",
+		"openapi-typescript": "^7.13.0",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}
