@@ -236,6 +236,25 @@ export function createFanOutDeps(): FanOutDeps {
 			}
 		},
 
+		// Cache the thread's GHL contact/conversation ids without posting the
+		// message back (GHL-originated sends). Same resolve/upsert-by-phone path as
+		// the projections, so the contact panel can read through to the CRM for a
+		// GHL-initiated thread before the contact ever replies. Best-effort.
+		async linkGhlThread(message) {
+			try {
+				const [client, connection] = await Promise.all([
+					createGoHighLevelClient(message.subaccountId),
+					getGhlConnection(message.subaccountId),
+				]);
+				if (!client || !connection) {
+					return;
+				}
+				await resolveGhlThread(message, client, connection.locationId);
+			} catch (error) {
+				logger.error(error, { ctx: "messaging.fanOut.linkGhlThread", chatId: message.chatId });
+			}
+		},
+
 		async markSynced(id, ghlMessageId) {
 			await markMessageGhlSynced(id, ghlMessageId);
 		},

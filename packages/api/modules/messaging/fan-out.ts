@@ -47,6 +47,15 @@ export interface ProjectionPlan {
 	sendOverWhatsApp: boolean;
 	pushGhlInbound: boolean;
 	recordGhlOutbound: boolean;
+	/**
+	 * Cache the GHL contact/conversation link on the thread WITHOUT posting the
+	 * message back to GHL. Needed for GHL-originated sends: they must not echo the
+	 * message to GHL, but the thread still needs its `ghlContactId` linked so the
+	 * contact panel can read through to the CRM (otherwise a GHL-initiated contact
+	 * shows no CRM info until they reply). Redundant for `contact`/`app`, whose
+	 * push/record projections already resolve the link.
+	 */
+	linkGhlThread: boolean;
 	notifyApp: boolean;
 }
 
@@ -58,28 +67,35 @@ export function planProjections(origin: MessageOrigin): ProjectionPlan {
 	switch (origin) {
 		case "contact":
 			// Inbound from the contact: mirror into GHL, show in our UI. Never re-send.
+			// pushGhlInbound resolves the thread link, so no separate link step.
 			return {
 				sendOverWhatsApp: false,
 				pushGhlInbound: true,
 				recordGhlOutbound: false,
+				linkGhlThread: false,
 				notifyApp: true,
 			};
 		case "ghl":
 			// GHL asked us to deliver (SMS takeover): send over WA, don't re-post to
-			// GHL. Delivery status is reconciled later from the WhatsApp ack.
+			// GHL. Delivery status is reconciled later from the WhatsApp ack. We still
+			// link the thread so the contact panel can read through to the CRM before
+			// the contact ever replies.
 			return {
 				sendOverWhatsApp: true,
 				pushGhlInbound: false,
 				recordGhlOutbound: false,
+				linkGhlThread: true,
 				notifyApp: true,
 			};
 		case "app":
 			// Sent from our messenger: deliver over WA and record it in GHL so the
-			// native thread stays complete for reps living in GHL.
+			// native thread stays complete for reps living in GHL. recordGhlOutbound
+			// resolves the thread link, so no separate link step.
 			return {
 				sendOverWhatsApp: true,
 				pushGhlInbound: false,
 				recordGhlOutbound: true,
+				linkGhlThread: false,
 				notifyApp: true,
 			};
 	}
@@ -95,6 +111,11 @@ export interface FanOutDeps {
 	pushGhlInbound(message: CanonicalMessage): Promise<{ ghlMessageId: string | null } | null>;
 	/** Record an outbound message in GHL's timeline; returns the GHL message id. */
 	recordGhlOutbound(message: CanonicalMessage): Promise<{ ghlMessageId: string | null } | null>;
+	/**
+	 * Cache the GHL contact/conversation link for a thread WITHOUT posting the
+	 * message (GHL-originated sends must not echo back to GHL). Best-effort.
+	 */
+	linkGhlThread(message: CanonicalMessage): Promise<void> | void;
 	/** Persist our-row ↔ GHL-id mapping so echoes/status can be matched. */
 	markSynced(id: string, ghlMessageId: string | null): Promise<void>;
 	/** Realtime nudge to the embedded messenger (best-effort). */
@@ -143,6 +164,11 @@ export async function fanOutMessage(
 	const stored = await deps.persist({ ...message, waMessageId });
 
 	// 4. Project to GHL.
+	// 4a. Link the thread to its GHL contact without re-posting (GHL-originated
+	// sends). Makes the contact panel read-through work before the first reply.
+	if (plan.linkGhlThread) {
+		await deps.linkGhlThread({ ...message, waMessageId });
+	}
 	let ghlMessageId: string | null = message.ghlMessageId ?? null;
 	if (plan.pushGhlInbound) {
 		const res = await deps.pushGhlInbound({ ...message, waMessageId });
