@@ -88,11 +88,11 @@ export const WhatsAppSettingsScalarFieldEnumSchema = z.enum(['id', 'subaccountId
 
 export type WhatsAppSettingsScalarFieldEnum = z.infer<typeof WhatsAppSettingsScalarFieldEnumSchema>;
 
-// File: MemberDefaultNumberScalarFieldEnum.schema.ts
+// File: OwnerDefaultNumberScalarFieldEnum.schema.ts
 
-export const MemberDefaultNumberScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'memberId', 'sessionId', 'createdAt', 'updatedAt'])
+export const OwnerDefaultNumberScalarFieldEnumSchema = z.enum(['id', 'subaccountId', 'ownerId', 'sessionId', 'createdAt', 'updatedAt'])
 
-export type MemberDefaultNumberScalarFieldEnum = z.infer<typeof MemberDefaultNumberScalarFieldEnumSchema>;
+export type OwnerDefaultNumberScalarFieldEnum = z.infer<typeof OwnerDefaultNumberScalarFieldEnumSchema>;
 
 // File: MemberScalarFieldEnum.schema.ts
 
@@ -432,18 +432,18 @@ export const WhatsAppSettingsSchema = z.object({
 export type WhatsAppSettingsType = z.infer<typeof WhatsAppSettingsSchema>;
 
 
-// File: MemberDefaultNumber.schema.ts
+// File: OwnerDefaultNumber.schema.ts
 
-export const MemberDefaultNumberSchema = z.object({
+export const OwnerDefaultNumberSchema = z.object({
   id: z.string(),
   subaccountId: z.string(),
-  memberId: z.string(),
+  ownerId: z.string(),
   sessionId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 
-export type MemberDefaultNumberType = z.infer<typeof MemberDefaultNumberSchema>;
+export type OwnerDefaultNumberType = z.infer<typeof OwnerDefaultNumberSchema>;
 
 
 // File: Member.schema.ts

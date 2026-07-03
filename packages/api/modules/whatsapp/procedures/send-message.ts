@@ -3,8 +3,7 @@ import {
 	getConversation,
 	getDefaultSession,
 	getGhlConnection,
-	getMemberDefaultNumber,
-	getOrganizationMembership,
+	getOwnerDefaultNumber,
 	getSessionByPriority,
 	getWhatsAppSession,
 	getWhatsAppSettings,
@@ -103,15 +102,19 @@ export const sendMessage = protectedProcedure
 			if (conversation?.activeSessionId) {
 				sender = await getWhatsAppSession(subaccount.id, conversation.activeSessionId);
 			}
-			// No number is pinned to this thread yet: fall back to the sending user's
-			// per-subaccount default number (Phase 2 stickiness), then the org default.
-			// The activeSessionId set-once above locks this choice for the thread.
+			// No number is pinned to this thread yet: fall back to the sending
+			// owner's per-subaccount default number (Phase 2 stickiness), then the
+			// org default. The activeSessionId set-once above locks this choice.
+			// `ownerId` is the same id space as listContactOwners: the GHL user id
+			// for an embedded SSO rep (`ghl:<id>`), else the app user id. (An
+			// app-login rep on a GHL-connected subaccount won't match a GHL-user
+			// owner id and simply falls through to the org default.)
 			if (!sender) {
-				const membership = await getOrganizationMembership(subaccount.organizationId, user.id);
-				if (membership) {
-					const memberDefault = await getMemberDefaultNumber(subaccount.id, membership.id);
-					if (memberDefault) {
-						sender = await getWhatsAppSession(subaccount.id, memberDefault.sessionId);
+				const ownerId = user.id.startsWith("ghl:") ? user.id.slice(4) : user.id;
+				if (ownerId && ownerId !== "sso") {
+					const ownerDefault = await getOwnerDefaultNumber(subaccount.id, ownerId);
+					if (ownerDefault) {
+						sender = await getWhatsAppSession(subaccount.id, ownerDefault.sessionId);
 					}
 				}
 			}

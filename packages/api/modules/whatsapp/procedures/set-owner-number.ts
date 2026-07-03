@@ -1,21 +1,21 @@
-import { clearMemberDefaultNumber, setMemberDefaultNumber } from "@repo/database";
+import { clearOwnerDefaultNumber, setOwnerDefaultNumber } from "@repo/database";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
 
-export const setMemberNumber = protectedProcedure
+export const setOwnerNumber = protectedProcedure
 	.route({
 		method: "POST",
-		path: "/whatsapp/member-number",
+		path: "/whatsapp/owner-number",
 		tags: ["WhatsApp"],
-		summary: "Set or clear a member's default number",
+		summary: "Set or clear an owner's default number",
 		description:
-			"Persist which of the subaccount's numbers a member sends from by default (sessionId null clears the default).",
+			"Persist which of the subaccount's numbers an owner (GHL staff user / agency member) sends from by default. `ownerId` is the id from listContactOwners; sessionId null clears the default.",
 	})
 	.input(
 		z.object({
-			memberId: z.string(),
+			ownerId: z.string(),
 			sessionId: z.string().nullable(),
 			subaccountId: z.string().optional(),
 		}),
@@ -24,13 +24,13 @@ export const setMemberNumber = protectedProcedure
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
 		if (input.sessionId === null) {
-			await clearMemberDefaultNumber(subaccount.id, input.memberId);
+			await clearOwnerDefaultNumber(subaccount.id, input.ownerId);
 			return { ok: true };
 		}
 
-		await setMemberDefaultNumber({
+		await setOwnerDefaultNumber({
 			subaccountId: subaccount.id,
-			memberId: input.memberId,
+			ownerId: input.ownerId,
 			sessionId: input.sessionId,
 		});
 

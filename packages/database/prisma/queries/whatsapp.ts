@@ -569,44 +569,46 @@ export async function listWhatsAppMessagesBySession(
 	});
 }
 
-// ─── Member default numbers (per member, per subaccount) ──────────────────────
+// ─── Owner default numbers (per owner, per subaccount) ────────────────────────
+// `ownerId` is the same id space as listContactOwners / contact ownership: a GHL
+// location user id when GHL is connected, else the agency member's app user id.
 
-/** The member's preferred sending number in a subaccount, if one is set. */
-export async function getMemberDefaultNumber(subaccountId: string, memberId: string) {
-	return db.memberDefaultNumber.findUnique({
-		where: { subaccountId_memberId: { subaccountId, memberId } },
+/** The owner's preferred sending number in a subaccount, if one is set. */
+export async function getOwnerDefaultNumber(subaccountId: string, ownerId: string) {
+	return db.ownerDefaultNumber.findUnique({
+		where: { subaccountId_ownerId: { subaccountId, ownerId } },
 	});
 }
 
-/** Set (or change) a member's default sending number for a subaccount. */
-export async function setMemberDefaultNumber(data: {
+/** Set (or change) an owner's default sending number for a subaccount. */
+export async function setOwnerDefaultNumber(data: {
 	subaccountId: string;
-	memberId: string;
+	ownerId: string;
 	sessionId: string;
 }) {
-	return db.memberDefaultNumber.upsert({
+	return db.ownerDefaultNumber.upsert({
 		where: {
-			subaccountId_memberId: { subaccountId: data.subaccountId, memberId: data.memberId },
+			subaccountId_ownerId: { subaccountId: data.subaccountId, ownerId: data.ownerId },
 		},
 		create: {
 			subaccountId: data.subaccountId,
-			memberId: data.memberId,
+			ownerId: data.ownerId,
 			sessionId: data.sessionId,
 		},
 		update: { sessionId: data.sessionId },
 	});
 }
 
-/** Clear a member's default sending number for a subaccount (no-op if unset). */
-export async function clearMemberDefaultNumber(subaccountId: string, memberId: string) {
-	return db.memberDefaultNumber.deleteMany({
-		where: { subaccountId, memberId },
+/** Clear an owner's default sending number for a subaccount (no-op if unset). */
+export async function clearOwnerDefaultNumber(subaccountId: string, ownerId: string) {
+	return db.ownerDefaultNumber.deleteMany({
+		where: { subaccountId, ownerId },
 	});
 }
 
-/** All member→number defaults for a subaccount, with the target number (settings UI). */
-export async function listMemberDefaultNumbers(subaccountId: string) {
-	return db.memberDefaultNumber.findMany({
+/** All owner→number defaults for a subaccount, with the target number (settings UI). */
+export async function listOwnerDefaultNumbers(subaccountId: string) {
+	return db.ownerDefaultNumber.findMany({
 		where: { subaccountId },
 		orderBy: { createdAt: "asc" },
 		include: {
