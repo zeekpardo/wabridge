@@ -25,17 +25,20 @@ export const markChatRead = protectedProcedure
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
-		const sender = await resolveSendingSession(subaccount.id, input.chatId);
-		if (!sender) {
-			throw new ORPCError("NOT_FOUND", { message: "No sendable number available." });
-		}
-
-		const openwa = createOpenWaClient();
-		try {
-			await openwa.markChatRead(sender.openwaSessionId, input.chatId);
-		} catch (error) {
-			logger.error(error, { ctx: "whatsapp.markChatRead", chatId: input.chatId });
-			throw new ORPCError("INTERNAL_SERVER_ERROR");
+		// Groups don't accept the send-seen route (the gateway returns 404) and a
+		// read receipt isn't a group concept — just clear our local unread count.
+		if (!input.chatId.endsWith("@g.us")) {
+			const sender = await resolveSendingSession(subaccount.id, input.chatId);
+			if (!sender) {
+				throw new ORPCError("NOT_FOUND", { message: "No sendable number available." });
+			}
+			const openwa = createOpenWaClient();
+			try {
+				await openwa.markChatRead(sender.openwaSessionId, input.chatId);
+			} catch (error) {
+				logger.error(error, { ctx: "whatsapp.markChatRead", chatId: input.chatId });
+				throw new ORPCError("INTERNAL_SERVER_ERROR");
+			}
 		}
 
 		await markConversationRead(subaccount.id, input.chatId);
