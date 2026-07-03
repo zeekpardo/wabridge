@@ -72,7 +72,9 @@ export function WhatsAppInbox({
 		senderName: string;
 	} | null>(null);
 	// The message being forwarded (opens the target picker). Cleared on pick/close.
-	const [forwardingMessageId, setForwardingMessageId] = useState<string | null>(null);
+	const [forwarding, setForwarding] = useState<{ messageId: string; body: string | null } | null>(
+		null,
+	);
 	// Contact details default open on desktop; on mobile the aside is a full
 	// overlay, so it stays opt-in there.
 	const [detailsOpen, setDetailsOpen] = useState(
@@ -413,7 +415,7 @@ export function WhatsAppInbox({
 							}}
 							onForward={(message) => {
 								// Open the target picker (a contact or a team member).
-								setForwardingMessageId(message.waMessageId ?? message.id);
+								setForwarding({ messageId: message.waMessageId ?? message.id, body: message.body });
 							}}
 							onDelete={(message) => {
 								const messageId = message.waMessageId ?? message.id;
@@ -469,21 +471,27 @@ export function WhatsAppInbox({
 			) : null}
 
 			<ForwardDialog
-				open={forwardingMessageId !== null}
+				open={forwarding !== null}
 				onOpenChange={(next) => {
 					if (!next) {
-						setForwardingMessageId(null);
+						setForwarding(null);
 					}
 				}}
 				subaccountId={subaccountId}
 				contacts={conversations}
 				fromChatId={selectedChatId}
 				onSelect={(target: ForwardTarget) => {
-					if (!forwardingMessageId) {
+					if (!forwarding || !selectedChatId) {
 						return;
 					}
-					forwardMutation.mutate({ messageId: forwardingMessageId, ...target, subaccountId });
-					setForwardingMessageId(null);
+					forwardMutation.mutate({
+						fromChatId: selectedChatId,
+						messageId: forwarding.messageId,
+						body: forwarding.body ?? undefined,
+						...target,
+						subaccountId,
+					});
+					setForwarding(null);
 				}}
 			/>
 		</Card>

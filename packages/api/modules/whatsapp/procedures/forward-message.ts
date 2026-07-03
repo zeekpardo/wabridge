@@ -5,6 +5,7 @@ import { createOpenWaClient, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
+import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
 import { listAssignableOwners } from "../lib/assignable-owners";
 import { resolveSendingSession } from "./lib-session";
@@ -25,6 +26,8 @@ export const forwardMessage = protectedProcedure
 				toChatId: z.string().optional(),
 				toPhone: z.string().optional(),
 				messageId: z.string(),
+				/** Original message body, stored on the forwarded record for display. */
+				body: z.string().optional(),
 				subaccountId: z.string().optional(),
 			})
 			.refine((value) => Boolean(value.toChatId || value.toPhone), {
@@ -62,7 +65,9 @@ export const forwardMessage = protectedProcedure
 			sentByName = owners.find((owner) => owner.id === senderOwnerId)?.name ?? null;
 		}
 
-		return createWhatsAppMessage({
+		const forwardedBody = input.body?.trim() ? input.body : "[forwarded]";
+		const timestamp = new Date();
+		const row = await createWhatsAppMessage({
 			subaccountId: subaccount.id,
 			organizationId: subaccount.organizationId,
 			sessionId: sender.id,
@@ -70,12 +75,34 @@ export const forwardMessage = protectedProcedure
 			chatId: toChat,
 			fromMe: true,
 			type: "text",
-			body: "[forwarded]",
+			body: forwardedBody,
 			status: "sent",
 			waMessageId: result?.id ?? null,
 			origin: "app",
 			sentByUserId: senderOwnerId,
 			sentByName,
-			timestamp: new Date(),
+			timestamp,
 		});
+
+		// Mirror the forwarded message into the destination contact's GHL
+		// conversation (best-effort; no-op when GHL is disconnected).
+		await mirrorAppSendToCrm(
+			{
+				subaccountId: subaccount.id,
+				organizationId: subaccount.organizationId,
+				sessionId: sender.id,
+				chatId: toChat,
+			},
+			[
+				{
+					id: row.id,
+					waMessageId: result?.id ?? null,
+					body: forwardedBody,
+					type: "text",
+					timestamp,
+				},
+			],
+		);
+
+		return row;
 	});
