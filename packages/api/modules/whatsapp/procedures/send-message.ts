@@ -18,6 +18,7 @@ import { protectedProcedure } from "../../../orpc/procedures";
 import { syncPrimaryNumberTag } from "../../ghl/sync-primary-number-tag";
 import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
+import { listAssignableOwners } from "../lib/assignable-owners";
 
 const attachmentSchema = z.object({
 	url: z.string().url().optional(),
@@ -133,9 +134,19 @@ export const sendMessage = protectedProcedure
 		}
 
 		// Stamp the acting staff user onto each outbound row so the thread shows
-		// who sent it. `user.name` is the app profile name, or the GHL SSO user's
-		// name for embedded sends; falls back to null (thread shows the number).
-		const sentByName = typeof user.name === "string" && user.name.trim() ? user.name.trim() : null;
+		// who sent it. The owner id is the same id space as listContactOwners /
+		// owner-number defaults: the GHL user id for an embedded SSO rep
+		// (`ghl:<id>`), else the app user id.
+		const senderOwnerId = user.id.startsWith("ghl:") ? user.id.slice(4) : user.id;
+		// Prefer the session's own name (app profile, or GHL SSO name on the
+		// embedded token). When it's absent — e.g. an embedded token minted before
+		// we captured the SSO name — resolve it from the SAME owners list the aside
+		// and settings use, so the message sender is always one of those people.
+		let sentByName = typeof user.name === "string" && user.name.trim() ? user.name.trim() : null;
+		if (!sentByName && senderOwnerId && senderOwnerId !== "sso") {
+			const owners = await listAssignableOwners(subaccount).catch(() => []);
+			sentByName = owners.find((owner) => owner.id === senderOwnerId)?.name ?? null;
+		}
 
 		const result = await sendProcessedMessage(
 			{
@@ -144,7 +155,7 @@ export const sendMessage = protectedProcedure
 				subaccountId: subaccount.id,
 				organizationId: subaccount.organizationId,
 				chatId,
-				sentByUserId: user.id,
+				sentByUserId: senderOwnerId,
 				sentByName,
 			},
 			processed,
