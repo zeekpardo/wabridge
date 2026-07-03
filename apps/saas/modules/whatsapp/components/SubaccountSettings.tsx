@@ -11,7 +11,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { MemberNumbersSettings } from "./MemberNumbersSettings";
+import { OwnerNumbersSettings } from "./OwnerNumbersSettings";
 
 interface SpintaxRow {
 	id: string;
@@ -167,7 +167,7 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 				</div>
 			</Card>
 
-			<MemberNumbersSettings subaccountId={subaccountId} />
+			<OwnerNumbersSettings subaccountId={subaccountId} />
 		</div>
 	);
 }

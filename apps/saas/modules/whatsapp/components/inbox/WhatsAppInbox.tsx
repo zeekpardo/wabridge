@@ -12,7 +12,7 @@ import {
 } from "@repo/ui/components/select";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeftIcon, MessageSquareIcon, PanelRightIcon } from "lucide-react";
+import { ChevronLeftIcon, MessageSquareIcon, PanelRightIcon, StarIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Composer } from "./Composer";
@@ -91,6 +91,7 @@ export function WhatsAppInbox({
 				timestamp: Date | string;
 				status?: string | null;
 				sessionId?: string | null;
+				sentByName?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 			}
 		>();
@@ -104,6 +105,7 @@ export function WhatsAppInbox({
 				timestamp: m.timestamp,
 				status: m.status,
 				sessionId: m.sessionId,
+				sentByName: m.sentByName,
 				media: null,
 			});
 		}
@@ -152,6 +154,9 @@ export function WhatsAppInbox({
 	const selectedChat = conversations.find((chat) => chat.chatId === selectedChatId);
 	const activeNumberId =
 		conversation?.activeSessionId ?? selectedChat?.activeSession?.id ?? numbers[0]?.id ?? "";
+	// The contact's actual sticky primary (persisted), not the display fallback —
+	// marked with a star in the switcher. Null until a first message sets it.
+	const primaryNumberId = conversation?.activeSessionId ?? selectedChat?.activeSession?.id ?? null;
 	const contactName =
 		selectedChat?.contactName ||
 		conversation?.contactName ||
@@ -245,7 +250,15 @@ export function WhatsAppInbox({
 									<SelectContent>
 										{numbers.map((number) => (
 											<SelectItem key={number.id} value={number.id}>
-												{number.label || number.phone || "Unnamed number"}
+												<span className="gap-1.5 flex items-center">
+													{number.label || number.phone || "Unnamed number"}
+													{number.id === primaryNumberId ? (
+														<StarIcon
+															className="size-3 fill-amber-400 text-amber-400"
+															aria-label="Primary number"
+														/>
+													) : null}
+												</span>
 											</SelectItem>
 										))}
 									</SelectContent>

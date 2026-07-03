@@ -35,6 +35,7 @@ export const protectedProcedure = publicProcedure.use(async ({ context, next }) 
 				} as unknown as NonNullable<typeof session>["session"],
 				user: {
 					id: `ghl:${embedded.ghlUserId ?? "sso"}`,
+					name: embedded.ghlUserName ?? undefined,
 				} as unknown as NonNullable<typeof session>["user"],
 			},
 		});

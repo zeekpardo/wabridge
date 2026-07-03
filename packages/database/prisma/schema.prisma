@@ -178,7 +178,7 @@ model Subaccount {
   whatsAppMessages      WhatsAppMessage[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppSettings      WhatsAppSettings?
-  memberDefaultNumbers  MemberDefaultNumber[]
+  ownerDefaultNumbers   OwnerDefaultNumber[]
 
   @@index([organizationId])
   @@map("subaccount")
@@ -232,7 +232,7 @@ model WhatsAppSession {
   updatedAt       DateTime          @updatedAt
   messages        WhatsAppMessage[]
   activeConversations WhatsAppConversation[] @relation("ConversationActiveSession")
-  memberDefaultNumbers MemberDefaultNumber[]
+  ownerDefaultNumbers OwnerDefaultNumber[]
 
   @@index([organizationId])
   @@index([subaccountId])
@@ -258,6 +258,12 @@ model WhatsAppMessage {
   // "contact" = inbound from WhatsApp, "ghl" = GHL-originated outbound (SMS
   // takeover / workflow / bulk), "app" = sent from our embedded messenger.
   origin         String          @default("contact")
+  // Who sent an outbound message from our app — the acting staff user (app
+  // login or GHL-embedded SSO user). Denormalized `sentByName` so the thread
+  // renders the sender without a per-message user/CRM lookup. Null for inbound
+  // and for GHL-native/automation sends (no acting app user).
+  sentByUserId   String?
+  sentByName     String?
   // GHL's message id once mirrored, for status updates + echo de-duplication.
   ghlMessageId   String?
   ghlSynced      Boolean         @default(false)
@@ -326,22 +332,23 @@ model WhatsAppSettings {
 
 /// An agency member's preferred sending number within a subaccount — the default
 /// WhatsAppSession used when that member starts a new conversation.
-model MemberDefaultNumber {
+model OwnerDefaultNumber {
   id           String          @id @default(cuid())
   subaccountId String
   subaccount   Subaccount      @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
-  memberId     String
-  member       Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  // The assignable owner's id — the SAME id space as listContactOwners and
+  // contact ownership: a GHL location user id when GHL is connected, else the
+  // agency member's app user id. Not an FK (a GHL user id has no local row).
+  ownerId      String
   sessionId    String
   session      WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  @@unique([subaccountId, memberId])
+  @@unique([subaccountId, ownerId])
   @@index([subaccountId])
-  @@index([memberId])
   @@index([sessionId])
-  @@map("member_default_number")
+  @@map("owner_default_number")
 }
 
 model Member {
@@ -352,8 +359,6 @@ model Member {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String
   createdAt      DateTime
-
-  memberDefaultNumbers MemberDefaultNumber[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])
