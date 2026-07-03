@@ -25,6 +25,8 @@ export interface ThreadMessage {
 	timestamp: Date | string;
 	status?: string | null;
 	sessionId?: string | null;
+	/** Display name of the staff user who sent an outbound message, when known. */
+	sentByName?: string | null;
 	media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 }
 
@@ -163,9 +165,12 @@ function MessageBubble({
 	const emptyText = !media && !message.body;
 	const linkUrl = !media && message.body ? (message.body.match(URL_RE)?.[0] ?? null) : null;
 
-	// Who + which number, for the avatar + hover card.
+	// Who + which number, for the avatar + hover card. For outbound, the avatar
+	// shows the staff user who sent it (when known) — their initials — falling
+	// back to the sending number for older rows or GHL-native/automation sends.
+	const numberLabel = number?.label || number?.phone || "Your number";
 	const senderName = isOutbound
-		? number?.label || number?.phone || "Your number"
+		? message.sentByName?.trim() || numberLabel
 		: contact.name || (contact.phone ?? "Contact");
 	const fromPhone = isOutbound ? (number?.phone ?? null) : contact.phone;
 	const status = statusMeta(message.status);

@@ -17,6 +17,10 @@ export interface SendTarget {
 	organizationId: string;
 	/** Destination chat id, e.g. `15551234567@c.us`. */
 	chatId: string;
+	/** The acting staff user who triggered the send (app or embedded SSO). */
+	sentByUserId?: string | null;
+	/** Denormalized display name of the sender, for the thread avatar/tooltip. */
+	sentByName?: string | null;
 }
 
 /** One persisted outbound message row (for downstream projections, e.g. CRM mirroring). */
@@ -85,6 +89,8 @@ export async function sendProcessedMessage(
 			waMessageId: result?.messageId ?? result?.id ?? null,
 			// Sent from our app (messenger/API) — drives the hub's CRM mirroring.
 			origin: "app",
+			sentByUserId: target.sentByUserId ?? null,
+			sentByName: target.sentByName ?? null,
 			timestamp,
 		});
 

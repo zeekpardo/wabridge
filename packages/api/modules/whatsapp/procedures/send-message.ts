@@ -129,6 +129,11 @@ export const sendMessage = protectedProcedure
 			return { sent: 0, processed, fromSessionId: sender.id };
 		}
 
+		// Stamp the acting staff user onto each outbound row so the thread shows
+		// who sent it. `user.name` is the app profile name, or the GHL SSO user's
+		// name for embedded sends; falls back to null (thread shows the number).
+		const sentByName = typeof user.name === "string" && user.name.trim() ? user.name.trim() : null;
+
 		const result = await sendProcessedMessage(
 			{
 				openwaSessionId: sender.openwaSessionId,
@@ -136,6 +141,8 @@ export const sendMessage = protectedProcedure
 				subaccountId: subaccount.id,
 				organizationId: subaccount.organizationId,
 				chatId,
+				sentByUserId: user.id,
+				sentByName,
 			},
 			processed,
 		);
