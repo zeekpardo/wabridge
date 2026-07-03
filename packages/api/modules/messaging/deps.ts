@@ -67,11 +67,27 @@ async function resolveGhlThread(
 		return { conversationId: cached.ghlConversationId };
 	}
 
-	const phone = contactPhone(message);
+	let phone = contactPhone(message);
+	if (!phone && message.chatId.endsWith("@lid")) {
+		// Outbound to a `@lid` (privacy) contact carries no `senderPhone`, and the
+		// lid digits are not a phone — so the FIRST message to a new contact could
+		// never mirror (only later ones, after an inbound resolved + cached the
+		// link). Resolve the lid -> phone via the gateway (same self-heal the
+		// contact panel uses) so the initial message logs immediately. Best-effort.
+		const session = await resolveSession(message);
+		if (session) {
+			const digits = await createOpenWaClient()
+				.resolveContactPhone(session.openwaSessionId, message.chatId)
+				.catch(() => null);
+			if (digits) {
+				phone = `+${digits}`;
+			}
+		}
+	}
 	if (!phone) {
-		// A `@lid` chat with no resolved sender phone: skip the CRM projection
-		// rather than mint a contact from privacy-id digits. The row stays
-		// ghlSynced=false; a later message with a resolved phone links the thread.
+		// Still no phone (e.g. the gateway can't map this lid): skip the CRM
+		// projection rather than mint a contact from privacy-id digits. The row
+		// stays ghlSynced=false; a later message with a resolved phone links it.
 		logger.warn("No contact phone for CRM projection", {
 			ctx: "messaging.fanOut.contactPhone",
 			chatId: message.chatId,
