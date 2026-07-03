@@ -103,6 +103,36 @@ export async function updateWhatsAppSession(
 	return getWhatsAppSession(subaccountId, id);
 }
 
+/**
+ * Set a session's send priority, swapping with whatever session currently holds
+ * the target priority so priorities stay unique within the subaccount (`#switch|N`
+ * resolves by exact match). No-op when already at that priority. Returns null if
+ * the session isn't in this subaccount.
+ */
+export async function setSessionPriority(subaccountId: string, id: string, priority: number) {
+	return db.$transaction(async (tx) => {
+		const target = await tx.whatsAppSession.findFirst({ where: { id, subaccountId } });
+		if (!target) {
+			return null;
+		}
+		if (target.priority === priority) {
+			return target;
+		}
+		// Give the current holder of this priority the target's old slot (swap), so
+		// the subaccount's priorities remain a set of unique values.
+		const holder = await tx.whatsAppSession.findFirst({
+			where: { subaccountId, priority, id: { not: id } },
+		});
+		if (holder) {
+			await tx.whatsAppSession.update({
+				where: { id: holder.id },
+				data: { priority: target.priority },
+			});
+		}
+		return tx.whatsAppSession.update({ where: { id }, data: { priority } });
+	});
+}
+
 export async function deleteWhatsAppSession(subaccountId: string, id: string) {
 	const result = await db.whatsAppSession.deleteMany({
 		where: { id, subaccountId },
