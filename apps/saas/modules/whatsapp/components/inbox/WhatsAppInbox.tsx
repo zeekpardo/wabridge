@@ -13,7 +13,7 @@ import {
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, MessageSquareIcon, PanelRightIcon, StarIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Composer } from "./Composer";
 import { ContactDetailsPanel } from "./ContactDetailsPanel";
@@ -21,6 +21,37 @@ import { ConversationFilters } from "./ConversationFilters";
 import { ConversationList } from "./ConversationList";
 import { prettyPhone } from "./helpers";
 import { MessageThread } from "./MessageThread";
+
+/**
+ * Coerce the stored `reactions` JSON into the shared UI shape. The column is
+ * `Json?`, so we defensively read whatever the gateway persisted and drop
+ * anything malformed rather than trusting the type.
+ */
+function normalizeReactions(
+	value: unknown,
+): Array<{ emoji: string; senderId: string; fromMe: boolean }> | null {
+	if (!Array.isArray(value)) {
+		return null;
+	}
+	const out: Array<{ emoji: string; senderId: string; fromMe: boolean }> = [];
+	for (const entry of value) {
+		if (!entry || typeof entry !== "object") {
+			continue;
+		}
+		const r = entry as Record<string, unknown>;
+		const emoji =
+			typeof r.emoji === "string" ? r.emoji : typeof r.reaction === "string" ? r.reaction : null;
+		if (!emoji) {
+			continue;
+		}
+		out.push({
+			emoji,
+			senderId: typeof r.senderId === "string" ? r.senderId : "",
+			fromMe: r.fromMe === true,
+		});
+	}
+	return out.length > 0 ? out : null;
+}
 
 export function WhatsAppInbox({
 	embedded = false,
@@ -31,6 +62,14 @@ export function WhatsAppInbox({
 }) {
 	const queryClient = useQueryClient();
 	const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+	// The message being replied to (drives the Composer's reply preview). Cleared
+	// on send/cancel and whenever the open conversation changes.
+	const [replyingTo, setReplyingTo] = useState<{
+		id: string;
+		waMessageId: string | null;
+		body: string | null;
+		senderName: string;
+	} | null>(null);
 	// Contact details default open on desktop; on mobile the aside is a full
 	// overlay, so it stays opt-in there.
 	const [detailsOpen, setDetailsOpen] = useState(
@@ -93,10 +132,22 @@ export function WhatsAppInbox({
 				sessionId?: string | null;
 				sentByName?: string | null;
 				media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
+				waMessageId?: string | null;
+				quotedMessageId?: string | null;
+				reactions?: Array<{ emoji: string; senderId: string; fromMe: boolean }> | null;
+				deleted?: boolean | null;
 			}
 		>();
-		// Our DB rows carry status + the sending/receiving session (which number).
+		// Our DB rows carry status + the sending/receiving session (which number),
+		// plus the reply/reaction/delete metadata (schema fields on WhatsAppMessage).
 		for (const m of threadQuery.data?.messages ?? []) {
+			// New schema fields land on the row once the migration ships; read them
+			// optional-safe so this compiles before/after that lands.
+			const row = m as typeof m & {
+				quotedMessageId?: string | null;
+				reactions?: unknown;
+				deleted?: boolean | null;
+			};
 			byKey.set(m.waMessageId ?? m.id, {
 				id: m.id,
 				direction: m.direction,
@@ -107,6 +158,10 @@ export function WhatsAppInbox({
 				sessionId: m.sessionId,
 				sentByName: m.sentByName,
 				media: null,
+				waMessageId: m.waMessageId,
+				quotedMessageId: row.quotedMessageId ?? null,
+				reactions: normalizeReactions(row.reactions),
+				deleted: row.deleted ?? null,
 			});
 		}
 		// OpenWA history carries media thumbnails — merge it in without dropping
@@ -125,6 +180,7 @@ export function WhatsAppInbox({
 					timestamp: m.timestamp,
 					status: m.status,
 					media: m.media,
+					waMessageId: m.waMessageId,
 				});
 			}
 		}
@@ -146,6 +202,58 @@ export function WhatsAppInbox({
 			onSuccess: () => invalidateInbox(),
 		}),
 	);
+
+	// Message actions. Reply/react/delete change stored state, so they invalidate
+	// the inbox; forward/typing don't touch the open thread.
+	const replyMutation = useMutation(
+		orpc.whatsapp.replyMessage.mutationOptions({ onSuccess: () => invalidateInbox() }),
+	);
+	const reactMutation = useMutation(
+		orpc.whatsapp.reactMessage.mutationOptions({ onSuccess: () => invalidateInbox() }),
+	);
+	const forwardMutation = useMutation(orpc.whatsapp.forwardMessage.mutationOptions());
+	const deleteMutation = useMutation(
+		orpc.whatsapp.deleteMessage.mutationOptions({ onSuccess: () => invalidateInbox() }),
+	);
+	const markReadMutation = useMutation(
+		orpc.whatsapp.markChatRead.mutationOptions({ onSuccess: () => invalidateInbox() }),
+	);
+	const markUnreadMutation = useMutation(
+		orpc.whatsapp.markChatUnread.mutationOptions({ onSuccess: () => invalidateInbox() }),
+	);
+	const setTypingMutation = useMutation(orpc.whatsapp.setTyping.mutationOptions());
+
+	// Contact avatar for the thread — reuse the CRM profile query (best-effort;
+	// undefined until it resolves or if it fails).
+	const contactProfileQuery = useQuery({
+		...orpc.whatsapp.getContactProfile.queryOptions({
+			input: { chatId: selectedChatId ?? "", subaccountId },
+		}),
+		enabled: !!selectedChatId,
+		staleTime: 60_000,
+	});
+
+	// Mark the thread read once per opened conversation (sends blue ticks). Guarded
+	// by a ref so the mutation fires a single time even as queries refetch.
+	const readChatRef = useRef<string | null>(null);
+	if (selectedChatId && readChatRef.current !== selectedChatId) {
+		readChatRef.current = selectedChatId;
+		setReplyingTo(null);
+		markReadMutation.mutate({ chatId: selectedChatId, subaccountId });
+	}
+
+	// Debounced typing indicator — coalesces rapid keystrokes into one gateway
+	// call every ~1.5s while the user is typing.
+	const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	function handleTyping() {
+		if (!selectedChatId || typingTimerRef.current) {
+			return;
+		}
+		setTypingMutation.mutate({ chatId: selectedChatId, state: "typing", subaccountId });
+		typingTimerRef.current = setTimeout(() => {
+			typingTimerRef.current = null;
+		}, 1500);
+	}
 
 	const conversations = conversationsQuery.data ?? [];
 	const numbers = numbersQuery.data ?? [];
@@ -183,6 +291,7 @@ export function WhatsAppInbox({
 					isLoading={conversationsQuery.isLoading}
 					selectedChatId={selectedChatId}
 					onSelect={setSelectedChatId}
+					onMarkUnread={(chatId) => markUnreadMutation.mutate({ chatId, subaccountId })}
 					filters={
 						<ConversationFilters
 							subaccountId={subaccountId}
@@ -280,9 +389,44 @@ export function WhatsAppInbox({
 							contact={{
 								name: contactName,
 								phone: selectedChat?.phone ?? (selectedChatId ? prettyPhone(selectedChatId) : null),
+								avatarUrl: contactProfileQuery.data?.avatarUrl ?? undefined,
 							}}
 							numbers={numbers}
 							fallbackNumberId={activeNumberId || null}
+							onReply={(message) =>
+								setReplyingTo({
+									id: message.id,
+									waMessageId: message.waMessageId ?? null,
+									body: message.body,
+									senderName:
+										message.direction === "outbound"
+											? message.sentByName?.trim() || "You"
+											: contactName,
+								})
+							}
+							onReact={(message, emoji) => {
+								const messageId = message.waMessageId ?? message.id;
+								reactMutation.mutate({ chatId: selectedChatId, messageId, emoji, subaccountId });
+							}}
+							onForward={(message) => {
+								const messageId = message.waMessageId ?? message.id;
+								// Minimal best-effort target: forward back to the same chat. A real
+								// chat-picker lands later; this keeps the wire live and compiling.
+								forwardMutation.mutate({
+									toChatId: selectedChatId,
+									messageId,
+									subaccountId,
+								});
+							}}
+							onDelete={(message) => {
+								const messageId = message.waMessageId ?? message.id;
+								deleteMutation.mutate({
+									chatId: selectedChatId,
+									messageId,
+									forEveryone: true,
+									subaccountId,
+								});
+							}}
 						/>
 
 						<Composer
@@ -290,6 +434,28 @@ export function WhatsAppInbox({
 							fromSessionId={activeNumberId || null}
 							subaccountId={subaccountId}
 							onSent={invalidateInbox}
+							replyingTo={
+								replyingTo
+									? {
+											id: replyingTo.id,
+											waMessageId: replyingTo.waMessageId,
+											body: replyingTo.body,
+											senderName: replyingTo.senderName,
+										}
+									: null
+							}
+							onCancelReply={() => setReplyingTo(null)}
+							onReply={(text) => {
+								const quotedMessageId = replyingTo?.waMessageId ?? replyingTo?.id;
+								if (!quotedMessageId) {
+									return;
+								}
+								replyMutation.mutate(
+									{ chatId: selectedChatId, quotedMessageId, text, subaccountId },
+									{ onSuccess: () => setReplyingTo(null) },
+								);
+							}}
+							onTyping={handleTyping}
 						/>
 					</>
 				)}

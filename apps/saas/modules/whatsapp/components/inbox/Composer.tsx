@@ -14,12 +14,14 @@ import {
 	ClockIcon,
 	FileIcon,
 	FileTextIcon,
+	MapPinIcon,
 	MicIcon,
 	PaperclipIcon,
 	ShuffleIcon,
 	SmileIcon,
 	SquareIcon,
 	Trash2Icon,
+	UserIcon,
 	XIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -50,11 +52,24 @@ function pickAudioMime(): string {
 	return "audio/webm";
 }
 
+interface ReplyTarget {
+	id?: string;
+	waMessageId?: string | null;
+	body?: string | null;
+	senderName?: string | null;
+}
+
 interface ComposerProps {
 	chatId: string;
 	fromSessionId: string | null;
 	subaccountId?: string;
 	onSent: () => void;
+	replyingTo?: ReplyTarget | null;
+	onCancelReply?: () => void;
+	onReply?: (text: string) => void;
+	onSendLocation?: (input: { latitude: number; longitude: number; description?: string }) => void;
+	onSendContact?: (input: { contactName: string; contactNumber: string }) => void;
+	onTyping?: () => void;
 }
 
 function hasSendableContent(segments: MessageSegment[]): boolean {
@@ -64,7 +79,18 @@ function hasSendableContent(segments: MessageSegment[]): boolean {
 	);
 }
 
-export function Composer({ chatId, fromSessionId, subaccountId, onSent }: ComposerProps) {
+export function Composer({
+	chatId,
+	fromSessionId,
+	subaccountId,
+	onSent,
+	replyingTo,
+	onCancelReply,
+	onReply,
+	onSendLocation,
+	onSendContact,
+	onTyping,
+}: ComposerProps) {
 	const editorRef = useRef<ChipEditorHandle>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const recorderRef = useRef<MediaRecorder | null>(null);
@@ -81,6 +107,14 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 	const [delayMin, setDelayMin] = useState("1");
 	const [delayMax, setDelayMax] = useState("4");
 	const [templatesOpen, setTemplatesOpen] = useState(false);
+	const [locationOpen, setLocationOpen] = useState(false);
+	const [locationLat, setLocationLat] = useState("");
+	const [locationLng, setLocationLng] = useState("");
+	const [locationDescription, setLocationDescription] = useState("");
+	const [contactOpen, setContactOpen] = useState(false);
+	const [contactName, setContactName] = useState("");
+	const [contactNumber, setContactNumber] = useState("");
+	const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	// Saved builder templates for this subaccount (loaded into the composer on pick).
 	const settingsQuery = useQuery(
@@ -120,6 +154,26 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 
 	// Stop any in-flight recording timer when the composer unmounts.
 	useEffect(() => stopTimer, []);
+
+	// Debounced typing indicator — fires onTyping shortly after the user types.
+	function notifyTyping() {
+		if (!onTyping) {
+			return;
+		}
+		if (typingTimerRef.current) {
+			clearTimeout(typingTimerRef.current);
+		}
+		typingTimerRef.current = setTimeout(() => onTyping(), 300);
+	}
+
+	// Clear any pending typing debounce when the composer unmounts.
+	useEffect(() => {
+		return () => {
+			if (typingTimerRef.current) {
+				clearTimeout(typingTimerRef.current);
+			}
+		};
+	}, []);
 
 	function onFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
 		const list = Array.from(event.target.files ?? []);
@@ -259,11 +313,52 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 		setDelayOpen(false);
 	}
 
+	function submitLocation() {
+		const latitude = Number.parseFloat(locationLat);
+		const longitude = Number.parseFloat(locationLng);
+		if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+			toastError("Enter a valid latitude and longitude.");
+			return;
+		}
+		const description = locationDescription.trim();
+		onSendLocation?.({
+			latitude,
+			longitude,
+			description: description.length > 0 ? description : undefined,
+		});
+		setLocationLat("");
+		setLocationLng("");
+		setLocationDescription("");
+		setLocationOpen(false);
+	}
+
+	function submitContact() {
+		const name = contactName.trim();
+		const number = contactNumber.trim();
+		if (name.length === 0 || number.length === 0) {
+			toastError("Enter a contact name and number.");
+			return;
+		}
+		onSendContact?.({ contactName: name, contactNumber: number });
+		setContactName("");
+		setContactNumber("");
+		setContactOpen(false);
+	}
+
 	function runSend() {
 		if (!canSend) {
 			return;
 		}
 		const raw = buildCommandString(editorRef.current?.getSegments() ?? segments);
+		// When replying to a message, a plain-text send becomes a quoted reply.
+		if (replyingTo && onReply && files.length === 0 && raw.trim().length > 0) {
+			onReply(raw);
+			editorRef.current?.clear();
+			setSegments([]);
+			preview.reset();
+			onCancelReply?.();
+			return;
+		}
 		const attachments = files.map((file) => ({
 			base64: file.base64,
 			mimetype: file.mimetype,
@@ -282,6 +377,27 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 
 	return (
 		<div className="gap-2 p-3 flex flex-col border-t bg-card/40">
+			{replyingTo && (
+				<div className="gap-2 py-1.5 pr-2 pl-2.5 flex items-start rounded-lg border-l-2 border-primary bg-muted/50">
+					<div className="min-w-0 flex-1">
+						<p className="font-medium text-xs text-primary">
+							Replying to {replyingTo.senderName ?? "message"}
+						</p>
+						{replyingTo.body ? (
+							<p className="text-xs truncate text-foreground/65">{replyingTo.body}</p>
+						) : null}
+					</div>
+					<button
+						type="button"
+						aria-label="Cancel reply"
+						className="size-5 flex shrink-0 items-center justify-center rounded-full text-foreground/60 hover:bg-muted hover:text-foreground"
+						onClick={() => onCancelReply?.()}
+					>
+						<XIcon className="size-3.5" />
+					</button>
+				</div>
+			)}
+
 			{files.length > 0 && (
 				<div className="gap-2 flex flex-wrap">
 					{files.map((file) => (
@@ -362,7 +478,10 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 				<ChipEditor
 					ref={editorRef}
 					placeholder="Type a message, or add an emoji / file / variable…"
-					onChange={setSegments}
+					onChange={(next) => {
+						setSegments(next);
+						notifyTyping();
+					}}
 					onEnter={runSend}
 				/>
 				<div className="gap-2 px-2 pb-2 flex items-center justify-between">
@@ -384,6 +503,97 @@ export function Composer({ chatId, fromSessionId, subaccountId, onSent }: Compos
 						>
 							<PaperclipIcon className="size-4" />
 						</Button>
+
+						{onSendLocation && (
+							<Popover open={locationOpen} onOpenChange={setLocationOpen}>
+								<PopoverTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										className="size-8 text-foreground/75"
+										aria-label="Send location"
+									>
+										<MapPinIcon className="size-4" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="start" className="w-72">
+									<div className="gap-2 flex flex-col">
+										<Label className="text-xs">Location</Label>
+										<div className="gap-2 flex items-center">
+											<Input
+												type="number"
+												step="any"
+												placeholder="Latitude"
+												value={locationLat}
+												onChange={(e) => setLocationLat(e.target.value)}
+											/>
+											<Input
+												type="number"
+												step="any"
+												placeholder="Longitude"
+												value={locationLng}
+												onChange={(e) => setLocationLng(e.target.value)}
+											/>
+										</div>
+										<Input
+											placeholder="Description (optional)"
+											value={locationDescription}
+											onChange={(e) => setLocationDescription(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													submitLocation();
+												}
+											}}
+										/>
+										<Button size="sm" onClick={submitLocation}>
+											Send location
+										</Button>
+									</div>
+								</PopoverContent>
+							</Popover>
+						)}
+
+						{onSendContact && (
+							<Popover open={contactOpen} onOpenChange={setContactOpen}>
+								<PopoverTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										className="size-8 text-foreground/75"
+										aria-label="Send contact"
+									>
+										<UserIcon className="size-4" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="start" className="w-72">
+									<div className="gap-2 flex flex-col">
+										<Label className="text-xs">Contact</Label>
+										<Input
+											placeholder="Name"
+											value={contactName}
+											onChange={(e) => setContactName(e.target.value)}
+										/>
+										<Input
+											placeholder="Phone number"
+											value={contactNumber}
+											onChange={(e) => setContactNumber(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													submitContact();
+												}
+											}}
+										/>
+										<Button size="sm" onClick={submitContact}>
+											Send contact
+										</Button>
+									</div>
+								</PopoverContent>
+							</Popover>
+						)}
 
 						<Button
 							type="button"

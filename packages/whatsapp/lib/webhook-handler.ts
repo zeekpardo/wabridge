@@ -38,6 +38,32 @@ export interface OpenWaMessageAck {
 }
 
 /**
+ * An inbound reaction to a message (add or un-react). The gateway sends an empty
+ * `emoji` to signal an un-react (WhatsApp's clear-reaction), surfaced here as
+ * `remove: true` so consumers don't have to special-case the empty string.
+ */
+export interface OpenWaReactionEvent {
+	subaccountId: string;
+	sessionId: string;
+	chatId: string;
+	/** The reacted-to message's WhatsApp id. */
+	waMessageId: string;
+	/** The reactor's neutral JID (resolved by the gateway). */
+	senderId: string;
+	emoji: string;
+	remove: boolean;
+}
+
+/** An inbound revoke ("delete for everyone") of a previously-seen message. */
+export interface OpenWaRevokeEvent {
+	subaccountId: string;
+	sessionId: string;
+	chatId: string;
+	/** The revoked message's WhatsApp id. */
+	waMessageId: string;
+}
+
+/**
  * Extension points the API layer injects so higher layers (the message hub,
  * CRM sync) can react to webhook events without this package depending on
  * them (@repo/api already depends on @repo/whatsapp).
@@ -51,6 +77,10 @@ export interface OpenWaWebhookHooks {
 	onInboundMessage?(event: OpenWaInboundMessage): Promise<void>;
 	/** Fired after the local status update; must not throw. */
 	onMessageAck?(event: OpenWaMessageAck): Promise<void>;
+	/** Fired for an inbound reaction (add or un-react); must not throw. */
+	onReaction?(event: OpenWaReactionEvent): Promise<void>;
+	/** Fired for an inbound revoke ("delete for everyone"); must not throw. */
+	onRevoke?(event: OpenWaRevokeEvent): Promise<void>;
 }
 
 /**
@@ -198,6 +228,37 @@ async function processEvent(
 				// Let the API layer relay the status upstream (e.g. GHL provider
 				// message status). Best-effort by contract.
 				await hooks?.onMessageAck?.({ subaccountId, sessionId, waMessageId, status });
+			}
+			break;
+		}
+		case OPENWA_WEBHOOK_EVENTS.messageReaction: {
+			// Inbound reaction. Gateway payload is the ReactionEvent plus a post-apply
+			// snapshot: { messageId, chatId, reaction, senderId, reactions }. An empty
+			// `reaction` is WhatsApp's un-react signal — surface it as remove.
+			const waMessageId = typeof data.messageId === "string" ? data.messageId : null;
+			const chatId = typeof data.chatId === "string" ? data.chatId : null;
+			const senderId = typeof data.senderId === "string" ? data.senderId : null;
+			const emoji = typeof data.reaction === "string" ? data.reaction : "";
+			if (hooks?.onReaction && waMessageId && chatId && senderId) {
+				await hooks.onReaction({
+					subaccountId,
+					sessionId,
+					chatId,
+					waMessageId,
+					senderId,
+					emoji,
+					remove: emoji === "",
+				});
+			}
+			break;
+		}
+		case OPENWA_WEBHOOK_EVENTS.messageRevoked: {
+			// Inbound revoke ("delete for everyone"). Gateway payload is the raw
+			// RevokedMessage: { id, chatId, from, to, type, body, timestamp }.
+			const waMessageId = typeof data.id === "string" ? data.id : null;
+			const chatId = typeof data.chatId === "string" ? data.chatId : null;
+			if (hooks?.onRevoke && waMessageId && chatId) {
+				await hooks.onRevoke({ subaccountId, sessionId, chatId, waMessageId });
 			}
 			break;
 		}

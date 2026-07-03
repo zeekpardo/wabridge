@@ -57,6 +57,8 @@ export const OPENWA_WEBHOOK_EVENTS = {
 	messageReceived: "message.received",
 	messageSent: "message.sent",
 	messageAck: "message.ack",
+	messageReaction: "message.reaction",
+	messageRevoked: "message.revoked",
 	sessionStatus: "session.status",
 	sessionQr: "session.qr",
 	sessionAuthenticated: "session.authenticated",

@@ -70,6 +70,50 @@ export interface SendMediaInput {
 	caption?: string;
 }
 
+export interface ReplyMessageInput {
+	chatId: string;
+	/** Provider id of the message being quoted/replied to. */
+	quotedMessageId: string;
+	text: string;
+}
+
+export interface ForwardMessageInput {
+	fromChatId: string;
+	toChatId: string;
+	messageId: string;
+}
+
+export interface ReactMessageInput {
+	chatId: string;
+	messageId: string;
+	/** Emoji to react with; send an empty string to remove the reaction. */
+	emoji: string;
+}
+
+export interface DeleteMessageInput {
+	chatId: string;
+	messageId: string;
+	/** Delete for everyone (default true on the gateway). */
+	forEveryone?: boolean;
+}
+
+export interface SendLocationInput {
+	chatId: string;
+	latitude: number;
+	longitude: number;
+	description?: string;
+	address?: string;
+}
+
+export interface SendContactInput {
+	chatId: string;
+	contactName: string;
+	contactNumber: string;
+}
+
+/** Presence indicator sent to a chat: 'typing'/'recording' show it, 'paused' clears it. */
+export type OpenWaChatState = "typing" | "recording" | "paused";
+
 export interface OpenWaClient {
 	createSession(input: CreateSessionInput): Promise<OpenWaSession>;
 	listSessions(): Promise<OpenWaSession[]>;
@@ -97,6 +141,17 @@ export interface OpenWaClient {
 		kind: OpenWaMediaKind,
 		input: SendMediaInput,
 	): Promise<OpenWaSendTextResult>;
+	replyMessage(id: string, input: ReplyMessageInput): Promise<OpenWaSendTextResult>;
+	forwardMessage(id: string, input: ForwardMessageInput): Promise<OpenWaSendTextResult>;
+	reactMessage(id: string, input: ReactMessageInput): Promise<void>;
+	deleteMessage(id: string, input: DeleteMessageInput): Promise<void>;
+	sendLocation(id: string, input: SendLocationInput): Promise<OpenWaSendTextResult>;
+	sendContact(id: string, input: SendContactInput): Promise<OpenWaSendTextResult>;
+	getMessageReactions(id: string, chatId: string, messageId: string): Promise<unknown>;
+	markChatRead(id: string, chatId: string): Promise<void>;
+	markChatUnread(id: string, chatId: string): Promise<void>;
+	sendChatState(id: string, chatId: string, state: OpenWaChatState): Promise<void>;
+	getProfilePicture(id: string, contactId: string): Promise<string | null>;
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown>;
 }
 
@@ -233,6 +288,86 @@ class OpenWaHttpClient implements OpenWaClient {
 			...(input.filename ? { filename: input.filename } : {}),
 			...(input.caption ? { caption: input.caption } : {}),
 		});
+	}
+
+	replyMessage(id: string, input: ReplyMessageInput): Promise<OpenWaSendTextResult> {
+		return this.request<OpenWaSendTextResult>("POST", `/sessions/${id}/messages/reply`, {
+			chatId: input.chatId,
+			quotedMessageId: input.quotedMessageId,
+			text: input.text,
+		});
+	}
+
+	forwardMessage(id: string, input: ForwardMessageInput): Promise<OpenWaSendTextResult> {
+		return this.request<OpenWaSendTextResult>("POST", `/sessions/${id}/messages/forward`, {
+			fromChatId: input.fromChatId,
+			toChatId: input.toChatId,
+			messageId: input.messageId,
+		});
+	}
+
+	async reactMessage(id: string, input: ReactMessageInput): Promise<void> {
+		await this.request<{ success: boolean }>("POST", `/sessions/${id}/messages/react`, {
+			chatId: input.chatId,
+			messageId: input.messageId,
+			emoji: input.emoji,
+		});
+	}
+
+	async deleteMessage(id: string, input: DeleteMessageInput): Promise<void> {
+		await this.request<{ success: boolean }>("POST", `/sessions/${id}/messages/delete`, {
+			chatId: input.chatId,
+			messageId: input.messageId,
+			...(input.forEveryone !== undefined ? { forEveryone: input.forEveryone } : {}),
+		});
+	}
+
+	sendLocation(id: string, input: SendLocationInput): Promise<OpenWaSendTextResult> {
+		return this.request<OpenWaSendTextResult>("POST", `/sessions/${id}/messages/send-location`, {
+			chatId: input.chatId,
+			latitude: input.latitude,
+			longitude: input.longitude,
+			...(input.description ? { description: input.description } : {}),
+			...(input.address ? { address: input.address } : {}),
+		});
+	}
+
+	sendContact(id: string, input: SendContactInput): Promise<OpenWaSendTextResult> {
+		return this.request<OpenWaSendTextResult>("POST", `/sessions/${id}/messages/send-contact`, {
+			chatId: input.chatId,
+			contactName: input.contactName,
+			contactNumber: input.contactNumber,
+		});
+	}
+
+	getMessageReactions(id: string, chatId: string, messageId: string): Promise<unknown> {
+		return this.request<unknown>(
+			"GET",
+			`/sessions/${id}/messages/${encodeURIComponent(chatId)}/${encodeURIComponent(messageId)}/reactions`,
+		);
+	}
+
+	async markChatRead(id: string, chatId: string): Promise<void> {
+		await this.request<{ success: boolean }>("POST", `/sessions/${id}/chats/read`, { chatId });
+	}
+
+	async markChatUnread(id: string, chatId: string): Promise<void> {
+		await this.request<{ success: boolean }>("POST", `/sessions/${id}/chats/unread`, { chatId });
+	}
+
+	async sendChatState(id: string, chatId: string, state: OpenWaChatState): Promise<void> {
+		await this.request<{ success: boolean }>("POST", `/sessions/${id}/chats/typing`, {
+			chatId,
+			state,
+		});
+	}
+
+	async getProfilePicture(id: string, contactId: string): Promise<string | null> {
+		const res = await this.request<{ url?: string | null }>(
+			"GET",
+			`/sessions/${id}/contacts/${encodeURIComponent(contactId)}/profile-picture`,
+		);
+		return res?.url ?? null;
 	}
 
 	registerWebhook(id: string, input: RegisterWebhookInput): Promise<unknown> {
