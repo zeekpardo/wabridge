@@ -39,6 +39,8 @@ export interface ContactProfile {
 	name: string;
 	phone: string | null;
 	avatarUrl: string | null;
+	/** The contact's name as WhatsApp shows it (self-set pushname / address book). */
+	whatsappName: string | null;
 	initials: string;
 	ownerId: string | null;
 	tags: string[];
@@ -135,6 +137,35 @@ async function resolveAvatarUrl(
 	}
 }
 
+/**
+ * Best-effort fetch of the contact's name AS WHATSAPP KNOWS IT — the contact's
+ * self-set display name ("pushname"), else the address-book name. Shown next to
+ * the CRM name so a rep can reconcile the two. Any error yields null.
+ */
+async function resolveWhatsappName(
+	subaccountId: string,
+	chatId: string,
+	activeSessionId: string | null,
+): Promise<string | null> {
+	try {
+		const session = activeSessionId
+			? await getWhatsAppSession(subaccountId, activeSessionId)
+			: await getDefaultSession(subaccountId);
+		if (!session) {
+			return null;
+		}
+		const contact = await createOpenWaClient().getContactById(session.openwaSessionId, chatId);
+		return contact?.pushName?.trim() || contact?.name?.trim() || null;
+	} catch (error) {
+		logger.warn("WhatsApp name fetch failed", {
+			ctx: "whatsapp.contactProfile.waName",
+			chatId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+}
+
 function initialsFrom(name: string): string {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
 	if (parts.length === 0) {
@@ -186,6 +217,11 @@ export const getContactProfile = protectedProcedure
 		// doesn't add its own round-trip to the happy path. Best-effort — resolves
 		// to null on any error.
 		const avatarUrlPromise = resolveAvatarUrl(
+			subaccount.id,
+			input.chatId,
+			conversation?.activeSessionId ?? null,
+		);
+		const whatsappNamePromise = resolveWhatsappName(
 			subaccount.id,
 			input.chatId,
 			conversation?.activeSessionId ?? null,
@@ -320,6 +356,7 @@ export const getContactProfile = protectedProcedure
 		];
 
 		const avatarUrl = await avatarUrlPromise;
+		const whatsappName = await whatsappNamePromise;
 
 		const contactUrl =
 			ghl && conversation?.ghlContactId
@@ -331,6 +368,7 @@ export const getContactProfile = protectedProcedure
 			name,
 			phone,
 			avatarUrl,
+			whatsappName,
 			initials: initialsFrom(name),
 			ownerId,
 			tags,

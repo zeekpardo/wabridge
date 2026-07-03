@@ -193,6 +193,15 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 						) : null}
 					</div>
 
+					{/* The contact's name as WhatsApp shows it (their self-set display
+					    name), so a rep can reconcile it with the CRM name above. */}
+					{profile.whatsappName ? (
+						<div className="gap-0.5 flex flex-col">
+							<span className="font-medium text-xs text-foreground/75">WhatsApp name</span>
+							<span className="text-sm truncate">{profile.whatsappName}</span>
+						</div>
+					) : null}
+
 					{/* Manual CRM link — for @lid (WhatsApp privacy) threads whose number
 					    couldn't be auto-resolved to match a GoHighLevel contact. */}
 					{profile.ghl.connected && profile.ghl.linkableByPhone ? (

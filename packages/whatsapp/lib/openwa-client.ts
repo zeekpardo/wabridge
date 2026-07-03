@@ -33,6 +33,16 @@ export interface SendTextInput {
 	text: string;
 }
 
+/** A WhatsApp contact as the gateway knows it (address-book + self-set names). */
+export interface OpenWaContact {
+	id: string;
+	/** Name saved in the linked phone's address book, if any. */
+	name?: string;
+	/** The contact's own self-set WhatsApp display name ("pushname"). */
+	pushName?: string;
+	number?: string;
+}
+
 export interface OpenWaChat {
 	id: string;
 	name?: string;
@@ -162,6 +172,8 @@ export interface OpenWaClient {
 	 * digits, no `+`), best-effort. Null when the engine can't map it.
 	 */
 	resolveContactPhone(id: string, contactId: string): Promise<string | null>;
+	/** The gateway's contact record (name/pushName), best-effort; null if unknown. */
+	getContactById(id: string, contactId: string): Promise<OpenWaContact | null>;
 	getChatHistory(
 		id: string,
 		chatId: string,
@@ -298,6 +310,18 @@ class OpenWaHttpClient implements OpenWaClient {
 		);
 		const digits = res?.phone?.replace(/\D/g, "");
 		return digits && digits.length >= 6 ? digits : null;
+	}
+
+	async getContactById(id: string, contactId: string): Promise<OpenWaContact | null> {
+		try {
+			return await this.request<OpenWaContact>(
+				"GET",
+				`/sessions/${id}/contacts/${encodeURIComponent(contactId)}`,
+			);
+		} catch {
+			// 404 (unknown contact) or any gateway hiccup — treat as "no info".
+			return null;
+		}
 	}
 
 	getChatHistory(
