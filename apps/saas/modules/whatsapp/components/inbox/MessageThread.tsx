@@ -50,6 +50,8 @@ export interface ThreadMessage {
 	sessionId?: string | null;
 	/** Display name of the staff user who sent an outbound message, when known. */
 	sentByName?: string | null;
+	/** Display name of the group sender for an inbound group message, when known. */
+	authorName?: string | null;
 	media?: { kind: string; dataUrl: string | null; mimetype?: string | null } | null;
 	/** WhatsApp-side id of this message, used to resolve replies/reactions. */
 	waMessageId?: string | null;
@@ -72,6 +74,10 @@ export interface ThreadContact {
 	phone: string | null;
 	/** Remote profile-picture URL for the contact, when known. */
 	avatarUrl?: string | null;
+	/** True when this thread is a WhatsApp group chat. */
+	isGroup?: boolean;
+	/** Participant count for a group thread, when known. */
+	memberCount?: number | null;
 }
 
 const VOICE_KINDS = new Set(["audio", "ptt", "voice"]);
@@ -280,6 +286,8 @@ function MessageBubble({
 	const status = statusMeta(message.status);
 	const reactions = !isDeleted && message.reactions ? summarizeReactions(message.reactions) : [];
 	const hasActions = Boolean(onReply || onReact || onForward || onDelete);
+	// In a group thread, label inbound bubbles with the sender's name (WhatsApp-style).
+	const groupAuthor = contact.isGroup && !isOutbound ? message.authorName?.trim() || null : null;
 
 	return (
 		<div className={cn("group gap-2 flex items-end", isOutbound ? "flex-row-reverse" : "flex-row")}>
@@ -314,6 +322,9 @@ function MessageBubble({
 			</Tooltip>
 
 			<div className={cn("min-w-0 flex flex-1 flex-col", isOutbound ? "items-end" : "items-start")}>
+				{groupAuthor ? (
+					<span className="mb-0.5 px-1 text-xs font-medium text-primary/80">{groupAuthor}</span>
+				) : null}
 				<div
 					className={cn("gap-1.5 flex items-center", isOutbound ? "flex-row-reverse" : "flex-row")}
 				>
