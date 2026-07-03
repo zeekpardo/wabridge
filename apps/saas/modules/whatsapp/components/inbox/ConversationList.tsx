@@ -6,7 +6,7 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Spinner } from "@repo/ui/components/spinner";
 import type { RouterOutputs } from "@shared/lib/orpc-query-utils";
-import { InboxIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react";
+import { InboxIcon, MailIcon, PlusIcon, SearchIcon, UsersIcon, XIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { prettyPhone, relativeTime, toChatId } from "./helpers";
@@ -18,6 +18,8 @@ interface ConversationListProps {
 	isLoading: boolean;
 	selectedChatId: string | null;
 	onSelect: (chatId: string) => void;
+	/** Mark a conversation unread (row hover action). */
+	onMarkUnread?: (chatId: string) => void;
 	/** Filter control (button + active-filter chips), shown beside the search box. */
 	filters?: ReactNode;
 }
@@ -45,6 +47,7 @@ export function ConversationList({
 	isLoading,
 	selectedChatId,
 	onSelect,
+	onMarkUnread,
 	filters,
 }: ConversationListProps) {
 	const [showNewChat, setShowNewChat] = useState(false);
@@ -146,6 +149,7 @@ export function ConversationList({
 							chat={chat}
 							isSelected={chat.chatId === selectedChatId}
 							onSelect={() => onSelect(chat.chatId)}
+							onMarkUnread={onMarkUnread ? () => onMarkUnread(chat.chatId) : undefined}
 						/>
 					))
 				)}
@@ -158,57 +162,76 @@ interface ConversationRowProps {
 	chat: Chat;
 	isSelected: boolean;
 	onSelect: () => void;
+	/** Mark this conversation unread; hover action rendered when provided. */
+	onMarkUnread?: () => void;
 }
 
-function ConversationRow({ chat, isSelected, onSelect }: ConversationRowProps) {
+function ConversationRow({ chat, isSelected, onSelect, onMarkUnread }: ConversationRowProps) {
 	const name = displayName(chat);
 	const numberLabel = chat.activeSession?.label || chat.activeSession?.phone;
 	const hasUnread = chat.unreadCount > 0;
 
 	return (
-		<button
-			type="button"
-			onClick={onSelect}
-			className={cn(
-				"gap-3 px-2.5 py-2 flex w-full items-center rounded-lg text-left transition-colors hover:bg-muted/60",
-				isSelected && "bg-muted",
-			)}
-		>
-			<Avatar className="size-9 shrink-0">
-				<AvatarFallback className={cn("text-xs", isSelected && "bg-primary/15 text-primary")}>
-					{chat.isGroup ? <UsersIcon className="size-4" /> : avatarText(name)}
-				</AvatarFallback>
-			</Avatar>
-			<div className="min-w-0 flex-1">
-				<div className="gap-2 flex items-center justify-between">
-					<span className={cn("text-sm truncate", hasUnread ? "font-semibold" : "font-medium")}>
-						{name}
-					</span>
-					<span className="shrink-0 text-[11px] text-foreground/55">
-						{relativeTime(chat.lastMessageAt)}
-					</span>
-				</div>
-				<div className="gap-2 flex items-center justify-between">
-					<span
-						className={cn(
-							"text-xs truncate",
-							hasUnread ? "text-foreground/80" : "text-foreground/55",
+		<div className="group relative">
+			<button
+				type="button"
+				onClick={onSelect}
+				className={cn(
+					"gap-3 px-2.5 py-2 flex w-full items-center rounded-lg text-left transition-colors hover:bg-muted/60",
+					isSelected && "bg-muted",
+				)}
+			>
+				<Avatar className="size-9 shrink-0">
+					<AvatarFallback className={cn("text-xs", isSelected && "bg-primary/15 text-primary")}>
+						{chat.isGroup ? <UsersIcon className="size-4" /> : avatarText(name)}
+					</AvatarFallback>
+				</Avatar>
+				<div className="min-w-0 flex-1">
+					<div className="gap-2 flex items-center justify-between">
+						<span className={cn("text-sm truncate", hasUnread ? "font-semibold" : "font-medium")}>
+							{name}
+						</span>
+						<span className="shrink-0 text-[11px] text-foreground/55">
+							{relativeTime(chat.lastMessageAt)}
+						</span>
+					</div>
+					<div className="gap-2 flex items-center justify-between">
+						<span
+							className={cn(
+								"text-xs truncate",
+								hasUnread ? "text-foreground/80" : "text-foreground/55",
+							)}
+						>
+							{chat.lastMessagePreview || "No messages yet"}
+						</span>
+						{hasUnread && (
+							<span className="size-5 min-w-5 px-1 flex shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+								{chat.unreadCount}
+							</span>
 						)}
-					>
-						{chat.lastMessagePreview || "No messages yet"}
-					</span>
-					{hasUnread && (
-						<span className="size-5 min-w-5 px-1 flex shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-							{chat.unreadCount}
+					</div>
+					{numberLabel && (
+						<span className="mt-0.5 block truncate text-[10px] text-foreground/55">
+							via {numberLabel}
 						</span>
 					)}
 				</div>
-				{numberLabel && (
-					<span className="mt-0.5 block truncate text-[10px] text-foreground/55">
-						via {numberLabel}
-					</span>
-				)}
-			</div>
-		</button>
+			</button>
+
+			{onMarkUnread && (
+				<button
+					type="button"
+					aria-label="Mark as unread"
+					title="Mark as unread"
+					className="right-2 top-2 size-6 absolute flex items-center justify-center rounded-md bg-card text-foreground/55 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus:opacity-100"
+					onClick={(e) => {
+						e.stopPropagation();
+						onMarkUnread();
+					}}
+				>
+					<MailIcon className="size-3.5" />
+				</button>
+			)}
+		</div>
 	);
 }
