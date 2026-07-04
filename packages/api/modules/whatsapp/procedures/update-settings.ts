@@ -15,14 +15,20 @@ export const updateSettings = protectedProcedure
 	.input(
 		z.object({
 			// Map of variable name -> list of variations, e.g. { SPINTAX_1: ["Hi", "Hello"] }.
-			globalSpintax: z.record(z.string(), z.array(z.string())),
+			globalSpintax: z.record(z.string(), z.array(z.string())).optional(),
+			// Toggle the WhatsApp Groups feature for this subaccount.
+			groupsEnabled: z.boolean().optional(),
 			subaccountId: z.string().optional(),
 		}),
 	)
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
-		await upsertWhatsAppSettings(subaccount.id, { globalSpintax: input.globalSpintax });
+		// Partial update: only the provided fields are written (undefined is skipped by the query).
+		await upsertWhatsAppSettings(subaccount.id, {
+			globalSpintax: input.globalSpintax,
+			groupsEnabled: input.groupsEnabled,
+		});
 
-		return { globalSpintax: input.globalSpintax };
+		return { ok: true };
 	});

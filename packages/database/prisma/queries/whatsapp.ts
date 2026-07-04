@@ -440,7 +440,7 @@ export async function getWhatsAppSettings(subaccountId: string) {
 
 export async function upsertWhatsAppSettings(
 	subaccountId: string,
-	data: { globalSpintax?: unknown; messageTemplates?: unknown },
+	data: { globalSpintax?: unknown; messageTemplates?: unknown; groupsEnabled?: boolean },
 ) {
 	return db.whatsAppSettings.upsert({
 		where: { subaccountId },
@@ -448,10 +448,12 @@ export async function upsertWhatsAppSettings(
 			subaccountId,
 			globalSpintax: data.globalSpintax ?? undefined,
 			messageTemplates: data.messageTemplates ?? undefined,
+			groupsEnabled: data.groupsEnabled ?? undefined,
 		},
 		update: {
 			globalSpintax: data.globalSpintax ?? undefined,
 			messageTemplates: data.messageTemplates ?? undefined,
+			groupsEnabled: data.groupsEnabled ?? undefined,
 		},
 	});
 }

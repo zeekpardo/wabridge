@@ -22,6 +22,8 @@ export const getSettings = protectedProcedure
 		const settings = await getWhatsAppSettings(subaccount.id);
 		const globalSpintax = (settings?.globalSpintax as GlobalSpintax | null) ?? {};
 		const messageTemplates = parseMessageTemplates(settings?.messageTemplates);
+		// Groups are on unless a subaccount has explicitly turned them off.
+		const groupsEnabled = settings?.groupsEnabled ?? true;
 
-		return { globalSpintax, messageTemplates };
+		return { globalSpintax, messageTemplates, groupsEnabled };
 	});
