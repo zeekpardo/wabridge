@@ -1,15 +1,8 @@
 import { ORPCError } from "@orpc/server";
-import {
-	getConversation,
-	getGhlConnection,
-	getWhatsAppSession,
-	setConversationActiveSession,
-} from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
+import { getWhatsAppSession, setConversationActiveSession } from "@repo/database";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { syncPrimaryNumberTag } from "../../ghl/sync-primary-number-tag";
 import { resolveSubaccount } from "../lib/active-organization";
 
 export const setConversationNumber = protectedProcedure
@@ -18,7 +11,8 @@ export const setConversationNumber = protectedProcedure
 		path: "/whatsapp/conversations/active-number",
 		tags: ["WhatsApp"],
 		summary: "Set a conversation's active number",
-		description: "Persist which of the org's numbers replies to a contact (the UI 'Send from').",
+		description:
+			"Persist which of the org's numbers replies to a contact (the UI 'Send from'). Transient — does NOT change the contact's primary number (use setPrimaryNumber for that).",
 	})
 	.input(
 		z.object({
@@ -35,25 +29,12 @@ export const setConversationNumber = protectedProcedure
 			throw new ORPCError("NOT_FOUND", { message: "Number not found for this subaccount." });
 		}
 
-		const result = await setConversationActiveSession({
+		// Send-from only: this must NOT touch the contact's primary number (the `wa:` tag). Changing the
+		// primary is a separate, intentional action — see setPrimaryNumber.
+		return setConversationActiveSession({
 			subaccountId: subaccount.id,
 			organizationId: subaccount.organizationId,
 			chatId: input.chatId,
 			sessionId: input.sessionId,
 		});
-
-		// Mark the newly-picked number as the contact's primary via a `wa:` tag on
-		// the linked GHL contact. Best-effort — a GHL hiccup never fails the pick.
-		const ghl = await getGhlConnection(subaccount.id);
-		if (ghl && target.phone) {
-			const conversation = await getConversation(subaccount.id, input.chatId);
-			if (conversation?.ghlContactId) {
-				const client = await createGoHighLevelClient(subaccount.id);
-				if (client) {
-					await syncPrimaryNumberTag(client, conversation.ghlContactId, target.phone);
-				}
-			}
-		}
-
-		return result;
 	});

@@ -220,6 +220,17 @@ export function WhatsAppInbox({
 		}),
 	);
 
+	// Explicitly set the contact's PRIMARY number (the `wa:` tag). Separate from the transient
+	// "Send from" pick above — refresh the profile so the star indicator moves.
+	const setPrimary = useMutation(
+		orpc.whatsapp.setPrimaryNumber.mutationOptions({
+			onSuccess: () => {
+				invalidateInbox();
+				void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getContactProfile.key() });
+			},
+		}),
+	);
+
 	// Message actions. Reply/react/delete change stored state, so they invalidate
 	// the inbox; forward/typing don't touch the open thread.
 	const replyMutation = useMutation(
@@ -279,9 +290,18 @@ export function WhatsAppInbox({
 	const selectedChat = conversations.find((chat) => chat.chatId === selectedChatId);
 	const activeNumberId =
 		conversation?.activeSessionId ?? selectedChat?.activeSession?.id ?? numbers[0]?.id ?? "";
-	// The contact's actual sticky primary (persisted), not the display fallback —
-	// marked with a star in the switcher. Null until a first message sets it.
-	const primaryNumberId = conversation?.activeSessionId ?? selectedChat?.activeSession?.id ?? null;
+	// The contact's actual sticky primary number = the `wa:<digits>` tag on the CRM contact, matched
+	// back to one of our numbers. This is DISTINCT from the send-from (activeSessionId): switching
+	// "Send from" no longer changes it; only the explicit "Set as primary" does. Null until set.
+	const primaryPhoneDigits =
+		(contactProfileQuery.data?.tags ?? [])
+			.find((tag) => /^wa:/i.test(tag))
+			?.slice(3)
+			.replace(/\D/g, "") || null;
+	const primaryNumberId = primaryPhoneDigits
+		? (numbers.find((number) => (number.phone ?? "").replace(/\D/g, "") === primaryPhoneDigits)
+				?.id ?? null)
+		: null;
 	const contactName =
 		selectedChat?.contactName ||
 		conversation?.contactName ||
@@ -376,7 +396,7 @@ export function WhatsAppInbox({
 							<div className="gap-2 flex items-center">
 								<span
 									className="text-xs sm:inline hidden text-foreground/75"
-									title="Sets this contact's primary number — future messages send from it."
+									title="Which number this reply sends from. Transient — it does NOT change the contact's primary number."
 								>
 									Send from
 								</span>
@@ -389,8 +409,8 @@ export function WhatsAppInbox({
 								>
 									<SelectTrigger
 										className="w-36 sm:w-44"
-										aria-label="Contact's primary number"
-										title="Sets this contact's primary number — future messages send from it."
+										aria-label="Send-from number"
+										title="Which number this reply sends from. Transient — it does NOT change the contact's primary number."
 									>
 										<SelectValue placeholder="No numbers" />
 									</SelectTrigger>
@@ -410,6 +430,26 @@ export function WhatsAppInbox({
 										))}
 									</SelectContent>
 								</Select>
+								{selectedChatId && activeNumberId && activeNumberId !== primaryNumberId ? (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="gap-1.5"
+										disabled={setPrimary.isPending}
+										aria-label="Set as primary number"
+										title="Make the selected number this contact's primary — the number we default to sending from."
+										onClick={() =>
+											setPrimary.mutate({
+												chatId: selectedChatId,
+												sessionId: activeNumberId,
+												subaccountId,
+											})
+										}
+									>
+										<StarIcon className="size-3.5" />
+										<span className="sm:inline hidden">Set as primary</span>
+									</Button>
+								) : null}
 								{isGroupChat && onManageGroup ? (
 									<Button
 										variant="ghost"
