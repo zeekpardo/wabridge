@@ -27,13 +27,13 @@ import {
 	CopyIcon,
 	LinkIcon,
 	LogOutIcon,
-	PlusIcon,
 	RefreshCwIcon,
 	UserMinusIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { prettyPhone } from "../inbox/helpers";
+import { AddGroupMembersDialog } from "./AddGroupMembersDialog";
 
 interface GroupDetailProps {
 	subaccountId?: string;
@@ -69,7 +69,6 @@ export function GroupDetail({
 
 	const [subject, setSubject] = useState("");
 	const [description, setDescription] = useState("");
-	const [newMember, setNewMember] = useState("");
 	// Numbers WhatsApp wouldn't add directly (privacy) — offered an invite link instead.
 	const [pendingInvite, setPendingInvite] = useState<string[]>([]);
 
@@ -109,21 +108,6 @@ export function GroupDetail({
 				invalidateGroup();
 			},
 			onError: (error) => toastError(error.message ?? "Could not update the description"),
-		}),
-	);
-	const addMutation = useMutation(
-		orpc.whatsapp.addGroupParticipants.mutationOptions({
-			onSuccess: (data) => {
-				setNewMember("");
-				if (data.notAdded && data.notAdded.length > 0) {
-					// WhatsApp wouldn't add them directly — surface an invite-link offer instead.
-					setPendingInvite((prev) => [...new Set([...prev, ...data.notAdded])]);
-				} else {
-					toastSuccess("Member added");
-				}
-				invalidateGroup();
-			},
-			onError: (error) => toastError(error.message ?? "Could not add the member"),
 		}),
 	);
 	const inviteMutation = useMutation(
@@ -392,40 +376,20 @@ export function GroupDetail({
 					</span>
 
 					{isAdmin ? (
-						<div className="gap-2 flex items-center">
-							<Input
-								value={newMember}
-								onChange={(event) => setNewMember(event.target.value)}
-								placeholder="Add by phone number, e.g. +15551234567"
-								onKeyDown={(event) => {
-									if (event.key === "Enter" && newMember.trim()) {
-										addMutation.mutate({
-											sessionId,
-											groupId,
-											participants: [newMember.trim()],
-											subaccountId,
-										});
-									}
-								}}
-							/>
-							<Button
-								size="sm"
-								className="gap-1.5"
-								disabled={!newMember.trim()}
-								loading={addMutation.isPending}
-								onClick={() =>
-									addMutation.mutate({
-										sessionId,
-										groupId,
-										participants: [newMember.trim()],
-										subaccountId,
-									})
+						<AddGroupMembersDialog
+							subaccountId={subaccountId}
+							sessionId={sessionId}
+							groupId={groupId}
+							existingNumbers={group.participants
+								.map((p) => p.number)
+								.filter((n): n is string => Boolean(n))}
+							onAdded={(notAdded) => {
+								if (notAdded.length > 0) {
+									setPendingInvite((prev) => [...new Set([...prev, ...notAdded])]);
 								}
-							>
-								<PlusIcon className="size-3.5" />
-								Add
-							</Button>
-						</div>
+								invalidateGroup();
+							}}
+						/>
 					) : null}
 
 					{isAdmin && pendingInvite.length > 0 ? (
@@ -469,7 +433,11 @@ export function GroupDetail({
 
 					<div className="flex flex-col rounded-md border">
 						{group.participants.map((participant) => {
-							const name = participant.name?.trim() || prettyPhone(participant.id);
+							// Prefer the CRM name over the WhatsApp push name / bare number.
+							const name =
+								participant.crmName?.trim() ||
+								participant.name?.trim() ||
+								prettyPhone(participant.id);
 							const phone = participant.number ? prettyPhone(participant.number) : null;
 							return (
 								<div
@@ -478,7 +446,19 @@ export function GroupDetail({
 								>
 									<div className="min-w-0 flex-1">
 										<div className="gap-1.5 flex items-center">
-											<p className="text-sm truncate">{name}</p>
+											{participant.profileUrl ? (
+												<a
+													href={participant.profileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="text-sm truncate text-primary hover:underline"
+													title="Open CRM profile"
+												>
+													{name}
+												</a>
+											) : (
+												<p className="text-sm truncate">{name}</p>
+											)}
 											{participant.isSuperAdmin ? (
 												<Badge status="success" className="px-2 py-0.5 normal-case">
 													Owner

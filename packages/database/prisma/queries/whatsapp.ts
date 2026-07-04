@@ -164,6 +164,21 @@ export async function listConversations(subaccountId: string) {
 }
 
 /**
+ * Fetch just the conversations for a set of chat ids (e.g. a group's members as
+ * `<phone>@c.us`) — used to overlay CRM name + link onto group participants
+ * without loading every conversation in the subaccount.
+ */
+export async function getConversationsByChatIds(subaccountId: string, chatIds: string[]) {
+	if (chatIds.length === 0) {
+		return [];
+	}
+	return db.whatsAppConversation.findMany({
+		where: { subaccountId, chatId: { in: chatIds } },
+		select: { chatId: true, contactName: true, ghlContactId: true },
+	});
+}
+
+/**
  * Inbound arrival: upsert the thread. The active/sending number is set once — on
  * create, or later via setConversationActiveSession — so subsequent inbound
  * messages never re-lock the reply number.
