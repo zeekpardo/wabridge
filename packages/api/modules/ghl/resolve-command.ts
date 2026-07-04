@@ -3,6 +3,7 @@ import {
 	type NumberOverride,
 	processMessage,
 	type Rng,
+	type SendAction,
 } from "@repo/whatsapp/commands";
 
 export type { NumberOverride };
@@ -16,6 +17,11 @@ export interface ResolvedOutboundCommand {
 	unresolved: string[];
 	/** Sender-number override from `#switch|N` (session) or `#switch_unique` (once), if any. */
 	numberOverride?: NumberOverride;
+	/**
+	 * A whole-message rich action (contact card / location pin) when the body is
+	 * one of those commands — the GHL path sends this instead of text.
+	 */
+	richAction?: SendAction;
 }
 
 /**
@@ -40,10 +46,15 @@ export function resolveOutboundCommand(
 		.filter((part) => part.length > 0)
 		.join("\n");
 
+	const richAction = processed.actions.find(
+		(action) => action.kind === "contact" || action.kind === "location",
+	);
+
 	return {
 		text,
 		delayMs: processed.meta.delayMs,
 		unresolved: processed.meta.unresolvedSpintax ?? [],
 		numberOverride: processed.numberOverride,
+		richAction,
 	};
 }

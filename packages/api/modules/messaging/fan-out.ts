@@ -46,6 +46,12 @@ export interface CanonicalMessage {
 	 * fan-out. Honoured by `sendOverWhatsApp` (capped) so bulk sends look human.
 	 */
 	sendDelayMs?: number;
+	/**
+	 * Rich outbound payloads for `type: "contact" | "location"` (the `#contact` /
+	 * `#location` commands). `sendOverWhatsApp` sends these instead of text.
+	 */
+	contact?: { name: string; number: string };
+	location?: { latitude: number; longitude: number; note?: string; address?: string };
 	timestamp: Date;
 }
 

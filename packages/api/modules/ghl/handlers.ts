@@ -235,6 +235,29 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	// last used (its active session), which must be a member to post.
 	const session = await resolveOutboundSession(subaccount, chatId, phone, resolved.numberOverride);
 
+	// A `#contact` / `#location` command sends a typed message instead of text.
+	const rich = resolved.richAction;
+	const messageType = rich?.kind ?? "text";
+	const contactPayload =
+		rich?.kind === "contact"
+			? { name: rich.contactName ?? "", number: rich.contactNumber ?? "" }
+			: undefined;
+	const locationPayload =
+		rich?.kind === "location"
+			? {
+					latitude: rich.latitude ?? 0,
+					longitude: rich.longitude ?? 0,
+					note: rich.text,
+					address: rich.address,
+				}
+			: undefined;
+	const messageBody =
+		rich?.kind === "contact"
+			? (rich.contactName ?? resolved.text)
+			: rich?.kind === "location"
+				? (rich.text ?? rich.address ?? `${rich.latitude ?? ""}, ${rich.longitude ?? ""}`)
+				: resolved.text;
+
 	try {
 		const result = await fanOutMessage(
 			{
@@ -244,9 +267,11 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 				chatId,
 				direction: "outbound",
 				origin: "ghl",
-				body: resolved.text,
+				body: messageBody,
 				sendDelayMs: resolved.delayMs,
-				type: "text",
+				type: messageType,
+				contact: contactPayload,
+				location: locationPayload,
 				attachments,
 				ghlMessageId: ghlMessageId ?? null,
 				timestamp: new Date(),

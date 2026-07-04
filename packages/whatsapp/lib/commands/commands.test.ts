@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { buildCommandString } from "./builder";
+import { parseContact } from "./contact";
 import { extractDelay } from "./delay";
+import { parseLocation } from "./location";
 import { processMessage } from "./process";
 import { expandSpintax } from "./spintax";
 
@@ -116,6 +118,84 @@ describe("processMessage", () => {
 		expect(result.numberOverride).toEqual({ priority: 3, scope: "once" });
 		expect(result.actions).toHaveLength(1);
 		expect(result.actions[0]?.text).toBe("Hi");
+	});
+});
+
+describe("parseContact", () => {
+	it("parses a valid #contact command, trimming name and stripping non-digits from phone", () => {
+		expect(parseContact("#contact|John Doe|+52 177 888 1234")).toEqual({
+			name: "John Doe",
+			number: "521778881234",
+		});
+	});
+
+	it("returns null for non-matching text", () => {
+		expect(parseContact("Hello there")).toBeNull();
+		expect(parseContact("#location|18.9|99.2")).toBeNull();
+	});
+
+	it("returns null when the name is empty", () => {
+		expect(parseContact("#contact||5551234567")).toBeNull();
+	});
+
+	it("returns null when the number is empty or strips to empty", () => {
+		expect(parseContact("#contact|John||")).toBeNull();
+		expect(parseContact("#contact|John|abc")).toBeNull();
+	});
+});
+
+describe("parseLocation", () => {
+	it("parses a valid #location command with note and address", () => {
+		const result = parseLocation("#location|18.9|99.2|hi|cuernavaca");
+		expect(result?.latitude).toBe(18.9);
+		expect(result?.longitude).toBe(99.2);
+		expect(result?.note).toBe("hi");
+		expect(result?.address).toBe("cuernavaca");
+	});
+
+	it("parses a valid #location command without note/address", () => {
+		expect(parseLocation("#location|18.9|99.2")).toEqual({
+			latitude: 18.9,
+			longitude: 99.2,
+			note: undefined,
+			address: undefined,
+		});
+	});
+
+	it("returns null for invalid (non-numeric) coordinates", () => {
+		expect(parseLocation("#location|abc|def")).toBeNull();
+	});
+
+	it("returns null for non-matching text", () => {
+		expect(parseLocation("Hello there")).toBeNull();
+		expect(parseLocation("#contact|John Doe|5551234567")).toBeNull();
+	});
+});
+
+describe("processMessage (contact/location commands)", () => {
+	it("produces a single contact action for a #contact message", () => {
+		const result = processMessage({ text: "#contact|John Doe|+52 177 888 1234" });
+		expect(result.actions).toEqual([
+			{ kind: "contact", contactName: "John Doe", contactNumber: "521778881234" },
+		]);
+	});
+
+	it("produces a single location action for a #location message", () => {
+		const result = processMessage({ text: "#location|18.9|99.2|hi|cuernavaca" });
+		expect(result.actions).toEqual([
+			{
+				kind: "location",
+				latitude: 18.9,
+				longitude: 99.2,
+				text: "hi",
+				address: "cuernavaca",
+			},
+		]);
+	});
+
+	it("still produces a text action for a plain text message", () => {
+		const result = processMessage({ text: "Hello" });
+		expect(result.actions).toEqual([{ kind: "text", text: "Hello", delayMs: undefined }]);
 	});
 });
 

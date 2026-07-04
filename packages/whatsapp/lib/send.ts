@@ -60,21 +60,48 @@ export async function sendProcessedMessage(
 			await sleep(Math.min(action.delayMs, MAX_DELAY_MS));
 		}
 
-		const result =
-			action.kind === "text"
-				? await openwa.sendText(target.openwaSessionId, {
-						chatId: target.chatId,
-						text: action.text ?? "",
-					})
-				: await openwa.sendMedia(target.openwaSessionId, action.kind as OpenWaMediaKind, {
-						chatId: target.chatId,
-						url: action.url,
-						base64: action.base64,
-						mimetype: action.mimetype,
-						filename: action.filename,
-						caption: action.text,
-					});
+		let result: { messageId?: string; id?: string };
+		if (action.kind === "text") {
+			result = await openwa.sendText(target.openwaSessionId, {
+				chatId: target.chatId,
+				text: action.text ?? "",
+			});
+		} else if (action.kind === "contact") {
+			result = await openwa.sendContact(target.openwaSessionId, {
+				chatId: target.chatId,
+				contactName: action.contactName ?? "",
+				contactNumber: action.contactNumber ?? "",
+			});
+		} else if (action.kind === "location") {
+			result = await openwa.sendLocation(target.openwaSessionId, {
+				chatId: target.chatId,
+				latitude: action.latitude ?? 0,
+				longitude: action.longitude ?? 0,
+				description: action.text,
+				address: action.address,
+			});
+		} else {
+			result = await openwa.sendMedia(target.openwaSessionId, action.kind as OpenWaMediaKind, {
+				chatId: target.chatId,
+				url: action.url,
+				base64: action.base64,
+				mimetype: action.mimetype,
+				filename: action.filename,
+				caption: action.text,
+			});
+		}
 
+		// A readable body for the thread/CRM log — the caption/name/label per kind.
+		const bodyText =
+			action.kind === "contact"
+				? (action.contactName ?? null)
+				: action.kind === "location"
+					? (action.text ??
+						action.address ??
+						`${action.latitude ?? ""}, ${action.longitude ?? ""}`)
+					: (action.text ?? null);
+
+		const waMessageId = result?.messageId ?? result?.id ?? null;
 		const timestamp = new Date();
 		const row = await createWhatsAppMessage({
 			subaccountId: target.subaccountId,
@@ -84,9 +111,9 @@ export async function sendProcessedMessage(
 			chatId: target.chatId,
 			fromMe: true,
 			type: action.kind,
-			body: action.text ?? null,
+			body: bodyText,
 			status: "sent",
-			waMessageId: result?.messageId ?? result?.id ?? null,
+			waMessageId,
 			// Sent from our app (messenger/API) — drives the hub's CRM mirroring.
 			origin: "app",
 			sentByUserId: target.sentByUserId ?? null,
@@ -96,8 +123,8 @@ export async function sendProcessedMessage(
 
 		messages.push({
 			id: row.id,
-			waMessageId: result?.messageId ?? result?.id ?? null,
-			body: action.text ?? null,
+			waMessageId,
+			body: bodyText,
 			type: action.kind,
 			timestamp,
 		});
