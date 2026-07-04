@@ -149,6 +149,11 @@ async function resolveGhlThread(
 		return { conversationId: conversation.id };
 	}
 
+	// Resolve the business WhatsApp session that owns/sends this thread up front. Its phone is the
+	// number the contact communicates with (the one they messaged us on / we contact them from) — the
+	// number we send FROM — which is what the `wa:<number>` primary-number tag must carry.
+	const session = await resolveSession(message);
+
 	let phone = contactPhone(message);
 	if (!phone && message.chatId.endsWith("@lid")) {
 		// Outbound to a `@lid` (privacy) contact carries no `senderPhone`, and the
@@ -156,7 +161,6 @@ async function resolveGhlThread(
 		// never mirror (only later ones, after an inbound resolved + cached the
 		// link). Resolve the lid -> phone via the gateway (same self-heal the
 		// contact panel uses) so the initial message logs immediately. Best-effort.
-		const session = await resolveSession(message);
 		if (session) {
 			const digits = await createOpenWaClient()
 				.resolveContactPhone(session.openwaSessionId, message.chatId)
@@ -190,10 +194,13 @@ async function resolveGhlThread(
 		ghlName = contact.name;
 	}
 
-	// Mark this contact's primary WhatsApp number on its GHL contact via the
-	// `wa:<digits>` tag. Best-effort (never fails the projection); runs for both
-	// the inbound and outbound-record paths since both resolve the thread here.
-	await provider.setPrimaryNumberTag(contactId, phone);
+	// Mark the contact's primary WhatsApp number on its GHL contact via the `wa:<digits>` tag. This is
+	// the BUSINESS number this thread uses (the session's phone) — the number we send FROM to reach
+	// this contact — NOT the contact's own number (`phone`). Best-effort (never fails the projection);
+	// runs for both the inbound and outbound-record paths since both resolve the thread here.
+	if (session?.phone) {
+		await provider.setPrimaryNumberTag(contactId, session.phone);
+	}
 
 	const conversation = await provider.getOrCreateConversation(contactId);
 
