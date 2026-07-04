@@ -1,3 +1,5 @@
+import { resolveCrmProvider } from "@repo/crm";
+import { logger } from "@repo/logs";
 import { createOpenWaClient, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
@@ -24,20 +26,55 @@ export const addGroupParticipants = protectedProcedure
 		tags: ["WhatsApp"],
 		summary: "Add participants to a group",
 	})
-	.input(participantsInput)
+	.input(
+		z.object({
+			sessionId: z.string(),
+			groupId: z.string(),
+			// Existing contacts to add (chat id or phone). At least one of participants / newContacts.
+			participants: z.array(z.string().min(1)).default([]),
+			// Typed phone + name for people not yet in the CRM: created as a CRM contact, then added.
+			newContacts: z
+				.array(z.object({ phone: z.string().min(6), name: z.string().min(1) }))
+				.default([]),
+			subaccountId: z.string().optional(),
+		}),
+	)
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 		const sender = await resolveGroupSession(subaccount.id, input.sessionId);
 
 		const openwa = createOpenWaClient();
 		try {
+			// Create the typed-in people as CRM contacts (with the given name) so they exist in the CRM
+			// and show up named — best-effort, so a CRM hiccup still lets the WhatsApp add proceed.
+			if (input.newContacts.length > 0) {
+				const provider = await resolveCrmProvider(subaccount.id).catch(() => null);
+				if (provider) {
+					await Promise.all(
+						input.newContacts.map((c) =>
+							provider
+								.upsertContactByPhone({ phone: c.phone, name: c.name })
+								.catch((error) =>
+									logger.warn(error, { ctx: "whatsapp.addGroupParticipants.upsertContact" }),
+								),
+						),
+					);
+				}
+			}
+
 			// Resolve any `@lid` privacy id to the contact's real phone before adding (a lid's digits
 			// are not a dialable number). A typed phone / `@c.us` passes through unchanged.
-			const participants = await resolveParticipantJids(
+			const fromContacts = await resolveParticipantJids(
 				openwa,
 				sender.openwaSessionId,
 				input.participants,
 			);
+			const fromNew = input.newContacts.map((c) => toChatId(c.phone));
+			const participants = [...new Set([...fromContacts, ...fromNew])];
+			if (participants.length === 0) {
+				return { ok: true, notAdded: [] };
+			}
+
 			const results = await openwa.addGroupParticipants(
 				sender.openwaSessionId,
 				input.groupId,
