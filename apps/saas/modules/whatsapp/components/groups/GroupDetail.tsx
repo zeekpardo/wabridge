@@ -54,7 +54,10 @@ export function GroupDetail({
 	subaccountId,
 	sessionId,
 	groupId,
-	isAdmin = false,
+	// The list endpoint can't tell us if we're an admin (it doesn't load participant metadata, so it
+	// reports isAdmin=null for every group). Treat this as an optimistic hint only; the authoritative
+	// value is derived below from the detail participants matched against our own number.
+	isAdmin: isAdminHint = false,
 	onBack,
 	onLeft,
 }: GroupDetailProps) {
@@ -64,8 +67,23 @@ export function GroupDetail({
 		...orpc.whatsapp.getGroup.queryOptions({ input: { sessionId, groupId, subaccountId } }),
 		refetchInterval: 20000,
 	});
+	const numbersQuery = useQuery(
+		orpc.whatsapp.listNumbers.queryOptions({ input: { subaccountId } }),
+	);
 
 	const group = groupQuery.data;
+
+	// Authoritative admin check: find OUR number among the (fully-loaded) detail participants and see if
+	// it's an admin/owner. Falls back to the list's optimistic hint until numbers/participants load.
+	const myDigits =
+		numbersQuery.data?.find((n) => n.id === sessionId)?.phone?.replace(/\D/g, "") ?? null;
+	const isAdmin =
+		isAdminHint ||
+		(myDigits
+			? (group?.participants.some(
+					(p) => (p.isAdmin || p.isSuperAdmin) && p.number?.replace(/\D/g, "") === myDigits,
+				) ?? false)
+			: false);
 
 	const [subject, setSubject] = useState("");
 	const [description, setDescription] = useState("");
