@@ -155,8 +155,8 @@ export function ReconnectNumberDialog({
 									)}
 								</div>
 								<p className="max-w-xs text-xs text-center text-foreground/75">
-									On your phone: WhatsApp → Settings → Linked Devices → Link a Device, then scan. The
-									code refreshes automatically.
+									On your phone: WhatsApp → Settings → Linked Devices → Link a Device, then scan.
+									The code refreshes automatically.
 								</p>
 							</div>
 						</TabsContent>
@@ -179,7 +179,9 @@ export function ReconnectNumberDialog({
 									variant="secondary"
 									disabled={phone.length < 8}
 									loading={pairing.isPending}
-									onClick={() => pairing.mutate({ id: sessionId, phoneNumber: phone, subaccountId })}
+									onClick={() =>
+										pairing.mutate({ id: sessionId, phoneNumber: phone, subaccountId })
+									}
 								>
 									Get pairing code
 								</Button>
