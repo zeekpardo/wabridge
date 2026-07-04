@@ -1,173 +1,131 @@
 "use client";
 
-import { Button } from "@repo/ui/components/button";
-import { Card } from "@repo/ui/components/card";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
-import { Spinner } from "@repo/ui/components/spinner";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@repo/ui/components/dialog";
 import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { PlusIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ShuffleIcon, SmartphoneIcon, TerminalIcon, UsersIcon } from "lucide-react";
+import { useState } from "react";
 
+import { CommandBuilder } from "./CommandBuilder";
+import { FeatureCard } from "./FeatureCard";
 import { OwnerNumbersSettings } from "./OwnerNumbersSettings";
+import { SpintaxEditor } from "./SpintaxEditor";
 
-interface SpintaxRow {
-	id: string;
-	/** The variable name — the token is `${SPINTAX_<name>}`. */
-	name: string;
-	/** Comma-separated variations. */
-	optionsRaw: string;
-}
+type Feature = "builder" | "spintax" | "owners";
 
-/** Normalise a typed name into a valid token suffix (upper snake, no edge `_`). */
-function normalizeName(input: string): string {
-	return input
-		.toUpperCase()
-		.replace(/[^A-Z0-9]+/g, "_")
-		.replace(/^_+|_+$/g, "");
-}
-
-/** Live-friendly normalisation: keep a trailing `_` the user is mid-typing. */
-function normalizeWhileTyping(input: string): string {
-	return input.toUpperCase().replace(/[^A-Z0-9_]+/g, "_");
-}
-
+/**
+ * The subaccount Settings tab: a grid of feature cards, each configured in a popup modal, plus a
+ * toggle to enable/disable the WhatsApp Groups feature.
+ */
 export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) {
+	const queryClient = useQueryClient();
+	const [open, setOpen] = useState<Feature | null>(null);
+
 	const settingsQuery = useQuery(
 		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
 	);
-	const [rows, setRows] = useState<SpintaxRow[]>([]);
+	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? true;
 
-	// Seed the editor from saved settings; keys are `SPINTAX_<NAME>`.
-	useEffect(() => {
-		const loaded = settingsQuery.data?.globalSpintax as Record<string, string[]> | undefined;
-		if (!loaded) {
-			return;
-		}
-		const seeded = Object.entries(loaded).map(([key, options]) => ({
-			id: crypto.randomUUID(),
-			name: key.replace(/^SPINTAX_/, ""),
-			optionsRaw: options.join(", "),
-		}));
-		setRows(seeded.length > 0 ? seeded : [{ id: crypto.randomUUID(), name: "", optionsRaw: "" }]);
-	}, [settingsQuery.data]);
-
-	const save = useMutation(
+	const toggleGroups = useMutation(
 		orpc.whatsapp.updateSettings.mutationOptions({
-			onSuccess: () => toastSuccess("Settings saved"),
-			onError: (error) => toastError(error.message ?? "Could not save settings"),
+			onSuccess: () => {
+				void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getSettings.key() });
+			},
+			onError: (error) => toastError(error.message ?? "Could not update Groups"),
 		}),
 	);
 
-	function updateRow(id: string, patch: Partial<SpintaxRow>) {
-		setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
-	}
-
-	function addRow() {
-		setRows((prev) => [...prev, { id: crypto.randomUUID(), name: "", optionsRaw: "" }]);
-	}
-
-	function removeRow(id: string) {
-		setRows((prev) => prev.filter((row) => row.id !== id));
-	}
-
-	function onSave() {
-		const globalSpintax: Record<string, string[]> = {};
-		for (const row of rows) {
-			const name = normalizeName(row.name);
-			const options = row.optionsRaw
-				.split(",")
-				.map((option) => option.trim())
-				.filter(Boolean);
-			if (name.length > 0 && options.length > 0) {
-				globalSpintax[`SPINTAX_${name}`] = options;
-			}
-		}
-		save.mutate({ globalSpintax, subaccountId });
-	}
-
-	if (settingsQuery.isLoading) {
-		return (
-			<div className="py-16 flex justify-center">
-				<Spinner className="size-6" />
-			</div>
+	function setGroups(enabled: boolean) {
+		toggleGroups.mutate(
+			{ groupsEnabled: enabled, subaccountId },
+			{ onSuccess: () => toastSuccess(enabled ? "Groups enabled" : "Groups disabled") },
 		);
 	}
 
 	return (
-		<div className="max-w-2xl gap-4 flex flex-col">
-			<Card className="gap-4 p-5 flex flex-col">
-				<div>
-					<h3 className="font-medium">Global spintax variables</h3>
-					<p className="text-sm text-foreground/75">
-						Reusable variations for this subaccount. Name each one, then reference it in messages as{" "}
-						<code className="rounded px-1 text-xs bg-muted">${"{SPINTAX_NAME}"}</code>. Separate
-						variations with commas.
-					</p>
-				</div>
+		<>
+			<div className="gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid grid-cols-1">
+				<FeatureCard
+					icon={<TerminalIcon className="size-4" />}
+					accentClassName="bg-pink-500/10 text-pink-500"
+					title="Command Builder"
+					description="Build outgoing messages with tokens, spintax, delays and CRM merge fields."
+					status={{ label: "Reference", tone: "muted" }}
+					action={{ label: "Open", onClick: () => setOpen("builder") }}
+				/>
 
-				<div className="gap-3 flex flex-col">
-					{rows.map((row) => {
-						const token = `\${SPINTAX_${normalizeName(row.name) || "…"}}`;
-						return (
-							<div key={row.id} className="gap-2 flex items-start">
-								<div className="w-40 gap-1.5 flex shrink-0 flex-col">
-									<Label className="text-xs">Name</Label>
-									<Input
-										placeholder="GREETING"
-										className="font-mono"
-										value={row.name}
-										onChange={(e) =>
-											updateRow(row.id, { name: normalizeWhileTyping(e.target.value) })
-										}
-									/>
-								</div>
-								<div className="min-w-0 gap-1.5 flex flex-1 flex-col">
-									<Label className="text-xs">Variations</Label>
-									<Input
-										placeholder="Hi, Hello, Hey there"
-										value={row.optionsRaw}
-										onChange={(e) => updateRow(row.id, { optionsRaw: e.target.value })}
-									/>
-									<p className="text-[11px] text-foreground/55">
-										Insert as <code className="text-foreground/70">{token}</code>
-									</p>
-								</div>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									className="mt-5 size-9 shrink-0 text-foreground/75"
-									aria-label="Remove variable"
-									onClick={() => removeRow(row.id)}
-								>
-									<Trash2Icon className="size-4" />
-								</Button>
-							</div>
-						);
-					})}
+				<FeatureCard
+					icon={<ShuffleIcon className="size-4" />}
+					accentClassName="bg-yellow-500/10 text-yellow-500"
+					title="Global Spintax"
+					description="Reusable spintax variables you can reference across messages in this subaccount."
+					action={{ label: "Configure", onClick: () => setOpen("spintax") }}
+				/>
 
-					{rows.length === 0 && (
-						<p className="py-4 text-sm rounded-lg border-2 border-dashed text-center text-foreground/60">
-							No variables yet.
-						</p>
-					)}
-				</div>
+				<FeatureCard
+					icon={<SmartphoneIcon className="size-4" />}
+					accentClassName="bg-sky-500/10 text-sky-500"
+					title="Owner Numbers"
+					description="Assign a default sending number per team member so new contacts spread across numbers."
+					action={{ label: "Configure", onClick: () => setOpen("owners") }}
+				/>
 
-				<div className="flex items-center justify-between">
-					<Button type="button" variant="outline" size="sm" onClick={addRow}>
-						<PlusIcon className="mr-1.5 size-3.5" />
-						Add spintax
-					</Button>
-					<Button onClick={onSave} loading={save.isPending}>
-						Save settings
-					</Button>
-				</div>
-			</Card>
+				<FeatureCard
+					icon={<UsersIcon className="size-4" />}
+					accentClassName="bg-teal-500/10 text-teal-500"
+					title="Groups"
+					description="WhatsApp Groups inbox and management. Turn off to hide the Groups tab for this subaccount."
+					toggle={{
+						checked: groupsEnabled,
+						onChange: setGroups,
+						disabled: settingsQuery.isLoading || toggleGroups.isPending,
+					}}
+				/>
+			</div>
 
-			<OwnerNumbersSettings subaccountId={subaccountId} />
-		</div>
+			{/* Command Builder — wide, scrollable */}
+			<Dialog open={open === "builder"} onOpenChange={(next) => setOpen(next ? "builder" : null)}>
+				<DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Command Builder</DialogTitle>
+						<DialogDescription>
+							Compose outgoing messages with tokens, spintax, delays and CRM merge fields.
+						</DialogDescription>
+					</DialogHeader>
+					<CommandBuilder subaccountId={subaccountId} />
+				</DialogContent>
+			</Dialog>
+
+			{/* Global Spintax */}
+			<Dialog open={open === "spintax"} onOpenChange={(next) => setOpen(next ? "spintax" : null)}>
+				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Global Spintax</DialogTitle>
+						<DialogDescription>Reusable variations for this subaccount.</DialogDescription>
+					</DialogHeader>
+					<SpintaxEditor subaccountId={subaccountId} />
+				</DialogContent>
+			</Dialog>
+
+			{/* Owner Numbers */}
+			<Dialog open={open === "owners"} onOpenChange={(next) => setOpen(next ? "owners" : null)}>
+				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Owner Numbers</DialogTitle>
+						<DialogDescription>
+							Assign a default sending number to each team member.
+						</DialogDescription>
+					</DialogHeader>
+					<OwnerNumbersSettings subaccountId={subaccountId} />
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }
