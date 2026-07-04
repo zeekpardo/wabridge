@@ -344,6 +344,12 @@ model WhatsAppSettings {
   // Whether the WhatsApp Groups feature is enabled for this subaccount (hides the Groups tab when off).
   // Off by default — a subaccount opts in from Settings. (Existing rows keep their prior value.)
   groupsEnabled Boolean    @default(false)
+  // Tag applied to a CRM contact when a message is sent to a number that isn't on WhatsApp.
+  // Null/empty disables the feature.
+  noWhatsappTag String?
+  // Staff triggers: [{ phrase, tag }, ...] — when an outbound message contains `phrase`
+  // (case-sensitive), `tag` is added to the CRM contact.
+  staffTriggers Json?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

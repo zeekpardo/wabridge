@@ -5,6 +5,7 @@ import type { OpenWaWebhookHooks } from "@repo/whatsapp";
 
 import { createFanOutDeps } from "./deps";
 import { fanOutMessage } from "./fan-out";
+import { applyStaffTriggers } from "./staff-triggers";
 
 /**
  * WhatsApp ack statuses → GHL provider message statuses. Unmapped statuses
@@ -83,6 +84,8 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 				},
 				createFanOutDeps(),
 			);
+			// Staff triggers: tag the CRM contact when this outbound body matches a rule.
+			await applyStaffTriggers(event.subaccountId, event.chatId, event.body);
 		},
 
 		// Best-effort by contract: a GHL hiccup must never fail the webhook (the

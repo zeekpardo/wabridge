@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
+import { MAX_STAFF_TRIGGERS, staffTriggerSchema } from "../types";
 
 export const updateSettings = protectedProcedure
 	.route({
@@ -18,6 +19,10 @@ export const updateSettings = protectedProcedure
 			globalSpintax: z.record(z.string(), z.array(z.string())).optional(),
 			// Toggle the WhatsApp Groups feature for this subaccount.
 			groupsEnabled: z.boolean().optional(),
+			// Tag applied when a message is sent to a number not on WhatsApp ("" clears it).
+			noWhatsappTag: z.string().max(120).optional(),
+			// Staff triggers: outbound phrase -> CRM tag.
+			staffTriggers: z.array(staffTriggerSchema).max(MAX_STAFF_TRIGGERS).optional(),
 			subaccountId: z.string().optional(),
 		}),
 	)
@@ -28,6 +33,8 @@ export const updateSettings = protectedProcedure
 		await upsertWhatsAppSettings(subaccount.id, {
 			globalSpintax: input.globalSpintax,
 			groupsEnabled: input.groupsEnabled,
+			noWhatsappTag: input.noWhatsappTag,
+			staffTriggers: input.staffTriggers,
 		});
 
 		return { ok: true };
