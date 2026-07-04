@@ -38,10 +38,25 @@ export const createGroup = protectedProcedure
 
 		const openwa = createOpenWaClient();
 		try {
-			return await openwa.createGroup(sender.openwaSessionId, {
+			const group = await openwa.createGroup(sender.openwaSessionId, {
 				name: input.name,
 				participants,
 			});
+			// WhatsApp silently drops participants who can't be added directly (privacy). Re-run the add
+			// against the fresh group to learn who actually joined (already-in => 409 => added) vs. who
+			// needs an invite; best-effort, so a hiccup here never fails the create.
+			let notAdded: string[] = [];
+			try {
+				const results = await openwa.addGroupParticipants(
+					sender.openwaSessionId,
+					group.id,
+					participants,
+				);
+				notAdded = results.filter((r) => !r.added).map((r) => r.number);
+			} catch {
+				notAdded = [];
+			}
+			return { ...group, notAdded };
 		} catch (error) {
 			mapGroupError(error, "whatsapp.createGroup");
 		}

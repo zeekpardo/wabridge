@@ -70,6 +70,8 @@ export function GroupDetail({
 	const [subject, setSubject] = useState("");
 	const [description, setDescription] = useState("");
 	const [newMember, setNewMember] = useState("");
+	// Numbers WhatsApp wouldn't add directly (privacy) — offered an invite link instead.
+	const [pendingInvite, setPendingInvite] = useState<string[]>([]);
 
 	// Seed the editable fields whenever the group loads/changes.
 	useEffect(() => {
@@ -111,12 +113,28 @@ export function GroupDetail({
 	);
 	const addMutation = useMutation(
 		orpc.whatsapp.addGroupParticipants.mutationOptions({
-			onSuccess: () => {
-				toastSuccess("Member added");
+			onSuccess: (data) => {
 				setNewMember("");
+				if (data.notAdded && data.notAdded.length > 0) {
+					// WhatsApp wouldn't add them directly — surface an invite-link offer instead.
+					setPendingInvite((prev) => [...new Set([...prev, ...data.notAdded])]);
+				} else {
+					toastSuccess("Member added");
+				}
 				invalidateGroup();
 			},
 			onError: (error) => toastError(error.message ?? "Could not add the member"),
+		}),
+	);
+	const inviteMutation = useMutation(
+		orpc.whatsapp.inviteToGroup.mutationOptions({
+			onSuccess: (data) => {
+				toastSuccess(
+					data.sent > 0 ? `Invite link sent to ${data.sent}` : "Could not send the invite link",
+				);
+				setPendingInvite([]);
+			},
+			onError: (error) => toastError(error.message ?? "Could not send the invite link"),
 		}),
 	);
 	const removeMutation = useMutation(
@@ -407,6 +425,45 @@ export function GroupDetail({
 								<PlusIcon className="size-3.5" />
 								Add
 							</Button>
+						</div>
+					) : null}
+
+					{isAdmin && pendingInvite.length > 0 ? (
+						<div className="gap-2 p-3 border-amber-500/40 bg-amber-500/10 flex flex-col rounded-md border">
+							<p className="text-xs text-foreground/80">
+								WhatsApp couldn't add{" "}
+								<span className="font-medium">
+									{pendingInvite.map((n) => prettyPhone(n)).join(", ")}
+								</span>{" "}
+								directly — their privacy settings require an invite. Send them the group's invite
+								link so they can join.
+							</p>
+							<div className="gap-2 flex items-center">
+								<Button
+									size="sm"
+									className="gap-1.5"
+									loading={inviteMutation.isPending}
+									onClick={() =>
+										inviteMutation.mutate({
+											sessionId,
+											groupId,
+											phones: pendingInvite,
+											subaccountId,
+										})
+									}
+								>
+									<LinkIcon className="size-3.5" />
+									Send invite link
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={inviteMutation.isPending}
+									onClick={() => setPendingInvite([])}
+								>
+									Dismiss
+								</Button>
+							</div>
 						</div>
 					) : null}
 

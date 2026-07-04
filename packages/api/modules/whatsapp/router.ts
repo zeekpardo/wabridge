@@ -20,6 +20,7 @@ import { createGroup } from "./procedures/group-create";
 import { setGroupDescription } from "./procedures/group-description";
 import { getGroup } from "./procedures/group-get";
 import { getGroupInviteCode, revokeGroupInviteCode } from "./procedures/group-invite";
+import { inviteToGroup } from "./procedures/group-invite-send";
 import { leaveGroup } from "./procedures/group-leave";
 import { listGroups } from "./procedures/group-list";
 import {
@@ -116,6 +117,7 @@ export const whatsappRouter = {
 	setGroupDescription,
 	getGroupInviteCode,
 	revokeGroupInviteCode,
+	inviteToGroup,
 	leaveGroup,
 	// GoHighLevel install (popup OAuth → callback page → connect) + disconnect
 	getGhlOAuthUrl,

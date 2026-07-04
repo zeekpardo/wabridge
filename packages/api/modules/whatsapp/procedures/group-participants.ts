@@ -31,16 +31,16 @@ export const addGroupParticipants = protectedProcedure
 
 		const openwa = createOpenWaClient();
 		try {
-			await openwa.addGroupParticipants(
+			const results = await openwa.addGroupParticipants(
 				sender.openwaSessionId,
 				input.groupId,
 				input.participants.map(toParticipantJid),
 			);
+			// Numbers WhatsApp wouldn't add directly (privacy) — the UI offers to invite them by link.
+			return { ok: true, notAdded: results.filter((r) => !r.added).map((r) => r.number) };
 		} catch (error) {
 			mapGroupError(error, "whatsapp.addGroupParticipants");
 		}
-
-		return { ok: true };
 	});
 
 export const removeGroupParticipants = protectedProcedure

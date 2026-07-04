@@ -157,6 +157,18 @@ export interface Invite {
 	inviteLink: string;
 }
 
+/**
+ * The outcome of trying to add one participant to a group. WhatsApp won't add a number that hasn't
+ * saved us (or restricts group-adds) — it must be invited via link instead. `added` is true when the
+ * number is now in the group (`status` "200" added or "409" already a member); false means it needs
+ * an invite. Mirrors the gateway's `ParticipantResult`.
+ */
+export interface ParticipantResult {
+	number: string;
+	status: string;
+	added: boolean;
+}
+
 export interface OpenWaClient {
 	createSession(input: CreateSessionInput): Promise<OpenWaSession>;
 	listSessions(): Promise<OpenWaSession[]>;
@@ -200,7 +212,11 @@ export interface OpenWaClient {
 	getGroups(id: string, opts?: { limit?: number; offset?: number }): Promise<Group[]>;
 	getGroupInfo(id: string, groupId: string): Promise<GroupInfo>;
 	createGroup(id: string, input: { name: string; participants: string[] }): Promise<Group>;
-	addGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
+	addGroupParticipants(
+		id: string,
+		groupId: string,
+		participants: string[],
+	): Promise<ParticipantResult[]>;
 	removeGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
 	promoteGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
 	demoteGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void>;
@@ -462,12 +478,19 @@ class OpenWaHttpClient implements OpenWaClient {
 		});
 	}
 
-	async addGroupParticipants(id: string, groupId: string, participants: string[]): Promise<void> {
-		await this.request<{ success: boolean }>(
+	async addGroupParticipants(
+		id: string,
+		groupId: string,
+		participants: string[],
+	): Promise<ParticipantResult[]> {
+		const res = await this.request<{ success: boolean; results?: ParticipantResult[] }>(
 			"POST",
 			`/sessions/${id}/groups/${encodeURIComponent(groupId)}/participants`,
 			{ participants },
 		);
+		// Older gateways don't report per-participant results; an empty list means
+		// "nothing to flag" (never a false "couldn't add").
+		return res.results ?? [];
 	}
 
 	async removeGroupParticipants(
