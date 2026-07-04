@@ -342,7 +342,8 @@ model WhatsAppSettings {
   // Saved bulk-message templates: [{ id, name, text, updatedAt }, ...].
   messageTemplates Json?
   // Whether the WhatsApp Groups feature is enabled for this subaccount (hides the Groups tab when off).
-  groupsEnabled Boolean    @default(true)
+  // Off by default — a subaccount opts in from Settings. (Existing rows keep their prior value.)
+  groupsEnabled Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
