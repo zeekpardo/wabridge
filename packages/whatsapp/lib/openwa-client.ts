@@ -189,6 +189,8 @@ export interface OpenWaClient {
 	 * digits, no `+`), best-effort. Null when the engine can't map it.
 	 */
 	resolveContactPhone(id: string, contactId: string): Promise<string | null>;
+	/** Whether a phone number (digits, country code included) is registered on WhatsApp. */
+	checkNumberExists(id: string, number: string): Promise<boolean>;
 	/** The gateway's contact record (name/pushName), best-effort; null if unknown. */
 	getContactById(id: string, contactId: string): Promise<OpenWaContact | null>;
 	getChatHistory(
@@ -331,6 +333,18 @@ class OpenWaHttpClient implements OpenWaClient {
 		);
 		const digits = res?.phone?.replace(/\D/g, "");
 		return digits && digits.length >= 6 ? digits : null;
+	}
+
+	async checkNumberExists(id: string, number: string): Promise<boolean> {
+		const digits = number.replace(/\D/g, "");
+		if (digits.length < 6) {
+			return false;
+		}
+		const res = await this.request<{ exists?: boolean }>(
+			"GET",
+			`/sessions/${id}/contacts/check/${encodeURIComponent(digits)}`,
+		);
+		return res?.exists === true;
 	}
 
 	async getContactById(id: string, contactId: string): Promise<OpenWaContact | null> {

@@ -440,7 +440,13 @@ export async function getWhatsAppSettings(subaccountId: string) {
 
 export async function upsertWhatsAppSettings(
 	subaccountId: string,
-	data: { globalSpintax?: unknown; messageTemplates?: unknown; groupsEnabled?: boolean },
+	data: {
+		globalSpintax?: unknown;
+		messageTemplates?: unknown;
+		groupsEnabled?: boolean;
+		noWhatsappTag?: string | null;
+		staffTriggers?: unknown;
+	},
 ) {
 	return db.whatsAppSettings.upsert({
 		where: { subaccountId },
@@ -449,11 +455,16 @@ export async function upsertWhatsAppSettings(
 			globalSpintax: data.globalSpintax ?? undefined,
 			messageTemplates: data.messageTemplates ?? undefined,
 			groupsEnabled: data.groupsEnabled ?? undefined,
+			noWhatsappTag: data.noWhatsappTag ?? undefined,
+			staffTriggers: data.staffTriggers ?? undefined,
 		},
 		update: {
 			globalSpintax: data.globalSpintax ?? undefined,
 			messageTemplates: data.messageTemplates ?? undefined,
 			groupsEnabled: data.groupsEnabled ?? undefined,
+			// `noWhatsappTag` is nullable-clearable: an explicit "" clears it, undefined leaves it.
+			noWhatsappTag: data.noWhatsappTag === undefined ? undefined : data.noWhatsappTag || null,
+			staffTriggers: data.staffTriggers ?? undefined,
 		},
 	});
 }

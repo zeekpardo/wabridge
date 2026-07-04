@@ -1,10 +1,12 @@
 import { auth } from "@repo/auth";
+import { resolveCrmProvider } from "@repo/crm";
 import {
 	createSubaccount,
 	getConversation,
 	getConversationByGhlContactId,
 	getConversationByPlaceholderPhone,
 	getDefaultSession,
+	getWhatsAppSession,
 	getGhlConnectionByLocationId,
 	getOrganizationById,
 	getSessionByPriority,
@@ -28,7 +30,7 @@ import {
 } from "@repo/integrations";
 import { logger } from "@repo/logs";
 import { getBaseUrl } from "@repo/utils";
-import { type GlobalSpintax, toChatId } from "@repo/whatsapp";
+import { createOpenWaClient, type GlobalSpintax, toChatId } from "@repo/whatsapp";
 
 import {
 	EMBEDDED_COOKIE,
@@ -183,6 +185,7 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	const phone = str(payload.phone) ?? str(payload.to);
 	const body = str(payload.message) ?? str(payload.body) ?? "";
 	const ghlMessageId = str(payload.messageId) ?? str(payload.id);
+	const ghlContactId = str(payload.contactId);
 	const attachments = Array.isArray(payload.attachments)
 		? (payload.attachments.filter((a) => typeof a === "string") as string[])
 		: undefined;
@@ -234,6 +237,34 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	// a group this resolves the member number the placeholder-linked conversation
 	// last used (its active session), which must be a member to post.
 	const session = await resolveOutboundSession(subaccount, chatId, phone, resolved.numberOverride);
+
+	// No-WhatsApp tag: if configured, verify a real 1:1 recipient is on WhatsApp before sending.
+	// If not, tag the CRM contact and skip the send (so the rep sees it wasn't delivered here and
+	// can fall back to SMS/email). Best-effort — a check error assumes reachable and just sends.
+	const noWhatsappTag = settings?.noWhatsappTag?.trim();
+	if (noWhatsappTag && session && !groupConversation) {
+		// The resolved session summary omits openwaSessionId — fetch the full row to run the check.
+		const fullSession = await getWhatsAppSession(subaccount.id, session.id);
+		const onWhatsApp = fullSession
+			? await createOpenWaClient()
+					.checkNumberExists(fullSession.openwaSessionId, phone)
+					.catch(() => true)
+			: true;
+		if (!onWhatsApp) {
+			if (ghlContactId) {
+				try {
+					const provider = await resolveCrmProvider(subaccount.id);
+					await provider?.addContactTags(ghlContactId, [noWhatsappTag]);
+				} catch (error) {
+					logger.warn(error, { ctx: "ghl.provider.noWhatsappTag", locationId });
+				}
+			}
+			if (ghlMessageId) {
+				await reportGhlSendFailure(subaccount.id, ghlMessageId, "Number not on WhatsApp");
+			}
+			return new Response("Not on WhatsApp.", { status: 200 });
+		}
+	}
 
 	// A `#contact` / `#location` command sends a typed message instead of text.
 	const rich = resolved.richAction;

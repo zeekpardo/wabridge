@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
-import { parseMessageTemplates } from "../types";
+import { parseMessageTemplates, parseStaffTriggers } from "../types";
 
 export const getSettings = protectedProcedure
 	.route({
@@ -24,6 +24,8 @@ export const getSettings = protectedProcedure
 		const messageTemplates = parseMessageTemplates(settings?.messageTemplates);
 		// Groups are off until a subaccount opts in (no settings row => disabled).
 		const groupsEnabled = settings?.groupsEnabled ?? false;
+		const noWhatsappTag = settings?.noWhatsappTag ?? "";
+		const staffTriggers = parseStaffTriggers(settings?.staffTriggers);
 
-		return { globalSpintax, messageTemplates, groupsEnabled };
+		return { globalSpintax, messageTemplates, groupsEnabled, noWhatsappTag, staffTriggers };
 	});
