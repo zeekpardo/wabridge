@@ -29,7 +29,7 @@ export function WhatsAppTabs({
 	const settingsQuery = useQuery(
 		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
 	);
-	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? true;
+	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? false;
 
 	useEffect(() => {
 		if (!groupsEnabled && tab === "groups") {

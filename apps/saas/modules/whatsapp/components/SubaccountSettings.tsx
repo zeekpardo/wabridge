@@ -31,7 +31,7 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 	const settingsQuery = useQuery(
 		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
 	);
-	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? true;
+	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? false;
 
 	const toggleGroups = useMutation(
 		orpc.whatsapp.updateSettings.mutationOptions({
