@@ -10,15 +10,24 @@ import {
 import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShuffleIcon, SmartphoneIcon, TerminalIcon, UsersIcon } from "lucide-react";
+import {
+	ShuffleIcon,
+	SmartphoneIcon,
+	TagIcon,
+	TerminalIcon,
+	UserXIcon,
+	UsersIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import { CommandBuilder } from "./CommandBuilder";
 import { FeatureCard } from "./FeatureCard";
+import { NoWhatsappTagEditor } from "./NoWhatsappTagEditor";
 import { OwnerNumbersSettings } from "./OwnerNumbersSettings";
 import { SpintaxEditor } from "./SpintaxEditor";
+import { StaffTriggersEditor } from "./StaffTriggersEditor";
 
-type Feature = "builder" | "spintax" | "owners";
+type Feature = "builder" | "spintax" | "owners" | "nowa" | "triggers";
 
 /**
  * The subaccount Settings tab: a grid of feature cards, each configured in a popup modal, plus a
@@ -88,6 +97,22 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 						disabled: settingsQuery.isLoading || toggleGroups.isPending,
 					}}
 				/>
+
+				<FeatureCard
+					icon={<UserXIcon className="size-4" />}
+					accentClassName="bg-rose-500/10 text-rose-500"
+					title="No-WhatsApp tag"
+					description="Tag contacts whose number isn't on WhatsApp so you can follow up another way."
+					action={{ label: "Configure", onClick: () => setOpen("nowa") }}
+				/>
+
+				<FeatureCard
+					icon={<TagIcon className="size-4" />}
+					accentClassName="bg-violet-500/10 text-violet-500"
+					title="Staff triggers"
+					description="Auto-tag a contact when your outgoing message contains a keyword."
+					action={{ label: "Configure", onClick: () => setOpen("triggers") }}
+				/>
 			</div>
 
 			{/* Command Builder — wide, scrollable */}
@@ -124,6 +149,32 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 						</DialogDescription>
 					</DialogHeader>
 					<OwnerNumbersSettings subaccountId={subaccountId} />
+				</DialogContent>
+			</Dialog>
+
+			{/* No-WhatsApp tag */}
+			<Dialog open={open === "nowa"} onOpenChange={(next) => setOpen(next ? "nowa" : null)}>
+				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>No-WhatsApp tag</DialogTitle>
+						<DialogDescription>
+							Tag contacts whose number isn't on WhatsApp so you can follow up another way.
+						</DialogDescription>
+					</DialogHeader>
+					<NoWhatsappTagEditor subaccountId={subaccountId} />
+				</DialogContent>
+			</Dialog>
+
+			{/* Staff triggers */}
+			<Dialog open={open === "triggers"} onOpenChange={(next) => setOpen(next ? "triggers" : null)}>
+				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Staff triggers</DialogTitle>
+						<DialogDescription>
+							Auto-tag a contact when your outgoing message contains a keyword.
+						</DialogDescription>
+					</DialogHeader>
+					<StaffTriggersEditor subaccountId={subaccountId} />
 				</DialogContent>
 			</Dialog>
 		</>
