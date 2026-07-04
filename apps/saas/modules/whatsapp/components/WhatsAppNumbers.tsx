@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SmartphoneIcon } from "lucide-react";
 
 import { ConnectNumberDialog } from "./ConnectNumberDialog";
+import { CrmConnectionCards } from "./CrmConnectionCards";
 import { SessionCard } from "./SessionCard";
 import { isPending } from "./SessionStatusBadge";
 
@@ -22,6 +23,8 @@ export function WhatsAppNumbers({ subaccountId }: { subaccountId?: string }) {
 
 	return (
 		<div className="gap-4 flex flex-col">
+			{subaccountId ? <CrmConnectionCards subaccountId={subaccountId} /> : null}
+
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="font-medium text-lg">Connected numbers</h2>
