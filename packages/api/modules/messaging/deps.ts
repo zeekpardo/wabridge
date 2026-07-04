@@ -56,6 +56,31 @@ function generatePlaceholderPhone(): string {
 }
 
 /**
+ * The group's subject (its display name), so the synthetic CRM contact is named
+ * after the group instead of the provider's generic fallback. Best-effort: the
+ * gateway holds the subject, and our number is a member (it received/sent this
+ * message), so `getGroupInfo` resolves. Any failure returns null and the caller
+ * falls back to the cached name / provider default.
+ */
+async function resolveGroupName(
+	subaccountId: string,
+	sessionId: string,
+	groupJid: string,
+): Promise<string | null> {
+	try {
+		const session = await getWhatsAppSession(subaccountId, sessionId);
+		if (!session) {
+			return null;
+		}
+		const info = await createOpenWaClient().getGroupInfo(session.openwaSessionId, groupJid);
+		return info.name?.trim() ? info.name.trim() : null;
+	} catch (error) {
+		logger.warn(error, { ctx: "messaging.resolveGroupName", groupJid });
+		return null;
+	}
+}
+
+/**
  * GHL message body for media messages that carry no caption. Inbound GROUP
  * messages are prefixed with the sending member's name (`<authorName>: <body>`)
  * so the CRM timeline shows who spoke; 1:1 and outbound bodies are unchanged.
@@ -92,10 +117,16 @@ async function resolveGhlThread(
 		let contactId = cached?.ghlContactId ?? null;
 		let ghlName = cached?.contactName ?? null;
 		if (!contactId) {
+			// Name the CRM contact after the group subject (falls back to the cached
+			// name, then the provider's generic default if neither is available).
+			const groupName =
+				(await resolveGroupName(message.subaccountId, message.sessionId, message.chatId)) ??
+				cached?.contactName ??
+				null;
 			const contact = await provider.upsertGroupContact({
 				groupJid: message.chatId,
 				placeholderPhone,
-				name: cached?.contactName ?? null,
+				name: groupName,
 			});
 			contactId = contact.id;
 			// Adopt the CRM's name (it wins once linked, as with 1:1 contacts).
