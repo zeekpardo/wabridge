@@ -2,7 +2,6 @@ import { ORPCError } from "@orpc/server";
 import {
 	getConversation,
 	getDefaultSession,
-	getGhlConnection,
 	getOwnerDefaultNumber,
 	getSessionByPriority,
 	getWhatsAppSession,
@@ -10,12 +9,10 @@ import {
 	setConversationActiveSession,
 	touchConversationOutbound,
 } from "@repo/database";
-import { createGoHighLevelClient } from "@repo/integrations";
 import { type GlobalSpintax, processMessage, sendProcessedMessage, toChatId } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
-import { syncPrimaryNumberTag } from "../../ghl/sync-primary-number-tag";
 import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
 import { listAssignableOwners } from "../lib/assignable-owners";
@@ -90,26 +87,15 @@ export const sendMessage = protectedProcedure
 				});
 			}
 			if (processed.numberOverride.scope === "session") {
+				// `#switch|N` changes the SEND-FROM number for this conversation only. It must NOT change
+				// the contact's primary number (the `wa:` tag) — that's a separate, intentional action
+				// (setPrimaryNumber). See also setConversationNumber.
 				await setConversationActiveSession({
 					subaccountId: subaccount.id,
 					organizationId: subaccount.organizationId,
 					chatId,
 					sessionId: sender.id,
 				});
-
-				// Mark this number as the contact's primary via a `wa:` tag on the
-				// linked GHL contact (mirrors the manual setConversationNumber path).
-				// Best-effort — a GHL hiccup never fails the send.
-				const ghl = await getGhlConnection(subaccount.id);
-				if (ghl && sender.phone) {
-					const conversation = await getConversation(subaccount.id, chatId);
-					if (conversation?.ghlContactId) {
-						const client = await createGoHighLevelClient(subaccount.id);
-						if (client) {
-							await syncPrimaryNumberTag(client, conversation.ghlContactId, sender.phone);
-						}
-					}
-				}
 			}
 		} else if (input.fromSessionId) {
 			sender = await getWhatsAppSession(subaccount.id, input.fromSessionId);

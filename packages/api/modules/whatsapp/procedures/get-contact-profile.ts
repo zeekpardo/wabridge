@@ -5,6 +5,7 @@ import {
 	getGhlConnection,
 	getWhatsAppSession,
 	listOrganizationMembers,
+	listWhatsAppSessions,
 	setConversationContactName,
 	setConversationOwner,
 	setConversationTags,
@@ -144,14 +145,31 @@ async function resolveWhatsappName(
 	activeSessionId: string | null,
 ): Promise<string | null> {
 	try {
-		const session = activeSessionId
-			? await getWhatsAppSession(subaccountId, activeSessionId)
-			: await getDefaultSession(subaccountId);
-		if (!session) {
+		const sessions = await listWhatsAppSessions(subaccountId);
+		if (sessions.length === 0) {
 			return null;
 		}
-		const contact = await createOpenWaClient().getContactById(session.openwaSessionId, chatId);
-		return contact?.pushName?.trim() || contact?.name?.trim() || null;
+		// A contact is only known to the number it actually messaged — which, with multiple numbers, may
+		// differ from the current send-from (activeSessionId). Query the active session first, then the
+		// rest; the first session that knows the contact wins. (getContactById 404s on a session that
+		// never saw the contact, so each lookup is guarded.)
+		const ordered = [
+			...sessions.filter((s) => s.id === activeSessionId),
+			...sessions.filter((s) => s.id !== activeSessionId),
+		];
+		const client = createOpenWaClient();
+		for (const s of ordered) {
+			try {
+				const contact = await client.getContactById(s.openwaSessionId, chatId);
+				const name = contact?.pushName?.trim() || contact?.name?.trim();
+				if (name) {
+					return name;
+				}
+			} catch {
+				// Not found / unreachable on this session — try the next.
+			}
+		}
+		return null;
 	} catch (error) {
 		logger.warn("WhatsApp name fetch failed", {
 			ctx: "whatsapp.contactProfile.waName",

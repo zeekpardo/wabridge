@@ -60,6 +60,7 @@ import { setContactOwner } from "./procedures/set-contact-owner";
 import { setContactTags } from "./procedures/set-contact-tags";
 import { setConversationNumber } from "./procedures/set-conversation-number";
 import { setOwnerNumber } from "./procedures/set-owner-number";
+import { setPrimaryNumber } from "./procedures/set-primary-number";
 import { setTyping } from "./procedures/set-typing";
 import { updateNumber } from "./procedures/update-number";
 import { updateSettings } from "./procedures/update-settings";
@@ -102,6 +103,7 @@ export const whatsappRouter = {
 	linkPreview,
 	linkContactByPhone,
 	setConversationNumber,
+	setPrimaryNumber,
 	listNumbers,
 	listOwnerNumbers,
 	setOwnerNumber,
