@@ -61,7 +61,12 @@ export async function reconcileWhatsAppSessions(subaccountId?: string): Promise<
 			}
 
 			if (live.status === "disconnected" || live.status === "failed") {
-				// Reconnect using persisted creds — no QR needed in the common case.
+				// Restart (stop -> start), not a bare start: a `failed` session still holds its engine on
+				// the worker, so start() alone 400s ("Session is already started") and never recovers. Stop
+				// first (ignore "not running" when the worker has no engine, e.g. after its own restart),
+				// then start fresh. Reconnects with persisted creds when valid — no QR needed — or emits a
+				// fresh QR when the creds are gone (the re-pair case).
+				await openwa.stopSession(session.openwaSessionId).catch(() => undefined);
 				await openwa.startSession(session.openwaSessionId);
 				await updateWhatsAppSession(session.subaccountId, session.id, {
 					status: "authenticating",
