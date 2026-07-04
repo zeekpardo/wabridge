@@ -57,9 +57,7 @@ export function processMessage(input: ProcessInput): ProcessedMessage {
 	const contact = parseContact(originalText);
 	if (contact) {
 		return {
-			actions: [
-				{ kind: "contact", contactName: contact.name, contactNumber: contact.number },
-			],
+			actions: [{ kind: "contact", contactName: contact.name, contactNumber: contact.number }],
 			meta: { spintaxApplied: false },
 		};
 	}

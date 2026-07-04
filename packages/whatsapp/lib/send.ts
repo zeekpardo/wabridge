@@ -96,9 +96,7 @@ export async function sendProcessedMessage(
 			action.kind === "contact"
 				? (action.contactName ?? null)
 				: action.kind === "location"
-					? (action.text ??
-						action.address ??
-						`${action.latitude ?? ""}, ${action.longitude ?? ""}`)
+					? (action.text ?? action.address ?? `${action.latitude ?? ""}, ${action.longitude ?? ""}`)
 					: (action.text ?? null);
 
 		const waMessageId = result?.messageId ?? result?.id ?? null;
