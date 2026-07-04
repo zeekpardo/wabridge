@@ -21,6 +21,7 @@ import { CheckIcon, PencilIcon, SmartphoneIcon, Trash2Icon, XIcon } from "lucide
 import { useState } from "react";
 
 import { CommandTester } from "./CommandTester";
+import { ReconnectNumberDialog } from "./ReconnectNumberDialog";
 import { SessionStatusBadge, isConnected } from "./SessionStatusBadge";
 
 interface SessionRow {
@@ -166,7 +167,15 @@ export function SessionCard({
 			<div className="gap-2 flex items-center">
 				<SessionStatusBadge status={session.status} />
 
-				{connected && <CommandTester sessionId={session.id} subaccountId={subaccountId} />}
+				{connected ? (
+					<CommandTester sessionId={session.id} subaccountId={subaccountId} />
+				) : (
+					<ReconnectNumberDialog
+						sessionId={session.id}
+						subaccountId={subaccountId}
+						label={session.label ?? session.phone}
+					/>
+				)}
 
 				<Button variant="ghost" size="icon" aria-label="Edit number" onClick={startEditing}>
 					<PencilIcon className="size-4" />
