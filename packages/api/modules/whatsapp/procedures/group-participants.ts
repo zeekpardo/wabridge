@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
-import { mapGroupError, resolveGroupSession } from "./group-lib";
+import { mapGroupError, resolveGroupSession, resolveParticipantJids } from "./group-lib";
 
 /** Normalize a participant to a `<digits>@c.us` jid (jids pass through). */
 function toParticipantJid(value: string): string {
@@ -31,10 +31,17 @@ export const addGroupParticipants = protectedProcedure
 
 		const openwa = createOpenWaClient();
 		try {
+			// Resolve any `@lid` privacy id to the contact's real phone before adding (a lid's digits
+			// are not a dialable number). A typed phone / `@c.us` passes through unchanged.
+			const participants = await resolveParticipantJids(
+				openwa,
+				sender.openwaSessionId,
+				input.participants,
+			);
 			const results = await openwa.addGroupParticipants(
 				sender.openwaSessionId,
 				input.groupId,
-				input.participants.map(toParticipantJid),
+				participants,
 			);
 			// Numbers WhatsApp wouldn't add directly (privacy) — the UI offers to invite them by link.
 			return { ok: true, notAdded: results.filter((r) => !r.added).map((r) => r.number) };

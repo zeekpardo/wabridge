@@ -1,17 +1,9 @@
-import { createOpenWaClient, toChatId } from "@repo/whatsapp";
+import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
-import { mapGroupError, resolveGroupSession } from "./group-lib";
-
-/**
- * Normalize a participant to a `<digits>@c.us` jid. Accepts a raw jid (passed
- * through) or a phone number (normalized via the same helper `send` uses).
- */
-function toParticipantJid(value: string): string {
-	return value.endsWith("@c.us") ? value : toChatId(value);
-}
+import { mapGroupError, resolveGroupSession, resolveParticipantJids } from "./group-lib";
 
 export const createGroup = protectedProcedure
 	.route({
@@ -34,9 +26,12 @@ export const createGroup = protectedProcedure
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 		const sender = await resolveGroupSession(subaccount.id, input.sessionId);
 
-		const participants = input.participants.map(toParticipantJid);
-
 		const openwa = createOpenWaClient();
+		const participants = await resolveParticipantJids(
+			openwa,
+			sender.openwaSessionId,
+			input.participants,
+		);
 		try {
 			const group = await openwa.createGroup(sender.openwaSessionId, {
 				name: input.name,
