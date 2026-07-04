@@ -78,7 +78,7 @@ export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScala
 
 // File: WhatsAppConversationScalarFieldEnum.schema.ts
 
-export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'chatId', 'contactName', 'ghlContactId', 'ghlConversationId', 'ownerId', 'tags', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
+export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'chatId', 'contactName', 'ghlContactId', 'ghlConversationId', 'crmPlaceholderPhone', 'ownerId', 'tags', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
 
 export type WhatsAppConversationScalarFieldEnum = z.infer<typeof WhatsAppConversationScalarFieldEnumSchema>;
 
@@ -411,6 +411,7 @@ export const WhatsAppConversationSchema = z.object({
   contactName: z.string().nullish(),
   ghlContactId: z.string().nullish(),
   ghlConversationId: z.string().nullish(),
+  crmPlaceholderPhone: z.string().nullish(),
   ownerId: z.string().nullish(),
   tags: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
   activeSessionId: z.string().nullish(),

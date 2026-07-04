@@ -309,6 +309,10 @@ model WhatsAppConversation {
   // The GHL conversation that mirrors this thread. Cached with ghlContactId so
   // message projections cost zero extra GHL API calls after the first message.
   ghlConversationId  String?
+  // For a WhatsApp GROUP mirrored as a synthetic CRM contact: the placeholder
+  // phone we assign so the CRM can hold the group as a contact, and CRM→WA sends
+  // can reverse-map back to this group thread. Null for ordinary 1:1 threads.
+  crmPlaceholderPhone String?
   // The org member (user id) who owns this contact.
   ownerId            String?
   // Contact tags. Held locally now; pushed to / pulled from GHL when connected.
@@ -325,6 +329,7 @@ model WhatsAppConversation {
 
   @@unique([subaccountId, chatId])
   @@index([subaccountId, lastMessageAt])
+  @@index([subaccountId, crmPlaceholderPhone])
   @@map("whatsapp_conversation")
 }
 

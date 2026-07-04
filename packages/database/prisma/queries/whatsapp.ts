@@ -244,6 +244,11 @@ export async function setConversationGhlLink(data: {
 	ghlConversationId?: string | null;
 	/** The CRM's name for the contact — overwrites local (GHL wins when linked). */
 	contactName?: string | null;
+	/**
+	 * For a GROUP thread mirrored as a synthetic CRM contact: the placeholder phone
+	 * we assigned it (enables CRM→WA reverse routing). Omit for 1:1 threads.
+	 */
+	crmPlaceholderPhone?: string | null;
 }) {
 	return db.whatsAppConversation.upsert({
 		where: { subaccountId_chatId: { subaccountId: data.subaccountId, chatId: data.chatId } },
@@ -254,11 +259,13 @@ export async function setConversationGhlLink(data: {
 			ghlContactId: data.ghlContactId,
 			ghlConversationId: data.ghlConversationId ?? undefined,
 			contactName: data.contactName ?? undefined,
+			crmPlaceholderPhone: data.crmPlaceholderPhone ?? undefined,
 		},
 		update: {
 			ghlContactId: data.ghlContactId,
 			...(data.ghlConversationId ? { ghlConversationId: data.ghlConversationId } : {}),
 			...(data.contactName ? { contactName: data.contactName } : {}),
+			...(data.crmPlaceholderPhone ? { crmPlaceholderPhone: data.crmPlaceholderPhone } : {}),
 		},
 	});
 }
@@ -266,6 +273,20 @@ export async function setConversationGhlLink(data: {
 /** The thread linked to a GHL contact, if any (webhook → conversation routing). */
 export async function getConversationByGhlContactId(subaccountId: string, ghlContactId: string) {
 	return db.whatsAppConversation.findFirst({ where: { subaccountId, ghlContactId } });
+}
+
+/**
+ * The GROUP thread that owns a given placeholder phone, if any. Powers CRM→WA
+ * reverse routing: a CRM-sent message to the synthetic group contact resolves
+ * back to the WhatsApp group by the placeholder phone we assigned it.
+ */
+export async function getConversationByPlaceholderPhone(
+	subaccountId: string,
+	placeholderPhone: string,
+) {
+	return db.whatsAppConversation.findFirst({
+		where: { subaccountId, crmPlaceholderPhone: placeholderPhone },
+	});
 }
 
 /** Cache a contact's display name on the thread (feeds the conversation list). */
