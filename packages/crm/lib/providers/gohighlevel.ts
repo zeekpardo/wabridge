@@ -67,6 +67,27 @@ export class GoHighLevelProvider implements CrmProvider {
 		return { id: contact.id, name: ghlContactDisplayName(contact) };
 	}
 
+	/**
+	 * Mirror a WhatsApp group as a GHL contact (Wazzap-style): the placeholder
+	 * phone is the reverse-routing key GHL holds the contact by, and the group jid
+	 * goes in `email` so the record is recognizable as a group in the GHL UI.
+	 * Best-effort mapping, consistent with {@link upsertContactByPhone}.
+	 */
+	async upsertGroupContact(input: {
+		groupJid: string;
+		placeholderPhone: string;
+		name?: string | null;
+	}): Promise<{ id: string; name: string | null }> {
+		const contact = await this.client.upsertContact({
+			phone: input.placeholderPhone,
+			locationId: this.connection.locationId,
+			name: input.name ?? "WhatsApp Group",
+			email: input.groupJid,
+			source: "WABridge",
+		});
+		return { id: contact.id, name: ghlContactDisplayName(contact) };
+	}
+
 	async getOrCreateConversation(contactId: string): Promise<{ id: string }> {
 		const conversation = await this.client.getOrCreateConversation({
 			locationId: this.connection.locationId,

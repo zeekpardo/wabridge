@@ -31,6 +31,18 @@ export interface CrmProvider {
 		name: string | null;
 	}>;
 
+	/**
+	 * Represent a WhatsApp GROUP as a CRM contact so its messages land on the CRM
+	 * timeline and a CRM-sent reply can route back into the group. Neutral: the
+	 * caller passes a placeholder phone it owns (the reverse-routing key) plus the
+	 * group jid; the provider decides how to make the group recognizable in the CRM.
+	 */
+	upsertGroupContact(input: {
+		groupJid: string;
+		placeholderPhone: string;
+		name?: string | null;
+	}): Promise<{ id: string; name: string | null }>;
+
 	/** Resolve (creating if needed) the contact's conversation thread. */
 	getOrCreateConversation(contactId: string): Promise<{ id: string }>;
 

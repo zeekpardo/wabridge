@@ -3,6 +3,7 @@ import {
 	createSubaccount,
 	getConversation,
 	getConversationByGhlContactId,
+	getConversationByPlaceholderPhone,
 	getDefaultSession,
 	getGhlConnectionByLocationId,
 	getOrganizationById,
@@ -217,9 +218,21 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 		});
 	}
 
+	// Reverse-map for GROUPS: a group contact is keyed in the CRM by a synthetic
+	// placeholder phone we assigned, not a real number. If `phone` matches a
+	// conversation's placeholder, that conversation's `chatId` IS the group jid
+	// (`@g.us`) — target the group directly instead of dialing the placeholder as
+	// a 1:1. Otherwise (a real number) keep today's `toChatId(phone)` behavior.
+	const groupConversation = await getConversationByPlaceholderPhone(
+		subaccount.id,
+		normalizePlaceholderPhone(phone),
+	);
+	const chatId = groupConversation ? groupConversation.chatId : toChatId(phone);
+
 	// Choose the sender number. Precedence: an explicit `#switch` override in the
-	// body → the conversation's sticky active number → the subaccount default.
-	const chatId = toChatId(phone);
+	// body → the conversation's sticky active number → the subaccount default. For
+	// a group this resolves the member number the placeholder-linked conversation
+	// last used (its active session), which must be a member to post.
 	const session = await resolveOutboundSession(subaccount, chatId, phone, resolved.numberOverride);
 
 	try {
@@ -326,6 +339,16 @@ async function reportGhlSendFailure(
 
 function str(value: unknown): string | undefined {
 	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Normalize an outbound `phone` to the E.164 shape group placeholders are stored
+ * in (`+` + digits, see `generatePlaceholderPhone`), so the reverse-map lookup
+ * matches regardless of how the CRM formatted the number it posts back.
+ */
+function normalizePlaceholderPhone(phone: string): string {
+	const digits = phone.replace(/\D/g, "");
+	return digits ? `+${digits}` : phone;
 }
 
 /**

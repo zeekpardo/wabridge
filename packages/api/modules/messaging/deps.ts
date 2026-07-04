@@ -41,9 +41,31 @@ function contactPhone(message: CanonicalMessage): string | null {
 	return null;
 }
 
-/** GHL message body for media messages that carry no caption. */
+/**
+ * A unique fake E.164 phone (`+1` + 10 random digits) to key a group's synthetic
+ * CRM contact by. Groups have no real number; this placeholder is the reverse-
+ * routing key the CRM holds the group contact by. `Math.random` is fine here —
+ * collisions are cosmetic (the row is re-linked on the next message).
+ */
+function generatePlaceholderPhone(): string {
+	let digits = "";
+	for (let i = 0; i < 10; i++) {
+		digits += Math.floor(Math.random() * 10).toString();
+	}
+	return `+1${digits}`;
+}
+
+/**
+ * GHL message body for media messages that carry no caption. Inbound GROUP
+ * messages are prefixed with the sending member's name (`<authorName>: <body>`)
+ * so the CRM timeline shows who spoke; 1:1 and outbound bodies are unchanged.
+ */
 function ghlMessageBody(message: CanonicalMessage): string {
-	return message.body?.trim() ? message.body : `[${message.type}]`;
+	const body = message.body?.trim() ? message.body : `[${message.type}]`;
+	if (message.chatId.endsWith("@g.us") && message.direction === "inbound" && message.authorName) {
+		return `${message.authorName}: ${body}`;
+	}
+	return body;
 }
 
 /**
@@ -58,6 +80,42 @@ async function resolveGhlThread(
 	const cached = await getConversation(message.subaccountId, message.chatId);
 	if (cached?.ghlConversationId) {
 		return { conversationId: cached.ghlConversationId };
+	}
+
+	// GROUP chats (`@g.us`) have no real contact phone, so they never fall into
+	// the phone/@lid path below. Mirror the group as a synthetic CRM contact keyed
+	// by a stable placeholder phone we assign (the reverse-routing key), with the
+	// group jid as the recognizable email/name. Best-effort, like the rest.
+	if (message.chatId.endsWith("@g.us")) {
+		const placeholderPhone = cached?.crmPlaceholderPhone ?? generatePlaceholderPhone();
+
+		let contactId = cached?.ghlContactId ?? null;
+		let ghlName = cached?.contactName ?? null;
+		if (!contactId) {
+			const contact = await provider.upsertGroupContact({
+				groupJid: message.chatId,
+				placeholderPhone,
+				name: cached?.contactName ?? null,
+			});
+			contactId = contact.id;
+			// Adopt the CRM's name (it wins once linked, as with 1:1 contacts).
+			ghlName = contact.name;
+		}
+
+		// No `setPrimaryNumberTag` for groups: the placeholder isn't a real number.
+		const conversation = await provider.getOrCreateConversation(contactId);
+
+		await setConversationGhlLink({
+			subaccountId: message.subaccountId,
+			organizationId: message.organizationId,
+			chatId: message.chatId,
+			ghlContactId: contactId,
+			ghlConversationId: conversation.id,
+			crmPlaceholderPhone: placeholderPhone,
+			contactName: ghlName,
+		});
+
+		return { conversationId: conversation.id };
 	}
 
 	let phone = contactPhone(message);
