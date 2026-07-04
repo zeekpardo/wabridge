@@ -1,4 +1,6 @@
+import { parseContact } from "./contact";
 import { extractDelay } from "./delay";
+import { parseLocation } from "./location";
 import { expandSpintax } from "./spintax";
 import { parseSwitch } from "./switch";
 import type { ProcessInput, ProcessedMessage, SendAction, SendActionKind } from "./types";
@@ -47,6 +49,32 @@ export function processMessage(input: ProcessInput): ProcessedMessage {
 		return {
 			...inner,
 			numberOverride: { priority: sw.priority, scope: "once" },
+		};
+	}
+
+	// Whole-message rich commands: the body IS the command, so they short-circuit
+	// text/spintax processing and produce a single typed action.
+	const contact = parseContact(originalText);
+	if (contact) {
+		return {
+			actions: [{ kind: "contact", contactName: contact.name, contactNumber: contact.number }],
+			meta: { spintaxApplied: false },
+		};
+	}
+
+	const location = parseLocation(originalText);
+	if (location) {
+		return {
+			actions: [
+				{
+					kind: "location",
+					latitude: location.latitude,
+					longitude: location.longitude,
+					text: location.note,
+					address: location.address,
+				},
+			],
+			meta: { spintaxApplied: false },
 		};
 	}
 

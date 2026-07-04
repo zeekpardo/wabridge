@@ -270,10 +270,28 @@ export function createFanOutDeps(): FanOutDeps {
 				await sleep(Math.min(message.sendDelayMs, MAX_SEND_DELAY_MS));
 			}
 			const openwa = createOpenWaClient();
-			const result = await openwa.sendText(session.openwaSessionId, {
-				chatId: message.chatId,
-				text: message.body ?? "",
-			});
+			// Rich commands (contact card / location pin) send a typed message instead of text.
+			let result: { messageId?: string; id?: string };
+			if (message.type === "contact" && message.contact) {
+				result = await openwa.sendContact(session.openwaSessionId, {
+					chatId: message.chatId,
+					contactName: message.contact.name,
+					contactNumber: message.contact.number,
+				});
+			} else if (message.type === "location" && message.location) {
+				result = await openwa.sendLocation(session.openwaSessionId, {
+					chatId: message.chatId,
+					latitude: message.location.latitude,
+					longitude: message.location.longitude,
+					description: message.location.note,
+					address: message.location.address,
+				});
+			} else {
+				result = await openwa.sendText(session.openwaSessionId, {
+					chatId: message.chatId,
+					text: message.body ?? "",
+				});
+			}
 			return { waMessageId: result?.messageId ?? result?.id ?? null };
 		},
 

@@ -12,12 +12,19 @@ export interface CommandAttachment {
 	filename?: string;
 }
 
-export type SendActionKind = "text" | "image" | "video" | "audio" | "document";
+export type SendActionKind =
+	| "text"
+	| "image"
+	| "video"
+	| "audio"
+	| "document"
+	| "contact"
+	| "location";
 
 /** One concrete thing to send, after commands have been processed. */
 export interface SendAction {
 	kind: SendActionKind;
-	/** Body for `text`; caption for media kinds. */
+	/** Body for `text`; caption for media kinds; the note for `location`. */
 	text?: string;
 	/** Media source URL (media kinds only). */
 	url?: string;
@@ -25,6 +32,15 @@ export interface SendAction {
 	base64?: string;
 	filename?: string;
 	mimetype?: string;
+	/** Send a `video` action as a round video note / PTV (the `circle` command). */
+	ptv?: boolean;
+	/** Contact card (`#contact|name|phone`). */
+	contactName?: string;
+	contactNumber?: string;
+	/** Location pin (`#location|lat|lng|note|address`). */
+	latitude?: number;
+	longitude?: number;
+	address?: string;
 	/** Milliseconds to wait before sending this action (from !/DELAY/x/y/!). */
 	delayMs?: number;
 }

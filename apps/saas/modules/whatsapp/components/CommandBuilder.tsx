@@ -12,8 +12,10 @@ import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	ClockIcon,
+	ContactIcon,
 	CopyIcon,
 	FilePlus2Icon,
+	MapPinIcon,
 	SaveIcon,
 	ShuffleIcon,
 	Trash2Icon,
@@ -57,6 +59,14 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 	const [loadedId, setLoadedId] = useState<string | null>(null);
 	const [contactVarsOpen, setContactVarsOpen] = useState(false);
 	const [globalOpen, setGlobalOpen] = useState(false);
+	const [contactCardOpen, setContactCardOpen] = useState(false);
+	const [contactCardName, setContactCardName] = useState("");
+	const [contactCardPhone, setContactCardPhone] = useState("");
+	const [locationOpen, setLocationOpen] = useState(false);
+	const [locationLat, setLocationLat] = useState("");
+	const [locationLng, setLocationLng] = useState("");
+	const [locationNote, setLocationNote] = useState("");
+	const [locationAddress, setLocationAddress] = useState("");
 
 	// Global spintax variables defined in Settings — offer the non-blank ones as
 	// one-click inserts so operators don't have to remember the ${SPINTAX_n} names.
@@ -187,6 +197,34 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 		const lead = text.length === 0 || text.endsWith(" ") ? "" : " ";
 		insertAtCursor(`${lead}!/DELAY/${Math.min(min, max)}/${Math.max(min, max)}/!`);
 		setDelayOpen(false);
+	}
+
+	function insertContactCard() {
+		const name = contactCardName.trim();
+		const phone = contactCardPhone.trim();
+		if (name.length === 0 || phone.length === 0) {
+			return;
+		}
+		insertAtCursor(`#contact|${name}|${phone}`);
+		setContactCardName("");
+		setContactCardPhone("");
+		setContactCardOpen(false);
+	}
+
+	function insertLocation() {
+		const lat = locationLat.trim();
+		const lng = locationLng.trim();
+		if (lat.length === 0 || lng.length === 0) {
+			return;
+		}
+		const note = locationNote.trim();
+		const address = locationAddress.trim();
+		insertAtCursor(`#location|${lat}|${lng}|${note}|${address}`);
+		setLocationLat("");
+		setLocationLng("");
+		setLocationNote("");
+		setLocationAddress("");
+		setLocationOpen(false);
 	}
 
 	async function copyText(value: string) {
@@ -417,6 +455,100 @@ export function CommandBuilder({ subaccountId }: { subaccountId?: string }) {
 								<p className="px-3 py-2 border-t text-[11px] text-foreground/55">
 									GoHighLevel fills these for each contact when it sends.
 								</p>
+							</PopoverContent>
+						</Popover>
+
+						<Popover open={contactCardOpen} onOpenChange={setContactCardOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
+									<ContactIcon className="size-3.5" />
+									Contact card
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-72">
+								<div className="gap-2 flex flex-col">
+									<Label className="text-xs">Name</Label>
+									<Input
+										// oxlint-disable-next-line no-autofocus
+										autoFocus
+										placeholder="Jane Doe"
+										value={contactCardName}
+										onChange={(e) => setContactCardName(e.target.value)}
+									/>
+									<Label className="text-xs">Phone (with country code)</Label>
+									<Input
+										placeholder="+1 555 123 4567"
+										value={contactCardPhone}
+										onChange={(e) => setContactCardPhone(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												insertContactCard();
+											}
+										}}
+									/>
+									<Button size="sm" onClick={insertContactCard}>
+										Insert contact card
+									</Button>
+								</div>
+							</PopoverContent>
+						</Popover>
+
+						<Popover open={locationOpen} onOpenChange={setLocationOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 gap-1 px-2 text-xs"
+								>
+									<MapPinIcon className="size-3.5" />
+									Location
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-72">
+								<div className="gap-2 flex flex-col">
+									<Label className="text-xs">Latitude</Label>
+									<Input
+										// oxlint-disable-next-line no-autofocus
+										autoFocus
+										placeholder="37.7749"
+										value={locationLat}
+										onChange={(e) => setLocationLat(e.target.value)}
+									/>
+									<Label className="text-xs">Longitude</Label>
+									<Input
+										placeholder="-122.4194"
+										value={locationLng}
+										onChange={(e) => setLocationLng(e.target.value)}
+									/>
+									<Label className="text-xs">Note (optional)</Label>
+									<Input
+										placeholder="Meet at the front desk"
+										value={locationNote}
+										onChange={(e) => setLocationNote(e.target.value)}
+									/>
+									<Label className="text-xs">Address (optional)</Label>
+									<Input
+										placeholder="1 Market St, San Francisco, CA"
+										value={locationAddress}
+										onChange={(e) => setLocationAddress(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												insertLocation();
+											}
+										}}
+									/>
+									<Button size="sm" onClick={insertLocation}>
+										Insert location
+									</Button>
+								</div>
 							</PopoverContent>
 						</Popover>
 					</div>
