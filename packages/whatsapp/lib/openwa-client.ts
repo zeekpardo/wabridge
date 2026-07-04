@@ -130,6 +130,11 @@ export interface Group {
 	participantsCount?: number;
 	isAdmin?: boolean;
 	linkedParentJID?: string;
+	/**
+	 * Per-participant add outcome from create, when the gateway reports it (whatsapp-web.js does;
+	 * Baileys doesn't). Absent on older gateways — the caller then flags nothing.
+	 */
+	results?: ParticipantResult[];
 }
 
 export interface GroupParticipant {

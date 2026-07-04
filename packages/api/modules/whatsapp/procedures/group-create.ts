@@ -42,20 +42,9 @@ export const createGroup = protectedProcedure
 				name: input.name,
 				participants,
 			});
-			// WhatsApp silently drops participants who can't be added directly (privacy). Re-run the add
-			// against the fresh group to learn who actually joined (already-in => 409 => added) vs. who
-			// needs an invite; best-effort, so a hiccup here never fails the create.
-			let notAdded: string[] = [];
-			try {
-				const results = await openwa.addGroupParticipants(
-					sender.openwaSessionId,
-					group.id,
-					participants,
-				);
-				notAdded = results.filter((r) => !r.added).map((r) => r.number);
-			} catch {
-				notAdded = [];
-			}
+			// The gateway's create result already reports who WhatsApp couldn't add directly (privacy) —
+			// those are auto-invited by WhatsApp, and we also offer to send the link. No second add call.
+			const notAdded = (group.results ?? []).filter((r) => !r.added).map((r) => r.number);
 			return { ...group, notAdded };
 		} catch (error) {
 			mapGroupError(error, "whatsapp.createGroup");
