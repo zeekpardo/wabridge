@@ -16,6 +16,7 @@ import { protectedProcedure } from "../../../orpc/procedures";
 import { mirrorAppSendToCrm } from "../../messaging/mirror";
 import { resolveSubaccount } from "../lib/active-organization";
 import { listAssignableOwners } from "../lib/assignable-owners";
+import { pickDistributedSession } from "./lib-distribution";
 
 const attachmentSchema = z.object({
 	url: z.string().url().optional(),
@@ -104,19 +105,25 @@ export const sendMessage = protectedProcedure
 			if (conversation?.activeSessionId) {
 				sender = await getWhatsAppSession(subaccount.id, conversation.activeSessionId);
 			}
-			// No number is pinned to this thread yet: fall back to the sending
-			// owner's per-subaccount default number (Phase 2 stickiness), then the
-			// org default. The activeSessionId set-once above locks this choice.
-			// `ownerId` is the same id space as listContactOwners: the GHL user id
-			// for an embedded SSO rep (`ghl:<id>`), else the app user id. (An
-			// app-login rep on a GHL-connected subaccount won't match a GHL-user
-			// owner id and simply falls through to the org default.)
+			// No number is pinned to this thread yet: pick a first number per the subaccount's
+			// assignment strategy. The activeSessionId set-once (touchConversationOutbound) locks it.
+			//   "distributed" — the least-loaded ready number, so contacts spread evenly across numbers.
+			//   "owner" (default) — the sending owner's per-subaccount default (Phase 2 stickiness).
+			// Either way we fall through to the org default if the strategy yields nothing.
+			// `ownerId` is the same id space as listContactOwners: the GHL user id for an embedded SSO
+			// rep (`ghl:<id>`), else the app user id. (An app-login rep on a GHL-connected subaccount
+			// won't match a GHL-user owner id and simply falls through to the org default.)
 			if (!sender) {
-				const ownerId = user.id.startsWith("ghl:") ? user.id.slice(4) : user.id;
-				if (ownerId && ownerId !== "sso") {
-					const ownerDefault = await getOwnerDefaultNumber(subaccount.id, ownerId);
-					if (ownerDefault) {
-						sender = await getWhatsAppSession(subaccount.id, ownerDefault.sessionId);
+				const settings = await getWhatsAppSettings(subaccount.id);
+				if (settings?.numberAssignmentStrategy === "distributed") {
+					sender = await pickDistributedSession(subaccount.id);
+				} else {
+					const ownerId = user.id.startsWith("ghl:") ? user.id.slice(4) : user.id;
+					if (ownerId && ownerId !== "sso") {
+						const ownerDefault = await getOwnerDefaultNumber(subaccount.id, ownerId);
+						if (ownerDefault) {
+							sender = await getWhatsAppSession(subaccount.id, ownerDefault.sessionId);
+						}
 					}
 				}
 			}
