@@ -350,6 +350,11 @@ model WhatsAppSettings {
   // Staff triggers: [{ phrase, tag }, ...] — when an outbound message contains `phrase`
   // (case-sensitive), `tag` is added to the CRM contact.
   staffTriggers Json?
+  // How a NEW contact's sticky sending number is chosen when the owner initiates first (no inbound yet):
+  //   "owner"       — the initiating owner's default number (OwnerDefaultNumber), then the org default.
+  //   "distributed" — the least-loaded of the subaccount's ready numbers, so contacts spread evenly.
+  // Only affects the owner-initiated first pick; inbound reply-lock and the set-once stickiness are unchanged.
+  numberAssignmentStrategy String @default("owner")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
