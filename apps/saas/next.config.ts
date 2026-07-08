@@ -28,12 +28,26 @@ const nextConfig: NextConfig = {
 		],
 	},
 	async headers() {
-		// Allow only GoHighLevel (+ self) to embed the /embedded/* pages in an iframe.
-		// Override the allowed hosts with GHL_FRAME_ANCESTORS (space-separated) for
-		// white-label domains.
+		// Allow GoHighLevel + our white-label agency domains (+ self) to embed the /embedded/*
+		// pages in an iframe. NOTE: next.config headers() is evaluated at BUILD time and the Docker
+		// build does not pass GHL_FRAME_ANCESTORS, so in practice the default list below is the
+		// effective value — a new white-label agency domain must be added here. (A runtime env
+		// override via GHL_FRAME_ANCESTORS only applies if the build is wired to pass it at
+		// `next build` time.)
 		const ghlFrameAncestors =
 			process.env.GHL_FRAME_ANCESTORS ??
-			"https://app.gohighlevel.com https://*.gohighlevel.com https://*.leadconnectorhq.com https://*.msgsndr.com";
+			[
+				// Standard GoHighLevel / LeadConnector domains
+				"https://app.gohighlevel.com",
+				"https://*.gohighlevel.com",
+				"https://*.leadconnectorhq.com",
+				"https://*.msgsndr.com",
+				// White-label agency domains (custom CRM domains that embed the Custom Page)
+				"https://app.minflow.co",
+				"https://*.minflow.co",
+				"https://app.ministryflow.io",
+				"https://*.ministryflow.io",
+			].join(" ");
 		return [
 			{
 				source: "/embedded/:path*",
