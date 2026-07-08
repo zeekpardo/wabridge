@@ -11,7 +11,6 @@ import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-	Share2Icon,
 	ShuffleIcon,
 	SmartphoneIcon,
 	TagIcon,
@@ -25,11 +24,10 @@ import { CommandBuilder } from "./CommandBuilder";
 import { FeatureCard } from "./FeatureCard";
 import { NoWhatsappTagEditor } from "./NoWhatsappTagEditor";
 import { NumberAssignmentSettings } from "./NumberAssignmentSettings";
-import { OwnerNumbersSettings } from "./OwnerNumbersSettings";
 import { SpintaxEditor } from "./SpintaxEditor";
 import { StaffTriggersEditor } from "./StaffTriggersEditor";
 
-type Feature = "builder" | "spintax" | "owners" | "distribution" | "nowa" | "triggers";
+type Feature = "builder" | "spintax" | "assignment" | "nowa" | "triggers";
 
 /**
  * The subaccount Settings tab: a grid of feature cards, each configured in a popup modal, plus a
@@ -83,17 +81,9 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 				<FeatureCard
 					icon={<SmartphoneIcon className="size-4" />}
 					accentClassName="bg-sky-500/10 text-sky-500"
-					title="Owner Numbers"
-					description="Assign a default sending number per team member so new contacts spread across numbers."
-					action={{ label: "Configure", onClick: () => setOpen("owners") }}
-				/>
-
-				<FeatureCard
-					icon={<Share2Icon className="size-4" />}
-					accentClassName="bg-emerald-500/10 text-emerald-500"
-					title="Number Distribution"
-					description="Evenly spread new contacts across your numbers instead of the owner's default — and backfill unassigned contacts."
-					action={{ label: "Configure", onClick: () => setOpen("distribution") }}
+					title="Number Assignment"
+					description="Choose how new contacts get a sending number — a per-member default, or evenly spread across your numbers."
+					action={{ label: "Configure", onClick: () => setOpen("assignment") }}
 				/>
 
 				<FeatureCard
@@ -149,29 +139,16 @@ export function SubaccountSettings({ subaccountId }: { subaccountId?: string }) 
 				</DialogContent>
 			</Dialog>
 
-			{/* Owner Numbers */}
-			<Dialog open={open === "owners"} onOpenChange={(next) => setOpen(next ? "owners" : null)}>
-				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-					<DialogHeader>
-						<DialogTitle>Owner Numbers</DialogTitle>
-						<DialogDescription>
-							Assign a default sending number to each team member.
-						</DialogDescription>
-					</DialogHeader>
-					<OwnerNumbersSettings subaccountId={subaccountId} />
-				</DialogContent>
-			</Dialog>
-
-			{/* Number Distribution */}
+			{/* Number Assignment */}
 			<Dialog
-				open={open === "distribution"}
-				onOpenChange={(next) => setOpen(next ? "distribution" : null)}
+				open={open === "assignment"}
+				onOpenChange={(next) => setOpen(next ? "assignment" : null)}
 			>
 				<DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Number Distribution</DialogTitle>
+						<DialogTitle>Number Assignment</DialogTitle>
 						<DialogDescription>
-							Choose how new contacts are assigned a sending number, and backfill existing ones.
+							Pick how a new contact gets its sending number. Only the selected mode applies.
 						</DialogDescription>
 					</DialogHeader>
 					<NumberAssignmentSettings subaccountId={subaccountId} />
