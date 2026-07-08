@@ -1,14 +1,25 @@
 "use client";
 
 import { Button } from "@repo/ui/components/button";
-import { Switch } from "@repo/ui/components/switch";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@repo/ui/components/select";
 import { toastError, toastSuccess } from "@repo/ui/components/toast";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { OwnerNumbersSettings } from "./OwnerNumbersSettings";
+
 /**
- * Choose how a NEW contact's sticky sending number is picked when the owner initiates first, and
- * (in distributed mode) evenly assign numbers to contacts that don't have one yet.
+ * Single config for how a new contact gets its sticky sending number. Only one mode is ever active, so
+ * the picker swaps the config shown beneath it:
+ *   - "owner"       → per-member default numbers (OwnerNumbersSettings)
+ *   - "distributed" → even spread across numbers + a backfill for existing unassigned contacts
+ * Either way, contacts who message in first — and everyone already assigned — keep their number.
  */
 export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: string }) {
 	const queryClient = useQueryClient();
@@ -16,14 +27,15 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 	const settingsQuery = useQuery(
 		orpc.whatsapp.getSettings.queryOptions({ input: { subaccountId } }),
 	);
-	const distributed = settingsQuery.data?.numberAssignmentStrategy === "distributed";
+	const strategy: "owner" | "distributed" =
+		settingsQuery.data?.numberAssignmentStrategy === "distributed" ? "distributed" : "owner";
 
 	const updateStrategy = useMutation(
 		orpc.whatsapp.updateSettings.mutationOptions({
 			onSuccess: () => {
 				void queryClient.invalidateQueries({ queryKey: orpc.whatsapp.getSettings.key() });
 			},
-			onError: (error) => toastError(error.message ?? "Could not update assignment"),
+			onError: (error) => toastError(error.message ?? "Could not update assignment mode"),
 		}),
 	);
 
@@ -33,12 +45,17 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 		}),
 	);
 
-	function setDistributed(next: boolean) {
+	function setStrategy(next: "owner" | "distributed") {
+		if (next === strategy) {
+			return;
+		}
 		updateStrategy.mutate(
-			{ numberAssignmentStrategy: next ? "distributed" : "owner", subaccountId },
+			{ numberAssignmentStrategy: next, subaccountId },
 			{
 				onSuccess: () =>
-					toastSuccess(next ? "Evenly distributing new contacts" : "Using owner number"),
+					toastSuccess(
+						next === "distributed" ? "Evenly distributing new contacts" : "Using owner numbers",
+					),
 			},
 		);
 	}
@@ -58,34 +75,46 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 	}
 
 	return (
-		<div className="space-y-6">
-			<div className="gap-4 flex items-start justify-between">
-				<div className="space-y-1">
-					<p className="font-medium text-sm">Evenly distribute new contacts</p>
-					<p className="text-sm text-muted-foreground">
-						When you start a new conversation, assign the least-loaded number instead of your
-						default — so contacts spread evenly across your numbers. Contacts who message you first
-						(and everyone already assigned) keep their number.
-					</p>
-				</div>
-				<Switch
-					checked={distributed}
-					onCheckedChange={setDistributed}
+		<div className="space-y-5">
+			<div className="space-y-2">
+				<p className="font-medium text-sm">How new contacts get a number</p>
+				<Select
+					value={strategy}
+					onValueChange={(value) => setStrategy(value as "owner" | "distributed")}
 					disabled={settingsQuery.isLoading || updateStrategy.isPending}
-				/>
+				>
+					<SelectTrigger className="w-full">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="owner">Owner numbers — the sender's default number</SelectItem>
+						<SelectItem value="distributed">Evenly distributed — least-loaded number</SelectItem>
+					</SelectContent>
+				</Select>
+				<p className="text-sm text-muted-foreground">
+					{strategy === "distributed"
+						? "New contacts you start are assigned the least-loaded number, so they spread evenly across your numbers."
+						: "New contacts you start use the sending member's default number, set below."}
+				</p>
 			</div>
 
-			<div className="space-y-3 pt-4 border-t">
-				<div className="space-y-1">
-					<p className="font-medium text-sm">Backfill existing contacts</p>
-					<p className="text-sm text-muted-foreground">
-						Assign a number to every contact that doesn't have one yet, spread evenly across your
-						numbers. Contacts with an established thread are never moved.
-					</p>
-				</div>
-				<Button variant="outline" onClick={runBackfill} disabled={backfill.isPending}>
-					{backfill.isPending ? "Assigning…" : "Backfill unassigned contacts"}
-				</Button>
+			<div className="pt-4 border-t">
+				{strategy === "owner" ? (
+					<OwnerNumbersSettings subaccountId={subaccountId} />
+				) : (
+					<div className="space-y-3">
+						<div className="space-y-1">
+							<p className="font-medium text-sm">Backfill existing contacts</p>
+							<p className="text-sm text-muted-foreground">
+								Assign a number to every contact that doesn't have one yet, spread evenly. Contacts
+								with an established thread are never moved.
+							</p>
+						</div>
+						<Button variant="outline" onClick={runBackfill} disabled={backfill.isPending}>
+							{backfill.isPending ? "Assigning…" : "Backfill unassigned contacts"}
+						</Button>
+					</div>
+				)}
 			</div>
 		</div>
 	);
