@@ -248,13 +248,24 @@ class OpenWaHttpClient implements OpenWaClient {
 	private readonly baseUrl: string;
 	private readonly apiKey: string;
 
+	// Bound every request so a slow/disconnected session can't hang the caller indefinitely (the fetch
+	// had no timeout, so a degraded gateway stalled reads for many seconds). Generous default so large
+	// media sends aren't cut off; best-effort contact reads pass the shorter READ_TIMEOUT_MS.
+	private static readonly DEFAULT_TIMEOUT_MS = 30_000;
+	private static readonly READ_TIMEOUT_MS = 8_000;
+
 	constructor(config: OpenWaClientConfig) {
 		// Trim a trailing slash so path concatenation stays predictable.
 		this.baseUrl = config.baseUrl.replace(/\/$/, "");
 		this.apiKey = config.apiKey;
 	}
 
-	private async request<TResult>(method: string, path: string, body?: unknown): Promise<TResult> {
+	private async request<TResult>(
+		method: string,
+		path: string,
+		body?: unknown,
+		timeoutMs: number = OpenWaHttpClient.DEFAULT_TIMEOUT_MS,
+	): Promise<TResult> {
 		const headers: Record<string, string> = {
 			"X-API-Key": this.apiKey,
 		};
@@ -267,6 +278,7 @@ class OpenWaHttpClient implements OpenWaClient {
 			method,
 			headers,
 			body: body !== undefined ? JSON.stringify(body) : undefined,
+			signal: AbortSignal.timeout(timeoutMs),
 		});
 
 		if (!response.ok) {
@@ -330,6 +342,8 @@ class OpenWaHttpClient implements OpenWaClient {
 		const res = await this.request<{ contactId: string; phone: string | null }>(
 			"GET",
 			`/sessions/${id}/contacts/${encodeURIComponent(contactId)}/phone`,
+			undefined,
+			OpenWaHttpClient.READ_TIMEOUT_MS,
 		);
 		const digits = res?.phone?.replace(/\D/g, "");
 		return digits && digits.length >= 6 ? digits : null;
@@ -352,6 +366,8 @@ class OpenWaHttpClient implements OpenWaClient {
 			return await this.request<OpenWaContact>(
 				"GET",
 				`/sessions/${id}/contacts/${encodeURIComponent(contactId)}`,
+				undefined,
+				OpenWaHttpClient.READ_TIMEOUT_MS,
 			);
 		} catch {
 			// 404 (unknown contact) or any gateway hiccup — treat as "no info".
@@ -470,6 +486,8 @@ class OpenWaHttpClient implements OpenWaClient {
 		const res = await this.request<{ url?: string | null }>(
 			"GET",
 			`/sessions/${id}/contacts/${encodeURIComponent(contactId)}/profile-picture`,
+			undefined,
+			OpenWaHttpClient.READ_TIMEOUT_MS,
 		);
 		return res?.url ?? null;
 	}

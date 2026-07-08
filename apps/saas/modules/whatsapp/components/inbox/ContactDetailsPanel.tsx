@@ -47,6 +47,12 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 		// to the live GHL contact).
 		refetchInterval: 8000,
 	});
+	// WhatsApp avatar + display name load separately so their (sometimes slow) OpenWA round-trips
+	// never block the CRM profile above from rendering. Fills in a moment after the panel opens.
+	const whatsappQuery = useQuery(
+		orpc.whatsapp.getContactWhatsapp.queryOptions({ input: { chatId, subaccountId } }),
+	);
+	const whatsappInfo = whatsappQuery.data;
 	const ownersQuery = useQuery(
 		orpc.whatsapp.listContactOwners.queryOptions({ input: { subaccountId } }),
 	);
@@ -169,7 +175,7 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 					{/* Identity card */}
 					<div className="gap-3 p-3 flex items-center rounded-lg border bg-background">
 						<Avatar className="size-10">
-							{profile.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="" /> : null}
+							{whatsappInfo?.avatarUrl ? <AvatarImage src={whatsappInfo.avatarUrl} alt="" /> : null}
 							<AvatarFallback className="text-xs bg-primary/10 text-primary">
 								{profile.initials}
 							</AvatarFallback>
@@ -195,10 +201,10 @@ export function ContactDetailsPanel({ chatId, subaccountId, onClose }: ContactDe
 
 					{/* The contact's name as WhatsApp shows it (their self-set display
 					    name), so a rep can reconcile it with the CRM name above. */}
-					{profile.whatsappName ? (
+					{whatsappInfo?.whatsappName ? (
 						<div className="gap-0.5 flex flex-col">
 							<span className="font-medium text-xs text-foreground/75">WhatsApp name</span>
-							<span className="text-sm truncate">{profile.whatsappName}</span>
+							<span className="text-sm truncate">{whatsappInfo.whatsappName}</span>
 						</div>
 					) : null}
 
