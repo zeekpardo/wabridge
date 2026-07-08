@@ -9,6 +9,7 @@ import { disconnectGoHighLevel } from "./procedures/disconnect-gohighlevel";
 import { forwardMessage } from "./procedures/forward-message";
 import { getChatHistory } from "./procedures/get-chat-history";
 import { getContactProfile } from "./procedures/get-contact-profile";
+import { getContactWhatsapp } from "./procedures/get-contact-whatsapp";
 import { getCustomFieldGroups } from "./procedures/get-custom-field-groups";
 import { getGhlOAuthUrl } from "./procedures/get-ghl-oauth-url";
 import { getGhlProvisionUrl } from "./procedures/get-ghl-provision-url";
@@ -130,6 +131,7 @@ export const whatsappRouter = {
 	disconnectGoHighLevel,
 	// Contact / CRM panel (prewired for GoHighLevel)
 	getContactProfile,
+	getContactWhatsapp,
 	listContactOwners,
 	listCrmConnections,
 	setContactOwner,

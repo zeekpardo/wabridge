@@ -5,7 +5,6 @@ import {
 	getGhlConnection,
 	getWhatsAppSession,
 	listOrganizationMembers,
-	listWhatsAppSessions,
 	setConversationContactName,
 	setConversationOwner,
 	setConversationTags,
@@ -106,80 +105,6 @@ async function resolveAndLinkLidThread(
 	}
 }
 
-/**
- * Best-effort fetch of a contact's WhatsApp profile picture. Resolves the
- * owning session (pinned active number, else the subaccount default) and asks
- * OpenWA for the avatar url. Any error yields null — this never fails the panel.
- */
-async function resolveAvatarUrl(
-	subaccountId: string,
-	chatId: string,
-	activeSessionId: string | null,
-): Promise<string | null> {
-	try {
-		const session = activeSessionId
-			? await getWhatsAppSession(subaccountId, activeSessionId)
-			: await getDefaultSession(subaccountId);
-		if (!session) {
-			return null;
-		}
-		return await createOpenWaClient().getProfilePicture(session.openwaSessionId, chatId);
-	} catch (error) {
-		logger.warn("profile picture fetch failed", {
-			ctx: "whatsapp.contactProfile.avatar",
-			chatId,
-			error: error instanceof Error ? error.message : String(error),
-		});
-		return null;
-	}
-}
-
-/**
- * Best-effort fetch of the contact's name AS WHATSAPP KNOWS IT — the contact's
- * self-set display name ("pushname"), else the address-book name. Shown next to
- * the CRM name so a rep can reconcile the two. Any error yields null.
- */
-async function resolveWhatsappName(
-	subaccountId: string,
-	chatId: string,
-	activeSessionId: string | null,
-): Promise<string | null> {
-	try {
-		const sessions = await listWhatsAppSessions(subaccountId);
-		if (sessions.length === 0) {
-			return null;
-		}
-		// A contact is only known to the number it actually messaged — which, with multiple numbers, may
-		// differ from the current send-from (activeSessionId). Query the active session first, then the
-		// rest; the first session that knows the contact wins. (getContactById 404s on a session that
-		// never saw the contact, so each lookup is guarded.)
-		const ordered = [
-			...sessions.filter((s) => s.id === activeSessionId),
-			...sessions.filter((s) => s.id !== activeSessionId),
-		];
-		const client = createOpenWaClient();
-		for (const s of ordered) {
-			try {
-				const contact = await client.getContactById(s.openwaSessionId, chatId);
-				const name = contact?.pushName?.trim() || contact?.name?.trim();
-				if (name) {
-					return name;
-				}
-			} catch {
-				// Not found / unreachable on this session — try the next.
-			}
-		}
-		return null;
-	} catch (error) {
-		logger.warn("WhatsApp name fetch failed", {
-			ctx: "whatsapp.contactProfile.waName",
-			chatId,
-			error: error instanceof Error ? error.message : String(error),
-		});
-		return null;
-	}
-}
-
 function initialsFrom(name: string): string {
 	const parts = name.trim().split(/\s+/).filter(Boolean);
 	if (parts.length === 0) {
@@ -227,19 +152,8 @@ export const getContactProfile = protectedProcedure
 			}
 		}
 
-		// Kick off the WhatsApp avatar fetch alongside the GHL read-through so it
-		// doesn't add its own round-trip to the happy path. Best-effort — resolves
-		// to null on any error.
-		const avatarUrlPromise = resolveAvatarUrl(
-			subaccount.id,
-			input.chatId,
-			conversation?.activeSessionId ?? null,
-		);
-		const whatsappNamePromise = resolveWhatsappName(
-			subaccount.id,
-			input.chatId,
-			conversation?.activeSessionId ?? null,
-		);
+		// WhatsApp avatar + display name are fetched separately (getContactWhatsapp) so their OpenWA
+		// round-trips never block this CRM profile from rendering.
 
 		// Read-through to the live GHL contact when linked — GHL is the source of
 		// truth for name/email/phone/tags/owner then. Best-effort: a GHL hiccup
@@ -369,9 +283,6 @@ export const getContactProfile = protectedProcedure
 			{ key: "email", label: "Email", value: ghlContact?.email?.trim() || null, editable: true },
 		];
 
-		const avatarUrl = await avatarUrlPromise;
-		const whatsappName = await whatsappNamePromise;
-
 		const contactUrl =
 			ghl && conversation?.ghlContactId
 				? (provider?.contactUrl(conversation.ghlContactId) ??
@@ -382,8 +293,9 @@ export const getContactProfile = protectedProcedure
 			chatId: input.chatId,
 			name,
 			phone,
-			avatarUrl,
-			whatsappName,
+			// Filled by the separate getContactWhatsapp query so a slow session can't stall this profile.
+			avatarUrl: null,
+			whatsappName: null,
 			initials: initialsFrom(name),
 			ownerId,
 			tags,
