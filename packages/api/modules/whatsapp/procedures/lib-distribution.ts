@@ -11,7 +11,9 @@ type WhatsAppSession = Awaited<ReturnType<typeof listSendableSessions>>[number];
  * Ties break toward the higher-priority number (listSendableSessions is ordered priority-then-age, and
  * we keep the first seen on an equal count). Returns null when the subaccount has no ready number.
  */
-export async function pickDistributedSession(subaccountId: string): Promise<WhatsAppSession | null> {
+export async function pickDistributedSession(
+	subaccountId: string,
+): Promise<WhatsAppSession | null> {
 	const [sessions, counts] = await Promise.all([
 		listSendableSessions(subaccountId),
 		countConversationsBySession(subaccountId),

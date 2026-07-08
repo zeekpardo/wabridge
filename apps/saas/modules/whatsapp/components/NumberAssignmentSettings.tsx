@@ -36,7 +36,10 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 	function setDistributed(next: boolean) {
 		updateStrategy.mutate(
 			{ numberAssignmentStrategy: next ? "distributed" : "owner", subaccountId },
-			{ onSuccess: () => toastSuccess(next ? "Evenly distributing new contacts" : "Using owner number") },
+			{
+				onSuccess: () =>
+					toastSuccess(next ? "Evenly distributing new contacts" : "Using owner number"),
+			},
 		);
 	}
 
@@ -56,13 +59,13 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
+			<div className="gap-4 flex items-start justify-between">
 				<div className="space-y-1">
 					<p className="font-medium text-sm">Evenly distribute new contacts</p>
-					<p className="text-muted-foreground text-sm">
-						When you start a new conversation, assign the least-loaded number instead of your default —
-						so contacts spread evenly across your numbers. Contacts who message you first (and everyone
-						already assigned) keep their number.
+					<p className="text-sm text-muted-foreground">
+						When you start a new conversation, assign the least-loaded number instead of your
+						default — so contacts spread evenly across your numbers. Contacts who message you first
+						(and everyone already assigned) keep their number.
 					</p>
 				</div>
 				<Switch
@@ -72,10 +75,10 @@ export function NumberAssignmentSettings({ subaccountId }: { subaccountId?: stri
 				/>
 			</div>
 
-			<div className="space-y-3 border-t pt-4">
+			<div className="space-y-3 pt-4 border-t">
 				<div className="space-y-1">
 					<p className="font-medium text-sm">Backfill existing contacts</p>
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						Assign a number to every contact that doesn't have one yet, spread evenly across your
 						numbers. Contacts with an established thread are never moved.
 					</p>
