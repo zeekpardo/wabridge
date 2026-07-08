@@ -26,6 +26,16 @@ export const getSettings = protectedProcedure
 		const groupsEnabled = settings?.groupsEnabled ?? false;
 		const noWhatsappTag = settings?.noWhatsappTag ?? "";
 		const staffTriggers = parseStaffTriggers(settings?.staffTriggers);
+		// How a new contact's first sending number is chosen (owner default vs evenly distributed).
+		const numberAssignmentStrategy =
+			settings?.numberAssignmentStrategy === "distributed" ? "distributed" : "owner";
 
-		return { globalSpintax, messageTemplates, groupsEnabled, noWhatsappTag, staffTriggers };
+		return {
+			globalSpintax,
+			messageTemplates,
+			groupsEnabled,
+			noWhatsappTag,
+			staffTriggers,
+			numberAssignmentStrategy,
+		};
 	});

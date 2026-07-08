@@ -1,4 +1,5 @@
 import { adminListSessions } from "./procedures/admin-list-sessions";
+import { backfillNumberAssignments } from "./procedures/backfill-number-assignments";
 import { connectGoHighLevel } from "./procedures/connect-gohighlevel";
 import { connectNumber } from "./procedures/connect-number";
 import { deleteMessage } from "./procedures/delete-message";
@@ -92,6 +93,7 @@ export const whatsappRouter = {
 	updateSettings,
 	saveMessageTemplate,
 	deleteMessageTemplate,
+	backfillNumberAssignments,
 	adminListSessions,
 	reconcileSessions,
 	reconcileConnections,

@@ -446,6 +446,7 @@ export async function upsertWhatsAppSettings(
 		groupsEnabled?: boolean;
 		noWhatsappTag?: string | null;
 		staffTriggers?: unknown;
+		numberAssignmentStrategy?: string;
 	},
 ) {
 	return db.whatsAppSettings.upsert({
@@ -457,6 +458,7 @@ export async function upsertWhatsAppSettings(
 			groupsEnabled: data.groupsEnabled ?? undefined,
 			noWhatsappTag: data.noWhatsappTag ?? undefined,
 			staffTriggers: data.staffTriggers ?? undefined,
+			numberAssignmentStrategy: data.numberAssignmentStrategy ?? undefined,
 		},
 		update: {
 			globalSpintax: data.globalSpintax ?? undefined,
@@ -465,7 +467,52 @@ export async function upsertWhatsAppSettings(
 			// `noWhatsappTag` is nullable-clearable: an explicit "" clears it, undefined leaves it.
 			noWhatsappTag: data.noWhatsappTag === undefined ? undefined : data.noWhatsappTag || null,
 			staffTriggers: data.staffTriggers ?? undefined,
+			numberAssignmentStrategy: data.numberAssignmentStrategy ?? undefined,
 		},
+	});
+}
+
+/**
+ * Count conversations grouped by their pinned number (`activeSessionId`) for a subaccount.
+ * Powers "evenly distributed" assignment: the ready number with the fewest contacts wins the next one.
+ * Rows with a null `activeSessionId` (orphaned by a deleted number) are excluded from the tally.
+ */
+export async function countConversationsBySession(subaccountId: string) {
+	const rows = await db.whatsAppConversation.groupBy({
+		by: ["activeSessionId"],
+		where: { subaccountId, activeSessionId: { not: null } },
+		_count: { _all: true },
+	});
+	const counts = new Map<string, number>();
+	for (const row of rows) {
+		if (row.activeSessionId) {
+			counts.set(row.activeSessionId, row._count._all);
+		}
+	}
+	return counts;
+}
+
+/**
+ * 1:1 phone-contact conversations with no pinned number yet (backfill targets). Groups (`@g.us`) are
+ * excluded — a group must act from a member number, never a distributed one.
+ */
+export async function listUnassignedPhoneConversations(subaccountId: string) {
+	return db.whatsAppConversation.findMany({
+		where: {
+			subaccountId,
+			activeSessionId: null,
+			chatId: { endsWith: "@c.us" },
+		},
+		select: { id: true, chatId: true },
+		orderBy: { createdAt: "asc" },
+	});
+}
+
+/** Pin a conversation's active (sending) number by conversation id (backfill assignment). */
+export async function assignConversationSessionById(id: string, sessionId: string) {
+	return db.whatsAppConversation.update({
+		where: { id },
+		data: { activeSessionId: sessionId },
 	});
 }
 

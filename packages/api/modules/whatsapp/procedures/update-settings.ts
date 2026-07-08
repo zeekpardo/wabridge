@@ -23,6 +23,8 @@ export const updateSettings = protectedProcedure
 			noWhatsappTag: z.string().max(120).optional(),
 			// Staff triggers: outbound phrase -> CRM tag.
 			staffTriggers: z.array(staffTriggerSchema).max(MAX_STAFF_TRIGGERS).optional(),
+			// How a new contact's first sending number is chosen: owner default vs evenly distributed.
+			numberAssignmentStrategy: z.enum(["owner", "distributed"]).optional(),
 			subaccountId: z.string().optional(),
 		}),
 	)
@@ -35,6 +37,7 @@ export const updateSettings = protectedProcedure
 			groupsEnabled: input.groupsEnabled,
 			noWhatsappTag: input.noWhatsappTag,
 			staffTriggers: input.staffTriggers,
+			numberAssignmentStrategy: input.numberAssignmentStrategy,
 		});
 
 		return { ok: true };
