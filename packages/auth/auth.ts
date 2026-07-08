@@ -17,7 +17,8 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, magicLink, openAPI, organization, twoFactor } from "better-auth/plugins";
-import { parse as parseCookies } from "cookie";
+// cookie v2 renamed `parse` -> `parseCookie` (and `serialize` -> `stringifyCookie`).
+import { parseCookie as parseCookies } from "cookie";
 
 import { config } from "./config";
 import { updateSeatsInOrganizationSubscription } from "./lib/organization";
