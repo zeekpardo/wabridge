@@ -1,10 +1,10 @@
-import { getConversation, getDefaultSession, getWhatsAppSession } from "@repo/database";
 import { logger } from "@repo/logs";
 import { createOpenWaClient } from "@repo/whatsapp";
 import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
+import { resolveSendingSession } from "./lib-session";
 
 export interface MessageMedia {
 	kind: string;
@@ -74,11 +74,10 @@ export const getChatHistory = protectedProcedure
 	.handler(async ({ input, context: { user, session } }) => {
 		const subaccount = await resolveSubaccount(session, user.id, input.subaccountId);
 
-		// Which number owns this chat: the conversation's active number, else the default.
-		const conversation = await getConversation(subaccount.id, input.chatId);
-		const sender = conversation?.activeSessionId
-			? await getWhatsAppSession(subaccount.id, conversation.activeSessionId)
-			: await getDefaultSession(subaccount.id);
+		// Which number owns this chat: the conversation's active number, else the default — reusing the
+		// exact fallback the send path uses (resolveSendingSession), so history reads and sends agree on
+		// the number (and, for group chats, never fall back to a non-member default).
+		const sender = await resolveSendingSession(subaccount.id, input.chatId);
 
 		if (!sender) {
 			return [] as HistoryMessage[];
