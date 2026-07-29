@@ -76,6 +76,12 @@ export const WhatsAppMessageScalarFieldEnumSchema = z.enum(['id', 'organizationI
 
 export type WhatsAppMessageScalarFieldEnum = z.infer<typeof WhatsAppMessageScalarFieldEnumSchema>;
 
+// File: RecoveryMessageScalarFieldEnum.schema.ts
+
+export const RecoveryMessageScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'sessionId', 'chatId', 'phone', 'ghlContactId', 'ghlConversationId', 'ghlMessageId', 'body', 'type', 'attachments', 'reason', 'status', 'attempts', 'lastAttemptAt', 'lastError', 'waMessageId', 'recoveredAt', 'createdAt', 'updatedAt'])
+
+export type RecoveryMessageScalarFieldEnum = z.infer<typeof RecoveryMessageScalarFieldEnumSchema>;
+
 // File: WhatsAppConversationScalarFieldEnum.schema.ts
 
 export const WhatsAppConversationScalarFieldEnumSchema = z.enum(['id', 'organizationId', 'subaccountId', 'chatId', 'contactName', 'ghlContactId', 'ghlConversationId', 'crmPlaceholderPhone', 'ownerId', 'tags', 'activeSessionId', 'lastMessageAt', 'lastMessagePreview', 'lastDirection', 'unreadCount', 'createdAt', 'updatedAt'])
@@ -399,6 +405,35 @@ export const WhatsAppMessageSchema = z.object({
 });
 
 export type WhatsAppMessageType = z.infer<typeof WhatsAppMessageSchema>;
+
+
+// File: RecoveryMessage.schema.ts
+
+export const RecoveryMessageSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  subaccountId: z.string(),
+  sessionId: z.string().nullish(),
+  chatId: z.string(),
+  phone: z.string().nullish(),
+  ghlContactId: z.string().nullish(),
+  ghlConversationId: z.string().nullish(),
+  ghlMessageId: z.string().nullish(),
+  body: z.string().nullish(),
+  type: z.string().default("text"),
+  attachments: z.unknown().refine((val) => { const getDepth = (obj: unknown, depth: number = 0): number => { if (depth > 10) return depth; if (obj === null || typeof obj !== 'object') return depth; const values = Object.values(obj as Record<string, unknown>); if (values.length === 0) return depth; return Math.max(...values.map(v => getDepth(v, depth + 1))); }; return getDepth(val) <= 10; }, "JSON nesting depth exceeds maximum of 10").nullish(),
+  reason: z.string(),
+  status: z.string().default("pending"),
+  attempts: z.number().int(),
+  lastAttemptAt: z.date().nullish(),
+  lastError: z.string().nullish(),
+  waMessageId: z.string().nullish(),
+  recoveredAt: z.date().nullish(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type RecoveryMessageType = z.infer<typeof RecoveryMessageSchema>;
 
 
 // File: WhatsAppConversation.schema.ts

@@ -151,6 +151,7 @@ model Organization {
   whatsAppSessions      WhatsAppSession[]
   whatsAppMessages      WhatsAppMessage[]
   whatsAppConversations WhatsAppConversation[]
+  recoveryMessages      RecoveryMessage[]
 
   @@unique([slug])
   @@map("organization")
@@ -179,6 +180,7 @@ model Subaccount {
   whatsAppConversations WhatsAppConversation[]
   whatsAppSettings      WhatsAppSettings?
   ownerDefaultNumbers   OwnerDefaultNumber[]
+  recoveryMessages      RecoveryMessage[]
 
   @@index([organizationId])
   @@map("subaccount")
@@ -292,6 +294,48 @@ model WhatsAppMessage {
   @@index([subaccountId, chatId, timestamp])
   @@index([ghlMessageId])
   @@map("whatsapp_message")
+}
+
+// A GHL-originated outbound that could not be delivered (the number was
+// disconnected / not on WhatsApp when GHL sent it). Captured at failure time by
+// the provider Delivery URL so the Recovery tab can resend once a number is back.
+model RecoveryMessage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subaccountId   String
+  subaccount     Subaccount   @relation(fields: [subaccountId], references: [id], onDelete: Cascade)
+  // The number this send would have used. Intentionally NOT a WhatsAppSession
+  // relation: recovery rows must OUTLIVE a session delete/recreate — the exact
+  // event that stranded these messages — so this is a plain id, null when no
+  // number was connected at all.
+  sessionId         String?
+  chatId            String
+  phone             String?
+  ghlContactId      String?
+  ghlConversationId String?
+  // The GHL message id that failed. Dedupe key so GHL retrying the same message
+  // doesn't pile up duplicate recovery rows.
+  ghlMessageId      String?
+  body              String?   @db.Text
+  type              String    @default("text")
+  attachments       Json?
+  // Why the send failed (e.g. "No connected WhatsApp number").
+  reason            String
+  // pending → recovered (resent OK) | dismissed (rep cleared it).
+  status            String    @default("pending")
+  attempts          Int       @default(0)
+  lastAttemptAt     DateTime?
+  lastError         String?
+  // WhatsApp id of the successful resend.
+  waMessageId       String?
+  recoveredAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([subaccountId, ghlMessageId])
+  @@index([subaccountId, status])
+  @@map("recovery_message")
 }
 
 model WhatsAppConversation {

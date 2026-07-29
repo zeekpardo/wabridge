@@ -13,6 +13,7 @@ import {
 	getSubaccount,
 	getSubaccountByLocationId,
 	getWhatsAppSettings,
+	recordRecoveryMessage,
 	setConversationActiveSession,
 	setConversationContactName,
 	setConversationTags,
@@ -232,6 +233,30 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	);
 	const chatId = groupConversation ? groupConversation.chatId : toChatId(phone);
 
+	// Persist a failed GHL send so the Recovery tab can resend it once a number is
+	// back online. Best-effort: capturing must never change the delivery outcome.
+	// The row has no session FK, so it survives the session delete/recreate that
+	// stranded these messages in the first place.
+	const captureFailure = async (reason: string, sessionId: string | null): Promise<void> => {
+		try {
+			await recordRecoveryMessage({
+				organizationId: subaccount.organizationId,
+				subaccountId: subaccount.id,
+				sessionId,
+				chatId,
+				phone,
+				ghlContactId: ghlContactId ?? null,
+				ghlMessageId: ghlMessageId ?? null,
+				body: resolved.text,
+				type: resolved.richAction?.kind ?? "text",
+				attachments,
+				reason,
+			});
+		} catch (error) {
+			logger.error(error, { ctx: "ghl.provider.outbound.recovery", locationId });
+		}
+	};
+
 	// Choose the sender number. Precedence: an explicit `#switch` override in the
 	// body → the conversation's sticky active number → the subaccount default. For
 	// a group this resolves the member number the placeholder-linked conversation
@@ -262,7 +287,9 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			sessionStatus: session?.status ?? "none",
 		});
 		// Nothing was sent — fail the delivery so GHL surfaces it (and can retry
-		// once the number reconnects) instead of showing a phantom "sent".
+		// once the number reconnects) instead of showing a phantom "sent", and
+		// capture it for the Recovery tab.
+		await captureFailure(detail, session?.id ?? null);
 		return deliveryFailed(detail);
 	}
 
@@ -347,6 +374,7 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			if (ghlMessageId) {
 				await reportGhlSendFailure(subaccount.id, ghlMessageId, "No connected WhatsApp number");
 			}
+			await captureFailure("Send did not reach WhatsApp", session.id);
 			return deliveryFailed("No connected WhatsApp number");
 		}
 	} catch (error) {
@@ -354,6 +382,7 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 		if (ghlMessageId) {
 			await reportGhlSendFailure(subaccount.id, ghlMessageId, "WhatsApp delivery failed");
 		}
+		await captureFailure("WhatsApp delivery failed", session.id);
 		return deliveryFailed("WhatsApp delivery failed");
 	}
 
