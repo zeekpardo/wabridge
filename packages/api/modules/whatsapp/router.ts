@@ -43,6 +43,9 @@ import { listCrmConnections } from "./procedures/list-crm-connections";
 import { listMessages } from "./procedures/list-messages";
 import { listNumbers } from "./procedures/list-numbers";
 import { listOwnerNumbers } from "./procedures/list-owner-numbers";
+import { dismissRecovery } from "./procedures/dismiss-recovery";
+import { listRecovery } from "./procedures/list-recovery";
+import { resendRecovery } from "./procedures/resend-recovery";
 import { listSessions } from "./procedures/list-sessions";
 import { markChatRead } from "./procedures/mark-chat-read";
 import { markChatUnread } from "./procedures/mark-chat-unread";
@@ -98,6 +101,10 @@ export const whatsappRouter = {
 	adminListSessions,
 	reconcileSessions,
 	reconcileConnections,
+	// Recovery (resend sends that failed while a number was disconnected)
+	listRecovery,
+	resendRecovery,
+	dismissRecovery,
 	// Inbox / conversations
 	listConversations: listConversationsProcedure,
 	listChats,

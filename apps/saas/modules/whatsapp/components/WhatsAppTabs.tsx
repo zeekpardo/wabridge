@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@repo/ui/components/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/components/tabs";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import { useEffect, useState } from "react";
 import { GroupsView } from "./groups/GroupsView";
 import { ConnectionBanner } from "./inbox/ConnectionBanner";
 import { WhatsAppInbox } from "./inbox/WhatsAppInbox";
+import { RecoveryView } from "./RecoveryView";
 import { SubaccountSettings } from "./SubaccountSettings";
 import { WhatsAppNumbers } from "./WhatsAppNumbers";
 
@@ -31,6 +33,20 @@ export function WhatsAppTabs({
 	);
 	const groupsEnabled = settingsQuery.data?.groupsEnabled ?? false;
 
+	// Count of failed sends awaiting recovery — drives the tab badge. Same query
+	// key as RecoveryView, so react-query dedupes the fetch.
+	const recoveryQuery = useQuery(
+		orpc.whatsapp.listRecovery.queryOptions({ input: { subaccountId } }),
+	);
+	const recoveryCount = recoveryQuery.data?.length ?? 0;
+
+	const recoveryTrigger = (
+		<TabsTrigger value="recovery">
+			Recovery
+			{recoveryCount > 0 ? <Badge className="ml-1.5">{recoveryCount}</Badge> : null}
+		</TabsTrigger>
+	);
+
 	useEffect(() => {
 		if (!groupsEnabled && tab === "groups") {
 			setTab("inbox");
@@ -53,6 +69,7 @@ export function WhatsAppTabs({
 					{groupsEnabled ? <TabsTrigger value="groups">Groups</TabsTrigger> : null}
 					<TabsTrigger value="numbers">Connections</TabsTrigger>
 					<TabsTrigger value="settings">Settings</TabsTrigger>
+					{recoveryTrigger}
 				</TabsList>
 				<TabsContent value="inbox" className="m-0 min-h-0 flex-1 overflow-hidden">
 					<WhatsAppInbox embedded subaccountId={subaccountId} onManageGroup={manageGroup} />
@@ -73,6 +90,9 @@ export function WhatsAppTabs({
 				<TabsContent value="settings" className="m-0 min-h-0 p-4 flex-1 overflow-y-auto">
 					<SubaccountSettings subaccountId={subaccountId} />
 				</TabsContent>
+				<TabsContent value="recovery" className="m-0 min-h-0 p-4 flex-1 overflow-y-auto">
+					<RecoveryView subaccountId={subaccountId} />
+				</TabsContent>
 			</Tabs>
 		);
 	}
@@ -84,6 +104,7 @@ export function WhatsAppTabs({
 				{groupsEnabled ? <TabsTrigger value="groups">Groups</TabsTrigger> : null}
 				<TabsTrigger value="numbers">Connections</TabsTrigger>
 				<TabsTrigger value="settings">Settings</TabsTrigger>
+				{recoveryTrigger}
 			</TabsList>
 			<TabsContent value="inbox" className="mt-4">
 				<WhatsAppInbox subaccountId={subaccountId} onManageGroup={manageGroup} />
@@ -102,6 +123,9 @@ export function WhatsAppTabs({
 			</TabsContent>
 			<TabsContent value="settings" className="mt-4">
 				<SubaccountSettings subaccountId={subaccountId} />
+			</TabsContent>
+			<TabsContent value="recovery" className="mt-4">
+				<RecoveryView subaccountId={subaccountId} />
 			</TabsContent>
 		</Tabs>
 	);
