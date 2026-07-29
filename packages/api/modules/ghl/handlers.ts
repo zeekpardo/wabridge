@@ -238,6 +238,32 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	// last used (its active session), which must be a member to post.
 	const session = await resolveOutboundSession(subaccount, chatId, phone, resolved.numberOverride);
 
+	// Delivery requires a CONNECTED (ready) sending number. A logged-out or
+	// disconnected session must never silently accept the message: the gateway
+	// still returns a locally-generated message id (Baileys queues it), which
+	// masks the offline state — so the `!waMessageId` failure guard below never
+	// trips and GHL shows the SMS as "sent" forever. This is exactly how a session
+	// drop drops messages silently. Resolving prefers the conversation's sticky
+	// active number, which — unlike getDefaultSession — is NOT status-filtered, so
+	// an established thread can still land on a dead number here. Report a hard
+	// "failed" back to GHL instead, so the rep sees it and can resend once the
+	// number reconnects. Success statuses still flow later from the WhatsApp ack.
+	if (!session || session.status !== "ready") {
+		if (ghlMessageId) {
+			const detail = session
+				? `WhatsApp number ${session.phone ?? session.label ?? session.id} is disconnected`
+				: "No connected WhatsApp number";
+			await reportGhlSendFailure(subaccount.id, ghlMessageId, detail);
+		}
+		logger.warn("Provider outbound with no ready WhatsApp session", {
+			ctx: "ghl.provider.outbound",
+			locationId,
+			subaccountId: subaccount.id,
+			sessionStatus: session?.status ?? "none",
+		});
+		return new Response("No connected WhatsApp number.", { status: 200 });
+	}
+
 	// No-WhatsApp tag: if configured, verify a real 1:1 recipient is on WhatsApp before sending.
 	// If not, tag the CRM contact and skip the send (so the rep sees it wasn't delivered here and
 	// can fall back to SMS/email). Best-effort — a check error assumes reachable and just sends.
