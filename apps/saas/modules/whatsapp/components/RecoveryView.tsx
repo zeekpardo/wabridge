@@ -47,9 +47,7 @@ function recipientLabel(row: RecoveryRow): string {
 
 export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 	const queryClient = useQueryClient();
-	const listQuery = useQuery(
-		orpc.whatsapp.listRecovery.queryOptions({ input: { subaccountId } }),
-	);
+	const listQuery = useQuery(orpc.whatsapp.listRecovery.queryOptions({ input: { subaccountId } }));
 	const rows = useMemo(() => (listQuery.data ?? []) as RecoveryRow[], [listQuery.data]);
 
 	const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -137,7 +135,7 @@ export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 
 	if (listQuery.isLoading) {
 		return (
-			<div className="flex items-center justify-center py-16 text-muted-foreground">
+			<div className="py-16 flex items-center justify-center text-muted-foreground">
 				<Spinner className="mr-2 size-4" /> Loading failed messages…
 			</div>
 		);
@@ -145,7 +143,7 @@ export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 
 	if (rows.length === 0) {
 		return (
-			<div className="rounded-lg border border-dashed py-16 text-center">
+			<div className="py-16 rounded-lg border border-dashed text-center">
 				<p className="font-medium">You&apos;re all caught up</p>
 				<p className="mt-1 text-sm text-muted-foreground">
 					No messages failed to send. Anything that fails while a number is disconnected shows up
@@ -157,27 +155,28 @@ export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 
 	return (
 		<div className="space-y-4">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+			<div className="gap-3 sm:flex-row sm:items-center sm:justify-between flex flex-col">
 				<div>
 					<h3 className="font-semibold">
-						Recovery{" "}
-						<Badge className="ml-1 align-middle">{rows.length}</Badge>
+						Recovery <Badge className="ml-1 align-middle">{rows.length}</Badge>
 					</h3>
 					<p className="text-sm text-muted-foreground">
 						Messages that couldn&apos;t be delivered. Reconnect the number, then resend.
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
-					<label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+				<div className="gap-2 flex items-center">
+					<label className="gap-1.5 text-sm flex items-center text-muted-foreground">
 						Delay
 						<input
 							type="number"
 							min={0}
 							max={60}
 							value={delaySeconds}
-							onChange={(e) => setDelaySeconds(Math.max(0, Math.min(60, Number(e.target.value) || 0)))}
+							onChange={(e) =>
+								setDelaySeconds(Math.max(0, Math.min(60, Number(e.target.value) || 0)))
+							}
 							disabled={busy}
-							className="h-9 w-16 rounded-md border bg-background px-2 text-sm"
+							className="h-9 w-16 px-2 text-sm rounded-md border bg-background"
 						/>
 						s
 					</label>
@@ -228,7 +227,9 @@ export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 										className="size-4 cursor-pointer accent-primary"
 									/>
 								</TableCell>
-								<TableCell className="font-medium whitespace-nowrap">{recipientLabel(row)}</TableCell>
+								<TableCell className="font-medium whitespace-nowrap">
+									{recipientLabel(row)}
+								</TableCell>
 								<TableCell className="max-w-[24rem] truncate text-muted-foreground">
 									{row.body || <span className="italic">(no text)</span>}
 								</TableCell>
@@ -238,7 +239,9 @@ export function RecoveryView({ subaccountId }: { subaccountId?: string }) {
 										<span className="ml-1 text-xs">· {row.attempts} tries</span>
 									) : null}
 								</TableCell>
-								<TableCell className="whitespace-nowrap text-muted-foreground">{row.reason}</TableCell>
+								<TableCell className="whitespace-nowrap text-muted-foreground">
+									{row.reason}
+								</TableCell>
 								<TableCell className="text-right whitespace-nowrap">
 									<Button
 										size="sm"
