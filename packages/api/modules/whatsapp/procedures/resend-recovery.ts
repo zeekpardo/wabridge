@@ -8,9 +8,9 @@ import {
 } from "@repo/database";
 import { z } from "zod";
 
+import { protectedProcedure } from "../../../orpc/procedures";
 import { createFanOutDeps } from "../../messaging/deps";
 import { fanOutMessage } from "../../messaging/fan-out";
-import { protectedProcedure } from "../../../orpc/procedures";
 import { resolveSubaccount } from "../lib/active-organization";
 
 /**
@@ -66,9 +66,7 @@ export const resendRecovery = protectedProcedure
 			});
 		}
 
-		const attachments = Array.isArray(row.attachments)
-			? (row.attachments as string[])
-			: undefined;
+		const attachments = Array.isArray(row.attachments) ? (row.attachments as string[]) : undefined;
 		const now = new Date();
 
 		try {
