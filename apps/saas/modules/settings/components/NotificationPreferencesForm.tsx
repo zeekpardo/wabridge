@@ -1,6 +1,6 @@
 "use client";
 
-import { NOTIFICATION_GROUPS } from "@repo/notifications/catalog";
+import { NOTIFICATION_GROUPS, type NotificationTypeId } from "@repo/notifications/catalog";
 import { Card, Switch } from "@repo/ui";
 import { orpc } from "@shared/lib/orpc-query-utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +39,7 @@ export function NotificationPreferencesForm() {
 
 	const isEnabled = (type: string, target: TargetKey) => !disabledSet.has(`${type}:${target}`);
 
-	const onToggle = (type: "WELCOME" | "APP_UPDATE", target: TargetKey, nextEnabled: boolean) => {
+	const onToggle = (type: NotificationTypeId, target: TargetKey, nextEnabled: boolean) => {
 		updateMutation.mutate({
 			type,
 			target,

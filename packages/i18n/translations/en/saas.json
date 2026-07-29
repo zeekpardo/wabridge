@@ -594,6 +594,9 @@
 				}
 			},
 			"types": {
+				"WHATSAPP_SESSION_DISCONNECTED": {
+					"label": "WhatsApp number disconnected"
+				},
 				"APP_UPDATE": {
 					"label": "App updates"
 				}

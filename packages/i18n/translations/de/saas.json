@@ -596,6 +596,9 @@
 				"WELCOME": {
 					"label": "Willkommen"
 				},
+				"WHATSAPP_SESSION_DISCONNECTED": {
+					"label": "WhatsApp-Nummer getrennt"
+				},
 				"APP_UPDATE": {
 					"label": "App-Updates"
 				}
