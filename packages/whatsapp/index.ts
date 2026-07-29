@@ -8,5 +8,7 @@ export { webhookHandler } from "./lib/webhook-handler";
 export type {
 	OpenWaInboundMessage,
 	OpenWaMessageAck,
+	OpenWaSessionDownReason,
+	OpenWaSessionHealthEvent,
 	OpenWaWebhookHooks,
 } from "./lib/webhook-handler";

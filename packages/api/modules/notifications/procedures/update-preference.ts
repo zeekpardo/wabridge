@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../../../orpc/procedures";
 
-const notificationTypeSchema = z.enum(["WELCOME", "APP_UPDATE"]);
+const notificationTypeSchema = z.enum(["WELCOME", "APP_UPDATE", "WHATSAPP_SESSION_DISCONNECTED"]);
 const notificationTargetSchema = z.enum(["IN_APP", "EMAIL"]);
 
 export const updatePreference = protectedProcedure

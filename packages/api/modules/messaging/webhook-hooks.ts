@@ -5,6 +5,7 @@ import type { OpenWaWebhookHooks } from "@repo/whatsapp";
 
 import { createFanOutDeps } from "./deps";
 import { fanOutMessage } from "./fan-out";
+import { notifySessionDown } from "./session-health-alert";
 import { applyStaffTriggers } from "./staff-triggers";
 
 /**
@@ -146,6 +147,13 @@ export function createOpenWaWebhookHooks(): OpenWaWebhookHooks {
 					waMessageId: event.waMessageId,
 				});
 			}
+		},
+
+		// A WhatsApp number went down (disconnect or logout) — alert the subaccount's
+		// operators so a silent drop doesn't strand outbound messages. notifySessionDown
+		// is best-effort and never throws.
+		async onSessionDown(event) {
+			await notifySessionDown(event);
 		},
 	};
 }

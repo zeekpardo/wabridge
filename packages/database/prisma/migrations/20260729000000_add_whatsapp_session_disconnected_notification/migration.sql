@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "NotificationType" ADD VALUE 'WHATSAPP_SESSION_DISCONNECTED';

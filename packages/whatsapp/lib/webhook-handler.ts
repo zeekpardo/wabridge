@@ -92,6 +92,25 @@ export interface OpenWaRevokeEvent {
 	waMessageId: string;
 }
 
+/** Why a session stopped being able to send/receive. */
+export type OpenWaSessionDownReason = "disconnected" | "logged_out";
+
+/**
+ * A WhatsApp session transitioned from healthy (`ready`, not awaiting a QR scan)
+ * to unable to deliver — the gateway either dropped the connection or the number
+ * logged out and now needs a fresh QR scan. Fired ONCE per down-episode (on the
+ * healthy→unhealthy edge), so a QR-regeneration storm does not fan out into a
+ * flood of alerts.
+ */
+export interface OpenWaSessionHealthEvent {
+	subaccountId: string;
+	organizationId: string;
+	sessionId: string;
+	/** The session's status after the transition (e.g. the gateway's status, or "disconnected"). */
+	status: string;
+	reason: OpenWaSessionDownReason;
+}
+
 /**
  * Extension points the API layer injects so higher layers (the message hub,
  * CRM sync) can react to webhook events without this package depending on
@@ -117,6 +136,12 @@ export interface OpenWaWebhookHooks {
 	onReaction?(event: OpenWaReactionEvent): Promise<void>;
 	/** Fired for an inbound revoke ("delete for everyone"); must not throw. */
 	onRevoke?(event: OpenWaRevokeEvent): Promise<void>;
+	/**
+	 * Fired once when a session goes from healthy to unable to deliver (a
+	 * disconnect or a logout that needs a new QR scan). Use it to alert operators
+	 * so a silent drop doesn't strand outbound messages. Must not throw.
+	 */
+	onSessionDown?(event: OpenWaSessionHealthEvent): Promise<void>;
 }
 
 /**
@@ -158,7 +183,16 @@ export async function webhookHandler(req: Request, hooks?: OpenWaWebhookHooks): 
 	}
 
 	try {
-		await processEvent(row.id, row.subaccountId, row.organizationId, payload, hooks);
+		await processEvent(
+			row.id,
+			row.subaccountId,
+			row.organizationId,
+			// The pre-update session state, so a session-event handler can detect a
+			// healthy→unhealthy edge and alert exactly once.
+			{ status: row.status, needsQr: row.needsQr },
+			payload,
+			hooks,
+		);
 	} catch (error) {
 		logger.error(error, { ctx: "whatsapp.webhook.process", event: payload.event });
 		return new Response("Processing error.", { status: 500 });
@@ -171,6 +205,7 @@ async function processEvent(
 	sessionId: string,
 	subaccountId: string,
 	organizationId: string,
+	previous: { status: string; needsQr: boolean },
 	payload: ReturnType<typeof parseOpenWaWebhookPayload>,
 	hooks?: OpenWaWebhookHooks,
 ): Promise<void> {
@@ -345,24 +380,67 @@ async function processEvent(
 		case OPENWA_WEBHOOK_EVENTS.sessionAuthenticated:
 		case OPENWA_WEBHOOK_EVENTS.sessionDisconnected: {
 			const status = typeof data.status === "string" ? data.status : undefined;
+			const authenticated = payload.event === OPENWA_WEBHOOK_EVENTS.sessionAuthenticated;
 			await updateWhatsAppSession(subaccountId, sessionId, {
 				...(status ? { status } : {}),
-				...(payload.event === OPENWA_WEBHOOK_EVENTS.sessionAuthenticated
-					? { needsQr: false, connectedAt: new Date() }
-					: {}),
+				...(authenticated ? { needsQr: false, connectedAt: new Date() } : {}),
 				...(typeof data.phone === "string" ? { phone: data.phone } : {}),
 				...(typeof data.jid === "string" ? { jid: data.jid } : {}),
 			});
+			// Alert on the healthy→down edge. Only sessionAuthenticated clears
+			// needsQr; the others leave it as-is, so the next state is the new status
+			// (or the prior one) plus the unchanged QR flag.
+			await alertIfSessionWentDown(
+				hooks,
+				{ subaccountId, organizationId, sessionId },
+				previous,
+				{ status: status ?? previous.status, needsQr: authenticated ? false : previous.needsQr },
+				"disconnected",
+			);
 			break;
 		}
 		case OPENWA_WEBHOOK_EVENTS.sessionQr: {
 			await updateWhatsAppSession(subaccountId, sessionId, { needsQr: true });
+			// A fresh QR means the number logged out and must be re-scanned.
+			await alertIfSessionWentDown(
+				hooks,
+				{ subaccountId, organizationId, sessionId },
+				previous,
+				{ status: previous.status, needsQr: true },
+				"logged_out",
+			);
 			break;
 		}
 		default:
 			// Any unhandled event types are acknowledged as no-ops.
 			break;
 	}
+}
+
+/**
+ * Fire {@link OpenWaWebhookHooks.onSessionDown} only on the healthy→unhealthy
+ * edge. "Healthy" is `status === "ready"` with no pending QR scan; anything else
+ * is down. Gating on the edge means a burst of QR-regeneration events (a logged-
+ * out number the gateway keeps re-QRing) produces exactly one alert — the first
+ * event flips the persisted state, so every later event already reads as down.
+ * Best-effort by contract: a hook failure must not fail the webhook.
+ */
+async function alertIfSessionWentDown(
+	hooks: OpenWaWebhookHooks | undefined,
+	ids: { subaccountId: string; organizationId: string; sessionId: string },
+	previous: { status: string; needsQr: boolean },
+	next: { status: string; needsQr: boolean },
+	reason: OpenWaSessionDownReason,
+): Promise<void> {
+	if (!hooks?.onSessionDown) {
+		return;
+	}
+	const wasHealthy = previous.status === "ready" && !previous.needsQr;
+	const healthyNow = next.status === "ready" && !next.needsQr;
+	if (!wasHealthy || healthyNow) {
+		return;
+	}
+	await hooks.onSessionDown({ ...ids, status: next.status, reason });
 }
 
 function parseTimestamp(value: string): Date {

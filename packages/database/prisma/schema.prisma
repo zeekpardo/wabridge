@@ -446,6 +446,7 @@ enum NotificationTarget {
 enum NotificationType {
   WELCOME
   APP_UPDATE
+  WHATSAPP_SESSION_DISCONNECTED
 }
 
 model Notification {
