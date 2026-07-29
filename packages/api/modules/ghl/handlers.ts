@@ -249,10 +249,10 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 	// "failed" back to GHL instead, so the rep sees it and can resend once the
 	// number reconnects. Success statuses still flow later from the WhatsApp ack.
 	if (!session || session.status !== "ready") {
+		const detail = session
+			? `WhatsApp number ${session.phone ?? session.label ?? session.id} is disconnected`
+			: "No connected WhatsApp number";
 		if (ghlMessageId) {
-			const detail = session
-				? `WhatsApp number ${session.phone ?? session.label ?? session.id} is disconnected`
-				: "No connected WhatsApp number";
 			await reportGhlSendFailure(subaccount.id, ghlMessageId, detail);
 		}
 		logger.warn("Provider outbound with no ready WhatsApp session", {
@@ -261,7 +261,9 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			subaccountId: subaccount.id,
 			sessionStatus: session?.status ?? "none",
 		});
-		return new Response("No connected WhatsApp number.", { status: 200 });
+		// Nothing was sent — fail the delivery so GHL surfaces it (and can retry
+		// once the number reconnects) instead of showing a phantom "sent".
+		return deliveryFailed(detail);
 	}
 
 	// No-WhatsApp tag: if configured, verify a real 1:1 recipient is on WhatsApp before sending.
@@ -288,7 +290,7 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			if (ghlMessageId) {
 				await reportGhlSendFailure(subaccount.id, ghlMessageId, "Number not on WhatsApp");
 			}
-			return new Response("Not on WhatsApp.", { status: 200 });
+			return deliveryFailed("Number not on WhatsApp");
 		}
 	}
 
@@ -335,19 +337,24 @@ export async function ghlProviderOutboundHandler(req: Request): Promise<Response
 			},
 			createFanOutDeps(),
 		);
-		// No WhatsApp message id and not a redelivery → the send didn't happen
-		// (e.g. no connected number). Tell GHL so the rep sees "failed" instead of
-		// an eternally-pending SMS. Success statuses flow later from the WA ack.
-		if (!result.deduped && !result.waMessageId && ghlMessageId) {
-			await reportGhlSendFailure(subaccount.id, ghlMessageId, "No connected WhatsApp number");
+		// No WhatsApp message id → the send never left the gateway. Fail the
+		// delivery so GHL marks it failed + offers retry, instead of an eternally
+		// "sent" SMS. A deduped row with no waMessageId is still an unsent message,
+		// so this also covers GHL retrying the same message; a genuine prior send
+		// carries a waMessageId and returns OK below. Success statuses flow later
+		// from the WhatsApp ack.
+		if (!result.waMessageId) {
+			if (ghlMessageId) {
+				await reportGhlSendFailure(subaccount.id, ghlMessageId, "No connected WhatsApp number");
+			}
+			return deliveryFailed("No connected WhatsApp number");
 		}
 	} catch (error) {
 		logger.error(error, { ctx: "ghl.provider.outbound", locationId });
 		if (ghlMessageId) {
 			await reportGhlSendFailure(subaccount.id, ghlMessageId, "WhatsApp delivery failed");
 		}
-		// Acknowledge: we reported the failure; a retry would double-send later.
-		return new Response("Delivery failed.", { status: 200 });
+		return deliveryFailed("WhatsApp delivery failed");
 	}
 
 	return new Response("OK", { status: 200 });
@@ -402,7 +409,27 @@ async function resolveOutboundSession(
 	return getDefaultSession(subaccount.id);
 }
 
-/** Best-effort "failed" status back to GHL for an SMS we couldn't deliver. */
+/**
+ * Non-2xx Delivery-URL response for an outbound we could not deliver. This is the
+ * reliable way to tell GHL the message failed: GHL marks it failed and shows the
+ * error + retry option in the conversation. The status-update API cannot do this
+ * for the SMS-replace (Option B) provider — those messages have no
+ * conversationProviderId, so GHL rejects the update with 403
+ * CONVERSATIONS_MSG_PROVIDER_NOT_FOUND — so the response code is the source of
+ * truth. 422 signals "understood but undeliverable"; adjust here if GHL's
+ * retry/redeliver behavior needs tuning (e.g. a 4xx that halts auto-retry).
+ */
+function deliveryFailed(detail: string): Response {
+	return Response.json({ status: "failed", error: detail }, { status: 422 });
+}
+
+/**
+ * Best-effort "failed" status back to GHL via the status API. Works for a real
+ * conversation provider (Option A); for the SMS-replace provider it 403s
+ * (CONVERSATIONS_MSG_PROVIDER_NOT_FOUND) because the message has no provider — the
+ * {@link deliveryFailed} response is what actually surfaces the failure there, so
+ * that expected 403 is logged as info, not error.
+ */
 async function reportGhlSendFailure(
 	subaccountId: string,
 	ghlMessageId: string,
@@ -415,6 +442,16 @@ async function reportGhlSendFailure(
 		}
 		await client.updateMessageStatus({ messageId: ghlMessageId, status: "failed", error: detail });
 	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (message.includes("CONVERSATIONS_MSG_PROVIDER_NOT_FOUND")) {
+			// Expected for the SMS-replace provider — the Delivery-URL response carries
+			// the failure signal instead. Not an error.
+			logger.info("GHL status update skipped (no conversation provider)", {
+				ctx: "ghl.provider.outbound.status",
+				ghlMessageId,
+			});
+			return;
+		}
 		logger.error(error, { ctx: "ghl.provider.outbound.status", ghlMessageId });
 	}
 }
